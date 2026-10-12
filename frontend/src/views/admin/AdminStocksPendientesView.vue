@@ -18,13 +18,13 @@
             <input v-model.number="umbralValor" type="number" min="1" max="9999" class="stk__umbral-input" />
             <span class="stk__umbral-unit">g</span>
             <button class="stk__umbral-save" :disabled="umbralSaving" @click="guardarUmbral">
-              {{ umbralSaving ? '…' : '✓' }}
+              <i class="bi" :class="umbralSaving ? 'bi-hourglass-split' : 'bi-check-lg'" aria-hidden="true"></i><span class="visually-hidden">Guardar</span>
             </button>
-            <button class="stk__umbral-cancel" @click="umbralEditing = false">✕</button>
+            <button class="stk__umbral-cancel" aria-label="Cancelar" @click="umbralEditing = false"><i class="bi bi-x-lg"></i></button>
           </template>
           <template v-else>
             <span class="stk__umbral-val">{{ umbralValor }}g</span>
-            <button class="stk__umbral-edit" @click="umbralEditing = true" title="Editar umbral">✏️</button>
+            <button class="stk__umbral-edit" @click="umbralEditing = true" title="Editar umbral" aria-label="Editar umbral"><i class="bi bi-pencil"></i></button>
           </template>
         </div>
         <!-- El stock externo se compra para dispensar: en uso personal no hay a quién. -->
@@ -40,58 +40,8 @@
 
     <template v-else>
 
-      <!-- ── KPIs ───────────────────────────────────────────────── -->
-      <div class="stk__kpis">
-        <div class="stk__kpi">
-          <div class="stk__kpi-ico">📦</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ totalG }}<span class="stk__kpi-unit">g</span></div>
-            <div class="stk__kpi-lbl">Flor seca disponible</div>
-          </div>
-        </div>
-        <div v-if="Number(reservadoG) > 0" class="stk__kpi">
-          <div class="stk__kpi-ico">🔖</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ reservadoG }}<span class="stk__kpi-unit">g</span></div>
-            <div class="stk__kpi-lbl">Reservado (flor)</div>
-          </div>
-        </div>
-        <div v-if="!esPersonal" class="stk__kpi" :class="{ 'stk__kpi--warn': pendientes.length > 0 }">
-          <div class="stk__kpi-ico">⏳</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ pendientes.length }}</div>
-            <div class="stk__kpi-lbl">Por asignar</div>
-          </div>
-        </div>
-        <div v-if="!esPersonal" class="stk__kpi">
-          <div class="stk__kpi-ico">🏪</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ sedesConStock }}</div>
-            <div class="stk__kpi-lbl">Sedes con stock</div>
-          </div>
-        </div>
-        <div class="stk__kpi">
-          <div class="stk__kpi-ico">🚬</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ derivadosItems }}</div>
-            <div class="stk__kpi-lbl">Derivados</div>
-          </div>
-        </div>
-        <div v-if="stocksVencidos > 0" class="stk__kpi stk__kpi--error">
-          <div class="stk__kpi-ico">🚫</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ stocksVencidos }}</div>
-            <div class="stk__kpi-lbl">Stock vencido</div>
-          </div>
-        </div>
-        <div v-if="stocksPorVencer > 0" class="stk__kpi stk__kpi--warn">
-          <div class="stk__kpi-ico">⚠️</div>
-          <div class="stk__kpi-body">
-            <div class="stk__kpi-val">{{ stocksPorVencer }}</div>
-            <div class="stk__kpi-lbl">Por vencer</div>
-          </div>
-        </div>
-      </div>
+      <!-- ── Resumen por producto (12-oct-2026: reemplaza a las tarjetas) ── -->
+      <ResumenPorProducto :filas="invTotales.por_producto || []" :personal="esPersonal" />
 
       <!-- ── Tabs ───────────────────────────────────────────────── -->
       <div class="stk__tabs">
@@ -112,7 +62,7 @@
       <!-- ── Tab: Por asignar ───────────────────────────────────── -->
       <div v-if="tabActiva === 'por_asignar'">
         <div v-if="!pendientes.length" class="stk__empty">
-          <span class="stk__empty-ico">✅</span>
+          <i class="bi bi-check2-circle stk__empty-ico" aria-hidden="true"></i>
           <p class="stk__empty-title">Todo asignado</p>
           <span class="stk__empty-sub">No hay stock pendiente de asignación a sede.</span>
         </div>
@@ -158,7 +108,7 @@
         <!-- Filtro por sede (tabs): toda la organización o una sede puntual. Con una sola
              sede (uso personal) no hay nada que filtrar. -->
         <div v-if="!esPersonal" class="stk__sede-tabs">
-          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">🏢 Toda la organización</button>
+          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">Toda la organización</button>
           <button v-for="s in sedes" :key="s.id" class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === String(s.id) }" @click="invFiltros.sede_id = String(s.id)">
             {{ s.nombre }}
           </button>
@@ -181,7 +131,7 @@
         <div v-if="loadingInv" class="stk__loading"><DsSpinner /></div>
 
         <div v-else-if="!inventario.length" class="stk__empty">
-          <span class="stk__empty-ico">📭</span>
+          <i class="bi bi-inbox stk__empty-ico" aria-hidden="true"></i>
           <p class="stk__empty-title">Sin stock para este filtro</p>
           <span class="stk__empty-sub">{{ esPersonal ? 'Cuando peses una cosecha, aparece acá.' : 'Ajustá los filtros o agregá stock externo.' }}</span>
           <button v-if="!esPersonal" class="stk__btn-outline stk__empty-cta" @click="openCrear">
@@ -239,7 +189,7 @@
             >{{ f.label }}</button>
           </div>
           <div v-if="!historialFiltrado.length" class="stk__empty">
-            <span class="stk__empty-ico">🗂️</span>
+            <i class="bi bi-archive stk__empty-ico" aria-hidden="true"></i>
             <p class="stk__empty-title">Sin registros</p>
           </div>
           <div v-else class="stk__hist">
@@ -552,7 +502,7 @@
                 </div>
               </div>
               <div v-if="mermaG > 0" class="stk__merma">
-                <span class="stk__merma-ico">⚠️</span>
+                <i class="bi bi-exclamation-triangle stk__merma-ico" aria-hidden="true"></i>
                 <span class="stk__merma-txt">Merma: <strong>{{ mermaG }}g ({{ mermaPct }}%)</strong></span>
               </div>
             </div>
@@ -709,7 +659,7 @@
             <div class="stk__modal-body stk__modal-body--scroll">
               <div v-if="loadingMovimientos" class="stk__loading"><DsSpinner /></div>
               <div v-else-if="!movimientos.length" class="stk__empty">
-                <span class="stk__empty-ico">📋</span>
+                <i class="bi bi-clock-history stk__empty-ico" aria-hidden="true"></i>
                 <p class="stk__empty-title">Sin movimientos registrados</p>
                 <span class="stk__empty-sub">Las operaciones futuras quedarán registradas aquí.</span>
               </div>
@@ -746,6 +696,7 @@ import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import Paginator from '../../components/ui/Paginator.vue'
 import TablaInventarioStock from '../../components/stock/TablaInventarioStock.vue'
+import ResumenPorProducto from '../../components/stock/ResumenPorProducto.vue'
 import {
   listStocksPendientes, listStocksHistorial, listStockInventario,
   asignarStock, ajustarStock, descartarStock, getStockMovimientos, listStocksVacios,
@@ -816,11 +767,11 @@ const tabActiva = ref(esPersonal.value ? 'inventario' : 'por_asignar')
 watch(esPersonal, (p) => { if (p && tabActiva.value === 'por_asignar') tabActiva.value = 'inventario' })
 // En uso personal no hay «por asignar»: el frasco nace en su casa, que es la única sede.
 const TABS = computed(() => [
-  ...(esPersonal.value ? [] : [{ key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length }]),
-  { key: 'inventario',  label: '📦 Inventario',  count: invTotal.value },
+  ...(esPersonal.value ? [] : [{ key: 'por_asignar', label: 'Por asignar', count: pendientes.value.length }]),
+  { key: 'inventario',  label: 'Inventario',  count: invTotal.value },
   // Sólo si hay: frascos que quedaron abiertos en 0 g al dispensar lo último sin cerrarlos.
-  ...(vacios.value.length ? [{ key: 'vacios', label: '🫙 Vacíos', count: vacios.value.length }] : []),
-  { key: 'historial',   label: '📋 Historial',   count: null },
+  ...(vacios.value.length ? [{ key: 'vacios', label: 'Vacíos', count: vacios.value.length }] : []),
+  { key: 'historial',   label: 'Historial',   count: null },
 ])
 
 watch(tabActiva, async (val) => {
@@ -910,13 +861,7 @@ async function guardarUmbral() {
   }
 }
 
-// ── KPIs ── (sobre el set FILTRADO del inventario; vienen del server en `invTotales`)
-const totalG          = computed(() => (invTotales.value.total_g || 0).toFixed(1))
-const derivadosItems  = computed(() => invTotales.value.derivados_items || 0)
-const reservadoG      = computed(() => (invTotales.value.reservado_g || 0).toFixed(1))
-const sedesConStock   = computed(() => invTotales.value.sedes_con_stock || 0)
-const stocksVencidos  = computed(() => invTotales.value.vencidos || 0)
-const stocksPorVencer = computed(() => invTotales.value.por_vencer || 0)
+// ── Totales del inventario ── (vienen del server en `invTotales`; el resumen por producto incluido)
 
 // ── Inventario (tabla paginada + filtros server-side) ────────────────────────────
 const loadingInv  = ref(false)
@@ -1510,25 +1455,6 @@ function formatDate(dateStr) {
   cursor: pointer; transition: all .15s;
 }
 .stk__btn-outline:hover { background: #f0fdf4; }
-
-/* ── KPIs ───────────────────────────────────────────────────────────────────── */
-.stk__kpis {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: .875rem; margin-bottom: 1.75rem;
-}
-@media (max-width: 700px) { .stk__kpis { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 400px) { .stk__kpis { grid-template-columns: 1fr; } }
-.stk__kpi {
-  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px;
-  padding: 1rem 1.1rem; display: flex; align-items: flex-start; gap: .65rem;
-  transition: box-shadow .15s;
-}
-.stk__kpi:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-.stk__kpi--warn { border-color: #fcd34d; background: #fffbeb; }
-.stk__kpi-ico  { font-size: 1.35rem; flex-shrink: 0; margin-top: .05rem; }
-.stk__kpi-val  { font-size: 1.75rem; font-weight: 800; line-height: 1; letter-spacing: -.04em; color: var(--c-slate-900); margin-bottom: .1rem; }
-.stk__kpi-unit { font-size: 1rem; font-weight: 500; color: var(--c-slate-400); margin-left: 2px; }
-.stk__kpi-lbl  { font-size: .68rem; font-weight: 600; color: var(--c-slate-500); text-transform: uppercase; letter-spacing: .05em; }
 
 /* ── Tabs ───────────────────────────────────────────────────────────────────── */
 .stk__tabs { display: flex; gap: .35rem; margin-bottom: 1.25rem; flex-wrap: wrap; }

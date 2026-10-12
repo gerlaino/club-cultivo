@@ -2,7 +2,7 @@ class ClubUsersController < ApplicationController
   include CambioDeRol
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :auditorias, :recibir_caja]
+  before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :auditorias, :recibir_caja, :cambio_de_rol]
 
   # GET /usuarios
   def index
@@ -30,6 +30,33 @@ class ClubUsersController < ApplicationController
     render json: { data: users.map { |u|
       usuario_json(u)
     } }
+  end
+
+  # GET /usuarios/actividad
+  #
+  # Lo que la lista de Equipo muestra al lado de cada persona y el cupo del plan por rol. La
+  # actividad sale de la misma cuenta que el panel de conducción (`Equipo::Actividad`).
+  def actividad
+    club = current_user.club
+    act  = Equipo::Actividad.new(club: club)
+    users = User.where(club_id: club.id).del_equipo.where.not(role: 'paciente').select(:id, :visto_at)
+    enforcer = PlanEnforcer.new(club)
+    tope = enforcer.tope_por_rol
+    roles = club.roles_para_alta - PlanEnforcer::ROLES_SIN_TOPE
+    # Sin sedes asignadas, la persona ve toda la organización (la pantalla lo dice así).
+    sedes = UserSede.joins(:sede).where(user_id: users.map(&:id)).order('sedes.nombre')
+                    .pluck(:user_id, 'sedes.nombre').group_by(&:first).transform_values { |v| v.map(&:last) }
+    render json: {
+      personas: users.to_h do |u|
+        a = act.por_usuario[u.id] || { actividad: [], alertas: [] }
+        [u.id, a.merge(horas_mes: act.horas_mes[u.id], ultimo_acceso: u.visto_at, sedes: sedes[u.id] || [])]
+      end,
+      cupo: {
+        plan: enforcer.info[:label],
+        tope_por_rol: tope,
+        por_rol: roles.map { |r| { rol: r, label: Club::ROLES_META.dig(r, :label) || r, usados: enforcer.usuarios_de_rol(r), tope: tope } },
+      },
+    }
   end
 
   # GET /usuarios/:id
@@ -98,17 +125,26 @@ class ClubUsersController < ApplicationController
 
   # PUT/PATCH /usuarios/:id
   def update
-    # Cambiar el rol pasa por las mismas puertas que crearlo (ver `CambioDeRol`).
-    if (rechazo = rechazo_cambio_de_rol(current_user.club, @user, params.dig(:user, :role)))
-      status, payload = rechazo
-      return render json: payload, status: status
+    # Cambiar el rol es un trámite entero (`Acceso::CambiarRol`): las mismas puertas que el alta,
+    # más lo que no se puede dejar colgado, la limpieza de lo que deja de tener sentido y el aviso
+    # a su sesión abierta. Lo demás (nombre, correo) va por el update de siempre.
+    nuevo_rol = params.dig(:user, :role)
+    User.transaction do
+      @user.assign_attributes(user_params.except(:role))
+      @user.save!
+      Acceso::CambiarRol.new(user: @user, nuevo_rol: nuevo_rol, por: current_user, sede_ids: params.dig(:user, :sede_ids)).call!
     end
+    render json: { data: usuario_json(@user.reload) }
+  rescue Acceso::CambiarRol::Bloqueado => e
+    render json: { errors: [e.message] }, status: e.status
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
 
-    if @user.update(user_params)
-      render json: { data: usuario_json(@user) }
-    else
-      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
-    end
+  # GET /usuarios/:id/cambio_de_rol?rol=… — lo que bloquea y lo que cambia, para la confirmación.
+  def cambio_de_rol
+    render json: Acceso::CambiarRol.new(user: @user, nuevo_rol: params[:rol], por: current_user,
+                                        sede_ids: params[:sede_ids]).efectos
   end
 
   # DELETE /usuarios/:id

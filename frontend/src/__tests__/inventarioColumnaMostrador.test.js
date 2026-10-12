@@ -33,6 +33,7 @@ vi.mock('../lib/api.js', () => ({
     stocks: [FILA],
     meta: { total: 1, page: 1, per_page: 25 },
     totales: { total_g: 18, reservado_g: 0, items: 1, sedes_con_stock: 1,
+      por_producto: [{ forma: 'flor_seca', unidad: 'g', stocks: 1, en_deposito: 0, en_mostrador: 18, comprometido: 0, disponible: 18, dispensa_diaria: 0, alcanza_dias: null, atencion: [] }],
                derivados_items: 0, vencidos: 0, por_vencer: 0 },
   } })),
   asignarStock: vi.fn(), ajustarStock: vi.fn(), descartarStock: vi.fn(),
@@ -59,7 +60,7 @@ async function montar () {
 describe('Inventario: dónde está el producto', () => {
   it('«Actual» muestra lo que se puede entregar, no el frasco menos la mesa', async () => {
     const w = await montar()
-    expect(w.find('.stk__inv-td-actual').text()).toBe('18.0g')
+    expect(w.find('.stk__inv-td-actual').text()).toBe('18 g')
     w.unmount()
   })
 
@@ -75,7 +76,7 @@ describe('Inventario: dónde está el producto', () => {
     const w = await montar()
     const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
     expect(encabezados).toContain('Mostrador')
-    expect(w.findAll('.stk__inv-td-mesa').at(-1).text()).toBe('18.0g')
+    expect(w.findAll('.stk__inv-td-mesa').at(-1).text()).toBe('18 g')
     w.unmount()
   })
 
@@ -86,7 +87,7 @@ describe('Inventario: dónde está el producto', () => {
     const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
     expect(encabezados).toContain('Depósito')
     expect(encabezados).not.toContain('Cantidad inicial')
-    expect(w.find('.stk__inv-td-deposito').text()).toBe('0.0g')
+    expect(w.find('.stk__inv-td-deposito').text()).toBe('0 g')
     w.unmount()
   })
 
@@ -95,13 +96,15 @@ describe('Inventario: dónde está el producto', () => {
     const w = await montar()
     const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
     expect(encabezados.slice(-4)).toEqual(['Depósito', 'Reserva', 'Mostrador', 'Actual'])
-    expect(w.find('.stk__inv-td-reserva').text()).toBe('4.0g')
+    expect(w.find('.stk__inv-td-reserva').text()).toBe('4 g')
     w.unmount()
   })
 
-  it('el KPI de arriba dice lo mismo que la fila', async () => {
+  it('el resumen por producto de arriba dice lo mismo que la fila', async () => {
     const w = await montar()
-    expect(w.text()).toContain('18.0')
+    const flor = w.findAll('.rpp__tabla tbody tr').find(r => r.text().includes('Flor seca'))
+    expect(flor.find('.rpp__disp').text()).toBe('18 g')
+    expect(w.find('.stk__inv-td-actual').text()).toBe('18 g')
     w.unmount()
   })
 })

@@ -1731,6 +1731,14 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 - **REPROCANN declara la población REGISTRADA**: sin los que no iniciaron trámite (se informan
   aparte) y **sin corte por sede — un paciente es del club**, no de una sede.
 - **Producción** separa "del período" de "hoy en el cultivo".
+- **Cambiar el rol pasa por `Acceso::CambiarRol` y nada más** (12-oct-2026): bloquea caja
+  abierta, turnos por venir, despachos, módulo y cupo; limpia sedes de otro tipo, salas y tareas
+  que el rol nuevo no ve; avisa a la sesión abierta, que recarga en su inicio. La confirmación
+  muestra los efectos que devuelve el backend: nunca «revisá vos sus asignaciones». Un efecto nuevo
+  (algo que cuelga del usuario según su rol) se agrega ahí, con su spec.
+- **Una cantidad lleva su unidad, siempre**: «g» sólo para gramos de flor o de un producto en
+  gramos; un preroll es «un». Sumar `dispensaciones.cantidad` mezcla unidades: los gramos de flor
+  salen de las líneas (`dispensacion_items` con stock `flor_seca`).
 - **El inicio del administrador es un panel de conducción** (12-oct-2026, Germán): responde qué
   requiere atención, cuánto hay en juego y quién se encarga; no es un catálogo de módulos. Todo
   sale de `Panel::Conduccion`; lo que se cumple va en «Dentro de parámetros» como constancia. Un
@@ -1738,6 +1746,11 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   (lotes, reservas, la caja) vive en su pantalla. **Textos de organizaciones en registro
   profesional de gestión** («Requiere atención», «Saldo esperado/declarado», «Responsable:»,
   «Marcar como revisado»); nunca «ciclo».
+- **Dónde está la plata y qué hizo el equipo se calcula en un solo lugar** (12-oct-2026):
+  `Contabilidad::Posicion` (efectivo en cajas, delivery sin rendir, por cobrar y su antigüedad
+  FIFO) y `Equipo::Actividad` (hoy / pendiente por persona). Panel de conducción, Contabilidad y
+  Equipo los leen; no se recalculan en otra pantalla. «Alcanza para» de Stock y «cobertura» del
+  panel usan la misma ventana de 28 días.
 - **Un número con el mismo nombre es el mismo número en todas las pantallas** (12-oct-2026,
   Mitocondria: Stock 2.865 g, informe 3.843 g). «Flor seca disponible» sale SÓLO de
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes

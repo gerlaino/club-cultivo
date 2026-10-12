@@ -58,16 +58,23 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
 
   def update
     user = User.find(params[:id])
-    # Mismas puertas que el alta para cambiar el rol (ver `CambioDeRol`).
-    if user.club && (rechazo = rechazo_cambio_de_rol(user.club, user, params.dig(:user, :role)))
-      status, payload = rechazo
-      return render json: payload, status: status
+    # El cambio de rol es el mismo trámite que en Equipo (`Acceso::CambiarRol`).
+    nuevo_rol = params.dig(:user, :role)
+    attrs = user_params_update
+    User.transaction do
+      if user.club
+        user.assign_attributes(attrs.except(:role))
+        user.save!
+        Acceso::CambiarRol.new(user: user, nuevo_rol: nuevo_rol, por: current_user).call!
+      else
+        user.update!(attrs)
+      end
     end
-    if user.update(user_params_update)
-      render json: serialize_user(user)
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
+    render json: serialize_user(user.reload)
+  rescue Acceso::CambiarRol::Bloqueado => e
+    render json: { errors: [e.message] }, status: e.status
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   # POST /super_admin/users/:id/reset_password — "perdí la contraseña del admin".

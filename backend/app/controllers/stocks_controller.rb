@@ -197,6 +197,14 @@ class StocksController < ApplicationController
                     .offset((page - 1) * per).limit(per)
              end
 
+    # El resumen por producto mira el inventario de ahora: la sede sí, las fechas y la forma no.
+    ambito = Stock.where(club_id: current_user.club_id)
+    ambito = ambito.where(sede_id: current_user.sedes_visibles_ids + [nil]) if current_user.limitado_por_sede?
+    if params[:sede_id].present?
+      ambito = params[:sede_id] == 'pool' ? ambito.where(sede_id: nil) : ambito.where(sede_id: params[:sede_id])
+    end
+    totales[:por_producto] = Stocks::ResumenPorProducto.new(club: current_user.club, ambito: ambito, hoy: hoy).call
+
     render json: {
       stocks:  serializar_lista(stocks),
       meta:    { total: totales[:items], page: page, per_page: per },

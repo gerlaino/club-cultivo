@@ -1,6 +1,8 @@
 <script setup>
 import { watch, onMounted, computed, ref } from "vue";
 import { logger } from './utils/logger.js'
+import { useToast } from './composables/useToast.js'
+import { rolInfo } from './lib/roles.js'
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useClubStore } from "./stores/club";
@@ -43,6 +45,7 @@ import DeliverySidebar        from "./components/layout/DeliverySidebar.vue";
 import DeliveryTopBar         from "./components/layout/DeliveryTopBar.vue";
 
 const auth   = useAuthStore();
+const toast  = useToast();
 const club   = useClubStore();
 const salas  = useSalasStore();
 const lotes  = useLotesStore();
@@ -184,6 +187,13 @@ watch(
 
 onMounted(async () => {
   await auth.ensureBootstrapped();
+  // Volvió de una recarga porque administración le cambió el rol (ver `cambiosStores.js`).
+  try {
+    if (sessionStorage.getItem('aviso_rol') && auth.user) {
+      sessionStorage.removeItem('aviso_rol');
+      toast.info(`Administración cambió tu rol: ahora sos ${rolInfo(auth.user.role).label}. Tu menú y tus pantallas son las de ese rol.`, { timeout: 9000 });
+    }
+  } catch { /* sin almacenamiento: no hay aviso que mostrar */ }
   if (auth.isAuthenticated && !club.data && auth.user?.role !== 'super_admin') {
     await club.fetch();
     await fetchPlan();

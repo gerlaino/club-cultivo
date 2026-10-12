@@ -12,7 +12,7 @@ import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword, saldarACuenta } from '../lib/api.js'
+import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, getCambioDeRol, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword, saldarACuenta } from '../lib/api.js'
 import { ROLES as ROLES_DS, rolesParaAlta, rolInfo, rolColor, rolBg } from '../lib/roles.js'
 import { useClubStore } from '../stores/club.js'
 
@@ -57,8 +57,6 @@ const ROLES = computed(() => {
   return actual && !ofrecidos.includes(actual) ? [actual, ...ofrecidos] : ofrecidos
 })
 const PERMISOS  = Object.fromEntries(ROLES_DS.map(r => [r.value, r.permisos || []]))
-const SEDE_HINTS = Object.fromEntries(
-  ROLES_DS.filter(r => r.sedes).map(r => [r.value, r.sedes.hint]))
 
 
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
@@ -132,19 +130,40 @@ const newRole     = ref('')
 function startEditRole() { newRole.value = u.value?.role || ''; editingRole.value = true }
 async function saveRole() {
   if (newRole.value === u.value?.role) { editingRole.value = false; return }
-  // Los permisos cambian en el acto; el historial (dispensas, turnos, cobros, auditoría) queda
-  // con la persona, y la auditoría del usuario guarda quién lo cambió y de qué a qué.
+  // Lo que va a pasar lo dice el backend (`Acceso::CambiarRol#efectos`): qué bloquea —una caja
+  // abierta, turnos por venir, despachos en la calle, el cupo del plan— y qué limpia —sedes de
+  // otro tipo, salas, tareas—. Antes el aviso le pedía al admin que lo revisara él.
+  let efectos
+  try {
+    const { data } = await getCambioDeRol(userId, newRole.value)
+    efectos = data
+  } catch {
+    toast.error('No se pudo verificar el cambio de rol.')
+    return
+  }
+  if (efectos.bloqueos?.length) {
+    await confirm({
+      title: 'No se puede cambiar el rol todavía',
+      message: efectos.bloqueos.join('\n\n'),
+      confirmText: 'Entendido',
+      variant: 'warning',
+      soloAceptar: true,
+    })
+    return
+  }
   const ok = await confirm({
-    title: 'Cambiar rol',
-    message: `${u.value?.first_name} pasa de ${roleInfo(u.value?.role).label} a ${roleInfo(newRole.value).label}. Sus permisos cambian ahora mismo; lo que hizo hasta hoy queda registrado a su nombre. Revisá sus sedes y salas asignadas por si ya no tienen sentido.`,
+    title: `Cambiar el rol de ${u.value?.first_name}`,
+    message: efectos.cambios.map(c => `· ${c}`).join('\n'),
     confirmText: 'Cambiar rol',
+    variant: 'warning',
   })
   if (!ok) return
   try {
     await store.update(userId, { role: newRole.value })
     editingRole.value = false
+    await store.fetchOne(userId)   // las sedes, salas y tarjetas del rol nuevo
     toast.success('Rol actualizado.')
-  } catch { toast.error(store.error || 'No se pudo actualizar el rol.') }
+  } catch (e) { toast.error(e?.response?.data?.errors?.[0] || store.error || 'No se pudo actualizar el rol.') }
 }
 
 async function doDelete() {
@@ -754,7 +773,7 @@ onMounted(async () => {
               <span class="ud__card-title">Sedes y salas</span>
             </div>
             <div class="ud__card-body ud__sedes-salas">
-              <UsuarioSedesYSalas :user-id="userId" :user-role="u.role" />
+              <UsuarioSedesYSalas :key="u.role" :user-id="userId" :user-role="u.role" />
             </div>
           </div>
 
@@ -841,7 +860,7 @@ onMounted(async () => {
               <span class="ud__card-title">Sedes</span>
             </div>
             <div class="ud__card-body">
-              <UsuarioSedesManager :user-id="userId" :user-role="u.role" />
+              <UsuarioSedesManager :key="u.role" :user-id="userId" :user-role="u.role" />
               <p v-if="u.role === 'supervisor'" class="ud__sede-note ud__sede-note--warn">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 Requiere al menos una sede asignada para operar.

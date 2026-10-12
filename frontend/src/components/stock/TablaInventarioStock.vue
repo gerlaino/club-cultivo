@@ -78,6 +78,9 @@ function ordenar (campo) {
 function formatDate (dateStr) {
   return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
+
+// «1.000 g» y «100 un», como el resumen de arriba: separador de miles, sin «.0» de más.
+const cant = (n, u) => `${Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${u || 'g'}`
 </script>
 
 <template>
@@ -138,26 +141,26 @@ function formatDate (dateStr) {
           <!-- En uso personal no hay mesa: todo está guardado, y lo que se mira es cuánto
                entró contra cuánto queda. -->
           <td v-if="esPersonal" class="stk__inv-num stk__inv-td-cosechado">
-            {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
+            {{ s.cantidad_inicial != null ? cant(s.cantidad_inicial, s.unidad) : '—' }}
           </td>
           <!-- DÓNDE ESTÁ CADA GRAMO: Depósito + Mostrador = lo que hay. «Depósito» NO es la
                cantidad inicial —eso es lo que entró y no baja nunca—: es el frasco menos la
                mesa, y lo calcula el backend. La reserva sale de la mesa, así que está ADENTRO
                de Mostrador; va al lado para que se lea qué parte de la mesa ya tiene dueño. -->
           <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa stk__inv-td-deposito" :class="{ 'stk__inv-td-mesa--cero': !s.en_deposito_g }">
-            {{ (s.en_deposito_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
+            {{ cant(s.en_deposito_g, s.unidad) }}
           </td>
           <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa stk__inv-td-reserva" :class="{ 'stk__inv-td-mesa--cero': !s.reservado }">
-            {{ (s.reservado || 0).toFixed(1) }}{{ s.unidad || 'g' }}
+            {{ cant(s.reservado, s.unidad) }}
           </td>
           <!-- DÓNDE ESTÁ EL PRODUCTO, que es otra pregunta que cuánto hay. Siempre, y
                también en cero apagado: un número que aparece de la nada el día que alguien
                carga la mesa no se aprende a mirar. -->
           <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
-            {{ (s.en_mostrador_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
+            {{ cant(s.en_mostrador_g, s.unidad) }}
           </td>
           <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && umbral != null && disponible(s) < umbral }">
-            {{ disponible(s).toFixed(1) }}{{ s.unidad || 'g' }}
+            {{ cant(disponible(s), s.unidad) }}
           </td>
         </tr>
       </tbody>

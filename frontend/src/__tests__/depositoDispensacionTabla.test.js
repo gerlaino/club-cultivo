@@ -51,9 +51,9 @@ describe('Depósito › Dispensación: la misma tabla que Stock', () => {
   // también, pero se muestra lo que manda el servidor).
   it('las cantidades salen de la fila que manda el backend', async () => {
     const w = await montar()
-    expect(w.find('.stk__inv-td-deposito').text()).toBe('22.0g')
-    expect(w.find('.stk__inv-td-reserva').text()).toBe('4.0g')
-    expect(w.find('.stk__inv-td-actual').text()).toBe('60.0g')
+    expect(w.find('.stk__inv-td-deposito').text()).toBe('22 g')
+    expect(w.find('.stk__inv-td-reserva').text()).toBe('4 g')
+    expect(w.find('.stk__inv-td-actual').text()).toBe('60 g')
     w.unmount()
   })
 

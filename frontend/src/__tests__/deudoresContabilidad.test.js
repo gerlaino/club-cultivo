@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-// AC (Germán, 16-sep-2026): el KPI «Por cobrar» lleva a la solapa Deudores, con la lista completa
+// AC (Germán, 16-sep-2026): el KPI «Por cobrar» lleva a la solapa Deudores (desde el 12-oct, la
+// tarjeta «Cuentas por cobrar» del resumen, con su «Ver deudores»), con la lista completa
 // de pacientes con cuenta corriente, ordenable por mayor deudor y con buscador por paciente.
 const CUENTAS = {
   total_deuda: 21500, deudores: 2,
@@ -58,9 +59,9 @@ function nombres (w) {
 describe('Contabilidad → Deudores', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('el KPI «Por cobrar» lleva a la solapa, con la lista mayor deudor primero', async () => {
+  it('«Cuentas por cobrar» lleva a la solapa, con la lista mayor deudor primero', async () => {
     const w = await montar()
-    await w.find('.cv__kpi--link').trigger('click')
+    await w.findAll('button').find(b => b.text() === 'Ver deudores').trigger('click')
     await flushPromises()
 
     expect(listCuentasCorrientes).toHaveBeenCalled()

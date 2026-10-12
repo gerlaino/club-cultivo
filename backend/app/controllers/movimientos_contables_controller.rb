@@ -10,6 +10,9 @@ class MovimientosContablesController < ApplicationController
   # y no saldan nada.
   MEDIOS_DE_PAGO_REAL = %w[efectivo transferencia mercado_pago].freeze
 
+  # Los movimientos del resumen: un pantallazo, no el libro (que está paginado en su solapa).
+  ULTIMOS_MOVIMIENTOS = 20
+
   # GET /movimientos_contables
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
   def index
@@ -51,6 +54,10 @@ class MovimientosContablesController < ApplicationController
 
     mes_actual  = scope.del_mes(hoy)
     mes_ant     = scope.del_mes(hoy - 1.month)
+    ant_desde   = (hoy - 1.month).beginning_of_month
+    ant_hasta   = [ant_desde + (hoy.day - 1), ant_desde.end_of_month].min
+    mes_ant_fecha = scope.del_periodo(ant_desde, ant_hasta)
+    posicion    = Contabilidad::Posicion.new(club: club, sede_id: params[:sede_id], hoy: hoy).call
     anio_actual = scope.del_periodo(hoy.beginning_of_year, hoy)
 
     # Desglose por sede (siempre, para el breakdown comparativo)
@@ -120,16 +127,32 @@ class MovimientosContablesController < ApplicationController
       por_sede:            por_sede,
       # P&L por unidad de negocio del mes en curso (eje analítico ortogonal a la sede)
       por_unidad:          resumen_por_unidad(mes_actual),
-      # Deuda real de socios = saldos negativos de cuentas corrientes (caja con deuda visible)
-      por_cobrar:          CuentaCorriente.where(club_id: club.id)
-                                          .where('saldo_disponible < 0')
-                                          .sum('-saldo_disponible').to_f,
+      # Deuda real de pacientes = saldos negativos de cuentas corrientes. Misma cuenta que el panel
+      # de conducción (`Contabilidad::Posicion`), que además dice dónde está la plata y la
+      # antigüedad de lo que se debe.
+      por_cobrar:          posicion[:por_cobrar_ars],
+      posicion:            posicion,
+      # El mes pasado HASTA EL MISMO DÍA: comparar el mes en curso contra un mes entero lo haría
+      # siempre «peor» hasta el día 30. Es el mismo tramo que usa el panel.
+      mes_anterior_a_la_fecha: {
+        hasta:    ant_hasta,
+        ingresos: mes_ant_fecha.ingresos.sum(:monto_ars).to_f,
+        egresos:  mes_ant_fecha.egresos.sum(:monto_ars).to_f,
+        balance:  (mes_ant_fecha.ingresos.sum(:monto_ars) - mes_ant_fecha.egresos.sum(:monto_ars)).to_f,
+      },
+      ultimos_12_meses:    resumen_12_meses(scope, hoy),
+      # Cierres de caja del mes que se va a cerrar que nadie revisó: no bloquean el cierre, pero
+      # la pantalla lo avisa antes (igual que los envíos en la calle).
+      cierres_sin_revisar_al_cierre: TurnoMostrador.cerrados
+                                                   .where(club_id: club.id, revisado_at: nil)
+                                                   .where(cerrado_at: (hoy - 1.month).beginning_of_month.beginning_of_day..(hoy - 1.month).end_of_month.end_of_day)
+                                                   .count,
       contabilidad_cerrada_hasta: club.contabilidad_cerrada_hasta,
       # Paquetes del mes anterior (lo que cierra el botón "Cerrar hasta…") que todavía están en
       # la calle. No bloquean el cierre —decisión de Germán, sep-2026—: lo que se cobre o se
       # cancele después cae en el período siguiente, y la pantalla lo avisa antes de cerrar.
       envios_en_la_calle_al_cierre: envios_en_la_calle_hasta(club, (hoy - 1.month).end_of_month),
-      ultimos_movimientos: serializar_movimientos(scope.sin_cuotas_futuras.recientes.limit(10)),
+      ultimos_movimientos: serializar_movimientos(scope.sin_cuotas_futuras.recientes.limit(ULTIMOS_MOVIMIENTOS)),
     }
   end
 
@@ -884,7 +907,11 @@ class MovimientosContablesController < ApplicationController
                             .where(id: scope.distinct.pluck(:categoria_contable_id).compact)
                             .index_by(&:id)
 
-    scope.group(:categoria_contable_id, :categoria, :tipo)
+    # Lo que se lista por categoría tiene que sumar lo mismo que el «Ingresos» y el «Egresos» de
+    # arriba: el ingreso sin cobrar (dispensa a cuenta corriente) no entra, igual que en el scope
+    # `ingresos`; los ajustes no son ni una cosa ni la otra.
+    scope.where(id: scope.ingresos.select(:id)).or(scope.where(id: scope.egresos.select(:id)))
+         .group(:categoria_contable_id, :categoria, :tipo)
          .sum(:monto_ars)
          .each_with_object(Hash.new(0.0)) do |((cat_id, legacy, tipo), total), acc|
            cat    = cats[cat_id]
@@ -914,6 +941,22 @@ class MovimientosContablesController < ApplicationController
       semana_num += 1
     end
     result
+  end
+
+  # Los últimos doce meses corridos (no el año calendario): en octubre, el gráfico de «este año»
+  # tenía diez barras y en enero una sola. Dos consultas agrupadas, no veinticuatro.
+  def resumen_12_meses(scope, hoy)
+    desde = (hoy - 11.months).beginning_of_month
+    rango = scope.del_periodo(desde, hoy)
+    mes   = Arel.sql("to_char(fecha, 'YYYY-MM')")
+    ing   = rango.ingresos.group(mes).sum(:monto_ars)
+    egr   = rango.egresos.group(mes).sum(:monto_ars)
+    (0..11).map do |i|
+      f = desde + i.months
+      k = f.strftime('%Y-%m')
+      { mes: k, mes_label: I18n.l(f, format: '%b'), ingresos: ing[k].to_f, egresos: egr[k].to_f,
+        balance: (ing[k].to_d - egr[k].to_d).to_f }
+    end
   end
 
   def resumen_por_mes(scope, hoy)

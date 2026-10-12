@@ -435,6 +435,8 @@ Rails.application.routes.draw do
     end
 
     resources :usuarios, controller: :club_users do
+      # Actividad del día, horas del mes y cupo por rol, para la lista de Equipo.
+      collection { get :actividad }
       member do
         post   :reset_password
         get    :salas_asignadas
@@ -446,6 +448,8 @@ Rails.application.routes.draw do
         get    :stats
         get    :auditorias
         post   :recibir_caja
+        # Qué pasa si se le cambia el rol (`Acceso::CambiarRol#efectos`), antes de confirmar.
+        get    :cambio_de_rol
       end
     end
 

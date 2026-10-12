@@ -4,7 +4,7 @@ import { useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from '../stores/club.js'
-import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
+import { listSalas, listSedes, asignarSedeAUsuario, getEquipoActividad } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -24,8 +24,11 @@ const PER_PAGE    = 20
 
 watch(q, () => { currentPage.value = 1 })
 
+// TODA la organización, con quien mira incluido (marcado «vos», sin editarse ni borrarse desde
+// acá). Se escondía, y el encabezado decía «5 miembros» sobre una lista de 4 (12-oct-2026).
+const esYo = (u) => u.id === auth.user?.id
 const filteredUsers = computed(() => {
-  const base = store.items.filter(u => u.id !== auth.user?.id)
+  const base = store.items
   if (!q.value.trim()) return base
   const s = q.value.toLowerCase()
   return base.filter(u =>
@@ -40,7 +43,35 @@ const pagedUsers = computed(() => {
   return filteredUsers.value.slice(start, start + PER_PAGE)
 })
 
-onMounted(() => store.fetch())
+// Qué hizo hoy cada persona, sus horas del mes, lo pendiente y el último acceso, más el cupo del
+// plan por rol (`GET /usuarios/actividad`, la misma cuenta que el panel de conducción).
+const actividad = ref({ personas: {}, cupo: null })
+async function cargarActividad () {
+  try { actividad.value = (await getEquipoActividad()).data || { personas: {}, cupo: null } } catch { /* la lista se ve igual */ }
+}
+const de = (u) => actividad.value.personas?.[u.id] || {}
+const enAdministracion = computed(() => store.items.filter(u => u.role === 'admin').length)
+const cupo = computed(() => actividad.value.cupo)
+
+function ultimoAcceso (iso) {
+  if (!iso) return 'Nunca'
+  const t = new Date(iso)
+  const min = Math.round((Date.now() - t) / 60000)
+  if (min < 5) return 'Ahora'
+  if (min < 60) return `Hace ${min} min`
+  const hora = t.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const hoy = new Date(); const ayer = new Date(Date.now() - 864e5)
+  if (t.toDateString() === hoy.toDateString()) return `Hoy ${hora}`
+  if (t.toDateString() === ayer.toDateString()) return `Ayer ${hora}`
+  const dias = Math.floor((hoy - t) / 864e5)
+  if (dias < 7) return `Hace ${dias} días`
+  return t.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+const horas = (h) => h == null ? '—' : `${Number(h).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`
+
+onMounted(() => { store.fetch(); cargarActividad() })
+// Alguien entró o se fue del equipo (o le cambiaron el rol): el cupo y la actividad cambian.
+watch(() => store.items.map(u => `${u.id}:${u.role}`).join(), (n, v) => { if (v) cargarActividad() })
 
 // ── Roles ─────────────────────────────────────────────────────────────────
 // Sólo los roles que se ofrecen al crear a alguien: supervisor, abogado y auditor quedan fuera
@@ -232,7 +263,7 @@ async function removeOne(u) {
     <div class="uv__header">
       <div class="uv__header-left">
         <h1 class="uv__title">Equipo</h1>
-        <p class="uv__sub">{{ store.items.length }} miembro{{ store.items.length !== 1 ? 's' : '' }} de la organización</p>
+        <p class="uv__sub">{{ store.loading && !store.items.length ? 'Cargando el equipo…' : `${store.items.length} persona${store.items.length !== 1 ? 's' : ''} · ${enAdministracion} en administración y ${store.items.length - enAdministracion} en operación` }}</p>
       </div>
       <div class="uv__header-right">
         <div class="uv__search">
@@ -241,10 +272,24 @@ async function removeOne(u) {
           <span v-if="q" class="uv__search-clear" @click="q = ''"><i class="bi bi-x"></i></span>
         </div>
         <button class="uv__btn-primary" @click="startCreate">
-          <i class="bi bi-plus-lg"></i> Nuevo usuario
+          <i class="bi bi-plus-lg"></i> Incorporar persona
         </button>
       </div>
     </div>
+
+    <!-- Cupo del plan por rol: cuántos hay de cada uno contra el tope -->
+    <section v-if="cupo?.por_rol?.length" class="uv__cupo" aria-label="Cupo por rol">
+      <div class="uv__cupo-hd">
+        <h2 class="uv__cupo-title">Cupo por rol · plan {{ cupo.plan }}</h2>
+        <span class="uv__cupo-sub">{{ cupo.tope_por_rol ? `${cupo.tope_por_rol} personas por rol` : 'Sin tope por rol' }}; administración sin tope</span>
+      </div>
+      <ul class="uv__cupo-lista">
+        <li v-for="r in cupo.por_rol" :key="r.rol" class="uv__cupo-item" :class="{ 'is-lleno': r.tope != null && r.usados >= r.tope }">
+          <span class="uv__cupo-rol">{{ getRoleInfo(r.rol).label || r.label }}</span>
+          <span class="uv__cupo-num">{{ r.usados }}<template v-if="r.tope != null"> / {{ r.tope }}</template></span>
+        </li>
+      </ul>
+    </section>
 
     <!-- Loading -->
     <div v-if="store.loading" class="uv__loading">
@@ -266,10 +311,13 @@ async function removeOne(u) {
       <table class="uv__table">
         <thead>
           <tr>
-            <th>Usuario</th>
-            <th>Rol</th>
-            <th class="uv__col-fecha">Miembro desde</th>
-            <th></th>
+            <th>Persona</th>
+            <th>Rol y sede</th>
+            <th class="uv__col-hoy">Hoy</th>
+            <th class="uv__col-horas">Horas del mes</th>
+            <th class="uv__col-pend">Pendiente</th>
+            <th class="uv__col-acceso">Último acceso</th>
+            <th><span class="visually-hidden">Acciones</span></th>
           </tr>
         </thead>
         <tbody>
@@ -278,7 +326,7 @@ async function removeOne(u) {
               <div class="uv__user-cell">
                 <div class="uv__avatar" :style="{ background: getAvatarColor(u) }">{{ getInitials(u) }}</div>
                 <div>
-                  <div class="uv__cell-name">{{ u.first_name }} {{ u.last_name }}</div>
+                  <div class="uv__cell-name">{{ u.first_name }} {{ u.last_name }}<span v-if="esYo(u)" class="uv__vos"> · vos</span></div>
                   <div class="uv__cell-email">{{ u.email }}</div>
                 </div>
               </div>
@@ -289,12 +337,15 @@ async function removeOne(u) {
                 <i :class="['bi', getRoleInfo(u.role).icon]"></i>
                 {{ getRoleInfo(u.role).label }}<template v-if="getRoleInfo(u.role).suspendido"> · no disponible</template>
               </span>
+              <div v-if="u.role !== 'admin'" class="uv__sedes">{{ de(u).sedes?.length ? de(u).sedes.join(', ') : 'Toda la organización' }}</div>
+              <div v-if="de(u).alertas?.length" class="uv__pend-mob">{{ de(u).alertas.join(' · ') }}</div>
             </td>
-            <td class="uv__col-fecha">
-              <span class="uv__fecha">{{ u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }) : '—' }}</span>
-            </td>
+            <td class="uv__col-hoy uv__muted">{{ de(u).actividad?.length ? de(u).actividad.join(' · ') : 'Sin actividad' }}</td>
+            <td class="uv__col-horas uv__num">{{ horas(de(u).horas_mes) }}</td>
+            <td class="uv__col-pend" :class="de(u).alertas?.length ? 'uv__pend' : 'uv__muted'">{{ de(u).alertas?.length ? de(u).alertas.join(' · ') : '—' }}</td>
+            <td class="uv__col-acceso uv__muted">{{ esYo(u) ? 'Ahora' : ultimoAcceso(de(u).ultimo_acceso) }}</td>
             <td>
-              <div class="uv__row-actions">
+              <div v-if="!esYo(u)" class="uv__row-actions">
                 <button class="uv__row-btn" @click.stop="startEdit(u)" title="Editar datos">
                   <i class="bi bi-pencil"></i>
                 </button>
@@ -309,7 +360,7 @@ async function removeOne(u) {
 
       <div v-if="totalPages > 1" class="uv__pagination">
         <span class="uv__page-info">
-          {{ filteredUsers.length }} usuario{{ filteredUsers.length !== 1 ? 's' : '' }} ·
+          {{ filteredUsers.length }} persona{{ filteredUsers.length !== 1 ? 's' : '' }} ·
           página {{ currentPage }} de {{ totalPages }}
         </span>
         <div class="uv__page-nav">
@@ -323,7 +374,7 @@ async function removeOne(u) {
         </div>
       </div>
       <div v-else class="uv__page-footer">
-        {{ filteredUsers.length }} usuario{{ filteredUsers.length !== 1 ? 's' : '' }}
+        {{ filteredUsers.length }} persona{{ filteredUsers.length !== 1 ? 's' : '' }}
       </div>
     </div>
 
@@ -587,15 +638,30 @@ async function removeOne(u) {
 .uv__cell-name { font-weight: 600; font-size: .875rem; color: var(--c-slate-900); }
 .uv__cell-email { font-size: .75rem; color: #9ca3af; }
 .uv__role-badge { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 700; padding: .2em .6em; border-radius: 5px; border: 1px solid transparent; }
-.uv__col-fecha { width: 140px; }
-.uv__fecha { font-size: .78rem; color: var(--c-slate-400); }
+.uv__col-horas, .uv__col-acceso { white-space: nowrap; }
+td.uv__col-hoy, td.uv__col-pend { min-width: 160px; font-size: .8rem; }
+.uv__pend-mob { display: none; margin-top: 4px; font-size: .74rem; color: var(--c-gold-500); font-weight: 600; }
+.uv__muted { color: var(--c-ink-500); }
+.uv__pend { color: var(--c-gold-500); font-weight: 600; }
+.uv__num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .82rem; }
+.uv__sedes { margin-top: 4px; font-size: .74rem; color: var(--c-ink-500); }
+.uv__cupo { background: white; border: 1px solid var(--c-leaf-100); border-radius: 14px; padding: 14px 18px; margin-bottom: 1.25rem; }
+.uv__cupo-hd { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 10px; }
+.uv__cupo-title { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--c-ink-900); }
+.uv__cupo-sub { font-size: var(--fs-12); color: var(--c-ink-500); }
+.uv__cupo-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.uv__cupo-item { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 999px; background: var(--c-leaf-50); font-size: var(--fs-13); }
+.uv__cupo-item.is-lleno { background: var(--c-amber-100); }
+.uv__cupo-rol { color: var(--c-ink-700); }
+.uv__cupo-num { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); }
 .uv__row-actions { display: flex; align-items: center; gap: .2rem; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
 .uv__table-row:hover .uv__row-actions { opacity: 1; }
 .uv__row-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px; background: none; border: none; color: var(--c-slate-500); cursor: pointer; font-size: .875rem; transition: all .15s; text-decoration: none; }
 .uv__row-btn:hover { background: var(--c-slate-100); color: #1e293b; }
 .uv__row-btn--danger:hover { background: #fef2f2; color: #b91c1c; }
 @media (max-width: 640px) {
-  .uv__col-fecha, .uv__table thead th:nth-child(3), .uv__table td:nth-child(3) { display: none; }
+  .uv__col-hoy, .uv__col-horas, .uv__col-pend, .uv__col-acceso { display: none; }
+  .uv__pend-mob { display: block; }
   .uv__row-actions { opacity: 1; }
 }
 
@@ -708,4 +774,5 @@ async function removeOne(u) {
 .uv__modal-footer { display: flex; justify-content: space-between; gap: .75rem; padding: 1.1rem 1.5rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; }
 
 /* Spinner */
+.uv__vos { font-weight: 400; color: var(--c-ink-500); }
 </style>

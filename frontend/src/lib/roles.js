@@ -10,7 +10,7 @@
 export const ROLES = [
   {
     value: 'admin', label: 'Administrador', icon: 'bi-shield-fill-check',
-    desc: 'Acceso total: todos los módulos, el equipo y la configuración del club.',
+    desc: 'Acceso total: todos los módulos, el equipo y la configuración de la organización.',
     permisos: [
       { ok: true,  label: 'Todos los módulos' },
       { ok: true,  label: 'Equipo y configuración' },
@@ -21,7 +21,7 @@ export const ROLES = [
   {
     value: 'medico', label: 'Médico', icon: 'bi-heart-pulse-fill',
     desc: 'Pacientes, historia clínica, indicaciones y turnos. Sin acceso a producción.',
-    sedes: { pide: false, hint: 'Sin sedes asignadas ve los pacientes de todo el club.' },
+    sedes: { pide: false, hint: 'Sin sedes asignadas ve los pacientes de toda la organización.' },
     permisos: [
       { ok: true,  label: 'Gestionar pacientes' },
       { ok: true,  label: 'Historia clínica e indicaciones' },
@@ -34,7 +34,7 @@ export const ROLES = [
     desc: 'Salas, lotes y plantas de las sedes que le asignes. Sin acceso a pacientes.',
     // Sin sedes ve TODO el cultivo del club, no nada: es lo que necesita un club de una sola
     // sede, que si no tendría que asignársela a cada persona para que la app le sirva.
-    sedes: { pide: false, hint: 'Sin sedes asignadas ve el cultivo de todo el club.' },
+    sedes: { pide: false, hint: 'Sin sedes asignadas ve el cultivo de toda la organización.' },
     permisos: [
       { ok: true,  label: 'Salas, lotes y plantas' },
       { ok: true,  label: 'Registrar ambiente y tareas' },
@@ -45,7 +45,7 @@ export const ROLES = [
   {
     value: 'supervisor', suspendido: true, label: 'Supervisor', icon: 'bi-binoculars-fill',
     desc: 'Ve el cultivo de sus sedes y gestiona tareas. Además dispensa y maneja reservas.',
-    sedes: { pide: false, hint: 'Sin sedes asignadas supervisa todo el club.' },
+    sedes: { pide: false, hint: 'Sin sedes asignadas supervisa toda la organización.' },
     permisos: [
       { ok: true,  label: 'Ver cultivo de sus sedes' },
       { ok: true,  label: 'Crear y asignar tareas' },
@@ -97,8 +97,8 @@ export const ROLES = [
   },
   {
     value: 'auditor', suspendido: true, label: 'Auditor', icon: 'bi-clipboard-data-fill',
-    desc: 'Solo lectura de todo el club. No puede modificar absolutamente nada.',
-    sedes: { pide: false, hint: 'Sin sedes asignadas ve los informes de todo el club.' },
+    desc: 'Solo lectura de toda la organización. No puede modificar absolutamente nada.',
+    sedes: { pide: false, hint: 'Sin sedes asignadas ve los informes de toda la organización.' },
     permisos: [
       { ok: true,  label: 'Lectura de todos los módulos' },
       { ok: true,  label: 'Todos los informes' },

@@ -8,6 +8,8 @@ const state = reactive({
   confirmText: 'Confirmar',
   cancelText:  'Cancelar',
   neutralText: '',      // botón intermedio opcional (3ª opción). Vacío = no se muestra.
+  // Sólo informa: un único botón (p. ej. «Entendido» ante un bloqueo). Resuelve `true`.
+  soloAceptar: false,
   // Un texto opcional que se pide junto con la confirmación (p. ej. el motivo de «no se hizo»).
   // Con `campo`, aceptar resuelve `{ valor }` en vez de `true`.
   campo:       null,    // { label, placeholder }
@@ -24,6 +26,7 @@ export function useConfirm() {
     state.confirmText = opts.confirmText || 'Confirmar'
     state.cancelText  = opts.cancelText  || 'Cancelar'
     state.neutralText = opts.neutralText || ''
+    state.soloAceptar = !!opts.soloAceptar
     state.campo       = opts.campo || null
     state.valor       = ''
     state.open        = true

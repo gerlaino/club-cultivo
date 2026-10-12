@@ -1,5 +1,63 @@
 # Changelog
 
+## Octubre 2026 (fb) — Contabilidad, Stock y Equipo según los lienzos aprobados (12-oct)
+
+Germán aprobó los lienzos de la revisión «como admin del club»: «3 me falta una sección con
+últimos movimientos… 5 no me convencen los KPIs… [Equipo]». Construido así:
+
+- **Contabilidad → Resumen** (`ResumenContable.vue`, la solapa «Dashboard» pasa a «Resumen»):
+  resultado del mes contra el mes pasado **a la misma fecha** (`mes_anterior_a_la_fecha`),
+  disponibilidades (efectivo en cajas abiertas + delivery sin rendir; el banco no se lleva),
+  cuentas por cobrar con **antigüedad FIFO** (hasta 30 / 31–60 / más de 60 días), ingresos por
+  concepto y egresos por categoría (con «N gastos fijos del mes sin registrar» desde
+  `/recurrentes`), **últimos 12 meses corridos** (`ultimos_12_meses`, dos consultas agrupadas),
+  **últimos 20 movimientos** con Todos/Ingresos/Egresos (los filtrados se piden al libro) y
+  tocar una fila abre el mismo detalle de siempre, por sede, por sector y cierre de período con
+  lo que queda pendiente (envíos en la calle y **cierres de caja sin revisar** del mes a cerrar).
+- **`Contabilidad::Posicion`**: efectivo en cajas, delivery sin rendir y por cobrar en una sola
+  cuenta; el panel de conducción la usa también (mismo nombre, mismo número).
+- `resumen_por_categoria` ya no suma ingresos sin cobrar ni ajustes: la lista por categoría suma
+  lo mismo que «Ingresos» y «Egresos» de arriba.
+- **Stock**: las tarjetas se reemplazan por el **resumen por producto**
+  (`Stocks::ResumenPorProducto`, en `/stocks/inventario` → `totales.por_producto`): una fila por
+  producto y unidad con depósito, mostrador, comprometido, disponible, **«Alcanza para»** (días al
+  ritmo de 28 días; mismo número que la cobertura del panel) y **«Atención»** (vencidos, vence en
+  30 días, sede de flor por debajo del umbral). Encabezados con explicación al pasar el mouse.
+  La tabla de abajo muestra «1.000 g» / «100 un» (no «1000.0g»); fuera los emojis de la pantalla.
+- **Equipo**: cupo del plan por rol arriba y, por persona, rol y sede, qué hizo hoy, horas del
+  mes (`JornadaLaboral`), pendiente y último acceso (`visto_at`). `GET /usuarios/actividad`;
+  la actividad sale de **`Equipo::Actividad`**, que el panel de conducción también usa.
+- Specs: `contabilidad_resumen_spec`, `stock_resumen_por_producto_spec`, `equipo_actividad_spec`
+  (cruces con el panel incluidos); vitest `rediseniosAdminPantallas.test.js`.
+
+## Octubre 2026 (fa) — Cambiar el rol de alguien cambia todo; las vistas por rol revisadas (12-oct)
+
+Germán: «fijate cada vista de cada rol si se ve como espera el admin y chequear que al cambiar de
+rol a algún miembro del equipo se cambie todo como corresponde». Recorridas las vistas de
+cultivador, manicura, delivery y dispensador en compu y teléfono (sin errores ni 403); médico y
+supervisor por código (no hay usuarios de esos roles en la org `e2e`).
+
+- **`Acceso::CambiarRol`** (Equipo y super admin, una sola puerta): bloquea lo que no se puede
+  dejar colgado —módulo, cupo y despachos (`CambioDeRol`), **una caja abierta a su nombre**,
+  **turnos médicos por venir**—; limpia lo que deja de tener sentido —sedes de un tipo que el rol
+  nuevo no atiende (`Sede::TIPOS_POR_ROL`), salas si el rol nuevo no cultiva, tareas activas si el
+  rol nuevo no tiene pantalla de tareas (quedan sin asignar)—; acepta `sede_ids` para el rol
+  nuevo; avisa por `ClubChannel` (`usuarios`/`rol`). `GET /usuarios/:id/cambio_de_rol?rol=`
+  devuelve los efectos y la ficha los muestra antes de confirmar (antes el aviso le pedía al admin
+  «revisá sus asignaciones»). Un bloqueo se muestra con un solo botón (`useConfirm` `soloAceptar`).
+- **La sesión abierta de esa persona** (`cambiosStores.js`): recarga en el inicio del rol nuevo
+  y le dice «Administración cambió tu rol: ahora sos …». Probado con dos navegadores.
+- **Equipo**: la lista incluye a quien mira (marcado «vos», sin editarse): el encabezado decía
+  «5 miembros» sobre una lista de 4. «Cargando el equipo…» en vez de «0 miembros» mientras carga.
+- **Inicio del dispensador**: cada stock en su unidad («Preroll 100 g» eran 100 unidades) y los
+  gramos dispensados (hoy, semana, mes, ranking) son de flor seca por línea, no la cantidad de la
+  dispensa entera con prerolls adentro. Lo mismo en el tablero de analítica del dispensador.
+- **Inicio del cultivador**: una cosecha atrasada dice «50 días de atraso» (decía «Hoy») y la fase
+  con su nombre («Floración», no `floracion`).
+- Textos de roles: «toda la organización», no «todo el club».
+- Specs: `cambiar_rol_completo_spec.rb`, `dispensador_inicio_unidades_spec.rb`,
+  `cambioDeRolSesion.test.js`.
+
 ## Octubre 2026 (ez) — El inicio del administrador es un panel de conducción (12-oct)
 
 Germán: «el dashboard del admin tiene mil cosas; como presidente esperás controlar y monitorear

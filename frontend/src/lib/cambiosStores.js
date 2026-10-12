@@ -5,13 +5,15 @@
 // cambios dispara una recarga (agrupado en 300 ms) y nunca pisa una que está en vuelo.
 //
 // Se engancha al entrar (con usuario) y se suelta al salir: lo anotado no vale para el próximo.
-import { alCambiarAgrupado, olvidarCambios } from './cambios.js'
+import { alCambiar, alCambiarAgrupado, olvidarCambios } from './cambios.js'
 import { cerrarCable } from './cableConsumer.js'
 import { useLotesStore }  from '../stores/lotes.js'
 import { useSalasStore }  from '../stores/salas.js'
 import { usePlantsStore } from '../stores/plants.js'
 import { useTareasStore } from '../stores/tareas.js'
 import { useStatsStore }  from '../stores/stats.js'
+import { useAuthStore }   from '../stores/auth.js'
+import { anotarReload }   from '../utils/reloadTrace.js'
 
 let enganchado = false
 
@@ -31,6 +33,19 @@ export function engancharCambios() {
   alCambiarAgrupado('tareas',                           () => tareas.refrescar())
   // El tablero resume todo: cualquier cosa operativa lo mueve.
   alCambiarAgrupado(['lotes', 'plantas', 'stocks', 'tareas', 'dispensaciones', 'salas'], () => stats.refrescar(), { espera: 800 })
+
+  // A ESTA PERSONA LE CAMBIARON EL ROL con la app abierta (`Acceso::CambiarRol`, 12-oct-2026).
+  // El backend ya le aplica los permisos nuevos; si la pantalla siguiera con el menú viejo, todo
+  // lo que toca le contestaría 403 sin explicación. Se recarga en el inicio del rol nuevo (el
+  // armazón, el menú y los stores son por rol: recargar es lo único que no deja restos) y el
+  // inicio le dice por qué.
+  alCambiar('usuarios', (ev) => {
+    const auth = useAuthStore()
+    if (ev?.accion !== 'rol' || !auth.user || ev.id !== auth.user.id) return
+    try { sessionStorage.setItem('aviso_rol', '1') } catch { /* sin almacenamiento: recarga igual */ }
+    anotarReload('rol-cambiado')
+    window.location.assign('/')
+  })
 }
 
 export function soltarCambios() {

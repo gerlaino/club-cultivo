@@ -196,6 +196,25 @@ class AnalyticsController < ApplicationController
     caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'
   end
 
+  # GRAMOS DE FLOR SECA DISPENSADOS, por línea (12-oct-2026). Se sumaba `dispensaciones.cantidad`
+  # —la dispensa entera, con prerolls y aceites adentro— y se mostraba como «g»: unidades de
+  # preroll leídas como gramos de flor. Es la misma cuenta que el panel y los informes.
+  def gramos_flor(scope)
+    DispensacionItem.joins(:stock).where(dispensacion_id: scope.select(:id), stocks: { forma_producto: 'flor_seca' })
+                    .sum('dispensacion_items.cantidad').to_f.round(2)
+  end
+
+  # Los pacientes que más flor retiraron en el período: gramos por línea, dispensas por cabecera.
+  def top_pacientes_flor(scope, limite: 10)
+    gramos = DispensacionItem.joins(:stock, :dispensacion)
+                             .where(dispensacion_id: scope.select(:id), stocks: { forma_producto: 'flor_seca' })
+                             .group('dispensaciones.paciente_id').sum('dispensacion_items.cantidad')
+    cuantas = scope.group(:paciente_id).count
+    ids = cuantas.keys.sort_by { |id| [-gramos[id].to_f, -cuantas[id]] }.first(limite)
+    pacientes = Paciente.where(id: ids).index_by(&:id)
+    ids.map { |id| { paciente: pacientes[id], total_g: gramos[id].to_f.round(2), dispens_count: cuantas[id] } }
+  end
+
   def sede_de_mostrador_de(usuario)
     usuario.sede_de_mostrador&.then { |x| { id: x.id, nombre: x.nombre } }
   end
@@ -215,22 +234,17 @@ class AnalyticsController < ApplicationController
                   .disponibles.asignados.includes(:lote)
 
     umbral = club.umbral_stock_g.to_f
-    stocks_data = stocks.group_by(&:forma_producto).map do |forma, ss|
+    # Por forma Y unidad: «Preroll 100 g» eran 100 unidades (12-oct-2026). `cantidad_g` queda por
+    # compatibilidad con el nombre; la unidad dice qué es.
+    stocks_data = stocks.group_by { |s| [s.forma_producto, s.unidad.presence || 'g'] }.map do |(forma, unidad), ss|
       total = ss.sum { |s| s.cantidad.to_f }
-      { forma: forma, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < umbral }
+      { forma: forma, unidad: unidad, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < umbral }
     end.sort_by { |s| s[:cantidad_g] }
 
     # Sus pacientes del mes. Sin los dígitos del DNI: en el mostrador no ayudan a reconocer a
     # nadie —la persona está enfrente— y son un dato identificatorio que no hace falta servir.
-    top_pacientes = mias
-      .where(fecha_dispensacion: inicio_mes..hoy)
-      .includes(:paciente)
-      .group(:paciente_id)
-      .select('paciente_id, SUM(dispensaciones.cantidad) AS total_g, COUNT(*) AS dispens_count')
-      .order('total_g DESC')
-      .limit(10)
-      .map { |r| { paciente: r.paciente&.nombre_completo, total_g: r.total_g.to_f.round(2),
-                   dispens_count: r.dispens_count } }
+    top_pacientes = top_pacientes_flor(mias.where(fecha_dispensacion: inicio_mes..hoy))
+      .map { |r| { paciente: r[:paciente]&.nombre_completo, total_g: r[:total_g], dispens_count: r[:dispens_count] } }
 
     # Una reserva la prepara quien está atendiendo, no necesariamente quien la tomó: el corte
     # es por SEDE, no por persona.
@@ -250,11 +264,11 @@ class AnalyticsController < ApplicationController
       sede_mostrador: sede_de_mostrador_de(usuario),
       resumen: {
         dispensaciones_hoy:    mias.where(fecha_dispensacion: hoy..hoy).count,
-        gramos_hoy:            mias.where(fecha_dispensacion: hoy..hoy).sum(:cantidad).to_f.round(2),
+        gramos_hoy:            gramos_flor(mias.where(fecha_dispensacion: hoy..hoy)),
         dispensaciones_semana: mias.where(fecha_dispensacion: inicio_semana..hoy).count,
-        gramos_semana:         mias.where(fecha_dispensacion: inicio_semana..hoy).sum(:cantidad).to_f.round(2),
+        gramos_semana:         gramos_flor(mias.where(fecha_dispensacion: inicio_semana..hoy)),
         dispensaciones_mes:    mias.where(fecha_dispensacion: inicio_mes..hoy).count,
-        gramos_mes:            mias.where(fecha_dispensacion: inicio_mes..hoy).sum(:cantidad).to_f.round(2),
+        gramos_mes:            gramos_flor(mias.where(fecha_dispensacion: inicio_mes..hoy)),
       },
       stocks:        stocks_data,
       top_pacientes: top_pacientes,
@@ -310,12 +324,12 @@ class AnalyticsController < ApplicationController
     # (`Stock.flor_seca_disponible`, toda la organización). Sumaba el frasco entero, sin restar lo
     # reservado, y sólo lo que ya tenía sede (12-oct-2026).
     flor_disponible = Stock.flor_seca_disponible(Stock.where(club_id: club.id)).to_f
-    por_forma = stocks.group_by(&:forma_producto)
-    por_forma['flor_seca'] ||= [] if flor_disponible.positive?   # flor que todavía no tiene sede
-    stocks_data = por_forma.map do |forma, ss|
+    por_forma = stocks.group_by { |s| [s.forma_producto, s.unidad.presence || 'g'] }
+    por_forma[['flor_seca', 'g']] ||= [] if flor_disponible.positive?   # flor que todavía no tiene sede
+    stocks_data = por_forma.map do |(forma, unidad), ss|
       total = forma == 'flor_seca' ? flor_disponible : ss.sum { |s| s.cantidad.to_f }
       # "Stock bajo" solo aplica a flor seca; los derivados son inventario, no disparan alerta.
-      { forma: forma, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < stock_bajo_umbral }
+      { forma: forma, unidad: unidad, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < stock_bajo_umbral }
     end.sort_by { |s| s[:cantidad_g] }
 
     # Pacientes REPROCANN por vencer
@@ -324,23 +338,17 @@ class AnalyticsController < ApplicationController
     reprocann_vencidos   = pacientes.where('reprocann_vencimiento < ?', hoy).count
 
     # Top pacientes del mes
-    top_pacientes = base_disps
-      .where(fecha_dispensacion: inicio_mes..hoy)
-      .includes(:paciente)
-      .group(:paciente_id)
-      .select('paciente_id, SUM(dispensaciones.cantidad) AS total_g, COUNT(*) AS dispens_count')
-      .order('total_g DESC')
-      .limit(10)
+    top_pacientes = top_pacientes_flor(base_disps.where(fecha_dispensacion: inicio_mes..hoy))
       .map do |r|
-        p = r.paciente
+        p = r[:paciente]
         {
           # Nombre completo: quien mira la analítica ya tiene acceso a la ficha del paciente,
           # así que la inicial no protegía nada y hacía ilegible el ranking.
           paciente:       p&.nombre_completo,
           iniciales:      "#{p&.nombre&.[](0)}.#{p&.apellido&.[](0)}.",
           dni_last4:      p&.dni_normalizado.to_s.last(4),
-          total_g:        r.total_g.to_f.round(2),
-          dispens_count:  r.dispens_count,
+          total_g:        r[:total_g],
+          dispens_count:  r[:dispens_count],
         }
       end
 
@@ -375,11 +383,11 @@ class AnalyticsController < ApplicationController
       sede_mostrador: sede_de_mostrador_de(current_user),
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
-        gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),
+        gramos_hoy:            gramos_flor(disps_hoy),
         dispensaciones_semana: disps_semana.count,
-        gramos_semana:         disps_semana.sum(:cantidad).to_f.round(2),
+        gramos_semana:         gramos_flor(disps_semana),
         dispensaciones_mes:    disps_mes.count,
-        gramos_mes:            disps_mes.sum(:cantidad).to_f.round(2),
+        gramos_mes:            gramos_flor(disps_mes),
       },
       reprocann: {
         por_vencer: reprocann_por_vencer,

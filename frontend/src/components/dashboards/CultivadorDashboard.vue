@@ -184,14 +184,15 @@
           <div class="cvd__cosecha-body">
             <div class="cvd__cosecha-dias-wrap">
               <span class="cvd__cosecha-num" :style="{ color: urgencyColor(lote.diasRestantes) }">
-                {{ lote.diasRestantes <= 0 ? 'Hoy' : lote.diasRestantes }}
+                {{ lote.diasRestantes === 0 ? 'Hoy' : Math.abs(lote.diasRestantes) }}
               </span>
-              <span v-if="lote.diasRestantes > 0" class="cvd__cosecha-dunit">días</span>
+              <!-- Pasada la fecha no es «hoy»: son días de atraso, y se dice así. -->
+              <span v-if="lote.diasRestantes !== 0" class="cvd__cosecha-dunit">{{ Math.abs(lote.diasRestantes) === 1 ? 'día' : 'días' }}{{ lote.diasRestantes < 0 ? ' de atraso' : '' }}</span>
             </div>
             <div class="cvd__cosecha-cepa">{{ lote.genetica?.nombre || lote.codigo }}</div>
             <div class="cvd__cosecha-sala">{{ lote.sala?.nombre || '—' }}</div>
             <span class="cvd__cosecha-estado-pill" :style="{ background: urgencyBg(lote.diasRestantes), color: urgencyColor(lote.diasRestantes) }">
-              {{ lote.estado }}
+              {{ ESTADO_META[lote.estado]?.label || lote.estado }}
             </span>
           </div>
         </RouterLink>
@@ -376,6 +377,7 @@
 </template>
 
 <script setup>
+import { ESTADO_META } from '../../lib/loteHelpers.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { tareaCerrada } from '../../lib/tareaEstado.js'
 import { useNoSeHizo } from '../../composables/useNoSeHizo.js'

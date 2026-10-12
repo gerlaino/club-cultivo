@@ -260,19 +260,18 @@ module Panel
         libro = libro.por_sede(@sede.id) if @sede
         actual   = resultado(libro.del_periodo(rango.first, rango.last))
         anterior = resultado(libro.del_periodo(rango_anterior.first, rango_anterior.last))
-        cajas = CajaTurno.activas.where(club_id: @club.id, sede_id: sede_ids).to_a
-        deudas = CuentaCorriente.where(club_id: @club.id).where('saldo_disponible < 0')
+        # La plata «ahora» sale de la misma cuenta que Contabilidad (`Contabilidad::Posicion`).
+        pos = Contabilidad::Posicion.new(club: @club, sede_id: @sede&.id, hoy: @hoy)
         {
           resultado_ars: actual[:resultado],
           ingresos_ars:  actual[:ingresos],
           egresos_ars:   actual[:egresos],
           resultado_anterior_ars: anterior[:resultado],
           variacion_pct: variacion(actual[:resultado], anterior[:resultado]),
-          efectivo_en_cajas_ars: cajas.sum { |c| c.efectivo_esperado_ars.to_d }.to_f.round(2),
-          cajas_abiertas: cajas.size,
-          # Igual que Contabilidad (`por_cobrar`): la deuda real son los saldos negativos.
-          cuentas_por_cobrar_ars: deudas.sum('-saldo_disponible').to_f,
-          cuentas_por_cobrar: deudas.count,
+          efectivo_en_cajas_ars: pos.efectivo_en_cajas_ars,
+          cajas_abiertas: pos.cajas.size,
+          cuentas_por_cobrar_ars: pos.por_cobrar_ars,
+          cuentas_por_cobrar: pos.deudas.count,
         }
       end
     end
@@ -428,30 +427,12 @@ module Panel
 
     # Una línea por persona que HIZO algo hoy o tiene algo atrasado. Sin pacientes. Es de toda la
     # organización: una persona puede trabajar en varias sedes el mismo día.
+    # La misma cuenta que la lista de Equipo (`Equipo::Actividad`): sólo quien hizo algo hoy o
+    # tiene algo pendiente, con lo pendiente primero.
     def equipo
-      dia = @hoy.beginning_of_day..@hoy.end_of_day
-      disp = dispensas.where(fecha_dispensacion: @hoy).group(:user_id).count
-      entregas = dispensas(todas: true).where(estado_envio: 'entregado', updated_at: dia).group(:delivery_id).count
-      en_mano = en_transito_sin_rendir.group(:created_by_id).sum(:monto_ars)
-      hechas = Tarea.del_club(@club.id).completadas.where(fecha_completada: dia).group(:asignada_a_id).count
-      vencidas = Tarea.del_club(@club.id).vencidas.group(:asignada_a_id).count
-      turnos = Turno.where(club_id: @club.id, fecha_hora: dia).where.not(estado: 'cancelado').group(:medico_id).count
-      sin_ver = Turno.where(club_id: @club.id, visto_at: nil).where('fecha_hora >= ?', Time.current).where.not(estado: 'cancelado').group(:medico_id).count
-      cajas = CajaTurno.activas.where(club_id: @club.id).pluck(:abierta_por_id, :abierta_at).to_h
-
-      ids = (disp.keys + entregas.keys + en_mano.keys + hechas.keys + vencidas.keys + turnos.keys + sin_ver.keys + cajas.keys).compact.uniq
-      User.where(id: ids, club_id: @club.id).del_equipo.map do |u|
-        partes = []
-        partes << "#{disp[u.id]} dispensa#{disp[u.id] == 1 ? '' : 's'}" if disp[u.id].to_i.positive?
-        partes << "caja abierta desde #{cajas[u.id].in_time_zone.to_date == @hoy ? "las #{hora(cajas[u.id])}" : "el #{fecha_corta(cajas[u.id])}"}" if cajas[u.id]
-        partes << "#{entregas[u.id]} entrega#{entregas[u.id] == 1 ? '' : 's'}" if entregas[u.id].to_i.positive?
-        partes << "#{hechas[u.id]} tarea#{hechas[u.id] == 1 ? '' : 's'} completada#{hechas[u.id] == 1 ? '' : 's'}" if hechas[u.id].to_i.positive?
-        partes << "#{turnos[u.id]} turno#{turnos[u.id] == 1 ? '' : 's'}" if turnos[u.id].to_i.positive?
-        alertas = []
-        alertas << "rendición pendiente de #{pesos(en_mano[u.id])}" if en_mano[u.id].to_d.positive?
-        alertas << "#{vencidas[u.id]} tarea#{vencidas[u.id] == 1 ? '' : 's'} vencida#{vencidas[u.id] == 1 ? '' : 's'}" if vencidas[u.id].to_i.positive?
-        alertas << "#{sin_ver[u.id]} asignaci#{sin_ver[u.id] == 1 ? 'ón' : 'ones'} sin confirmar" if sin_ver[u.id].to_i.positive?
-        { id: u.id, nombre: u.nombre_completo, rol: u.role, actividad: partes, alertas: alertas }
+      act = Equipo::Actividad.new(club: @club, hoy: @hoy, dispensas: dispensas(todas: true)).por_usuario
+      User.where(id: act.keys, club_id: @club.id).del_equipo.map do |u|
+        { id: u.id, nombre: u.nombre_completo, rol: u.role, actividad: act[u.id][:actividad], alertas: act[u.id][:alertas] }
       end.sort_by { |x| [x[:alertas].empty? ? 1 : 0, x[:nombre].to_s] }
     end
 

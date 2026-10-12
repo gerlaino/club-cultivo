@@ -107,14 +107,14 @@
       <div v-else class="dd__stock-grid">
         <div
           v-for="s in analytics.stocks"
-          :key="s.forma"
+          :key="`${s.forma}-${s.unidad}`"
           class="dd__stock-card"
           :class="{ 'dd__stock-card--warn': s.alerta }"
         >
           <!-- El backend manda el enum crudo (`flor_seca`): se muestra con su etiqueta humana. -->
           <div class="dd__stock-forma">{{ formaLabel(s.forma) }}</div>
-          <div class="dd__stock-cantidad">{{ formatG(s.cantidad_g) }}</div>
-          <div v-if="s.alerta" class="dd__stock-alerta">⚠ Stock bajo</div>
+          <div class="dd__stock-cantidad">{{ cantidad(s.cantidad_g, s.unidad) }}</div>
+          <div v-if="s.alerta" class="dd__stock-alerta">Stock bajo</div>
         </div>
       </div>
     </div>
@@ -253,6 +253,8 @@ const reprocannAlerta = computed(() => {
 })
 
 function formatG(g) { return g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—' }
+// Cada producto en su unidad: un preroll se cuenta en unidades, no en gramos.
+function cantidad(n, unidad = 'g') { return n != null ? `${Number(n).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${unidad || 'g'}` : '—' }
 
 // ── Reservas para preparar ────────────────────────────────────────────────
 const reservasHoy      = computed(() => analytics.value?.reservas?.hoy ?? 0)

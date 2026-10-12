@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
-import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
@@ -14,11 +13,11 @@ import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
 import ModalRegistrarPago from "../components/contabilidad/ModalRegistrarPago.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
+import ResumenContable from '../components/contabilidad/ResumenContable.vue'
 import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
 import { hoyISO, toISO, formatFechaCorta } from '../utils/dates.js'
-const { org: orgTxt } = useUsoPersonal()
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -248,26 +247,13 @@ async function confirmarSaldar() {
 }
 
 const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = toda la organización)
-
-// El resultado por sector sólo tiene sentido si hay DOS O MÁS sectores con movimientos: con
-// uno solo repite el total de arriba, y "Sin sector" no es un sector — es la bolsa de lo que
-// nadie clasificó. Por eso no cuenta para decidir si el bloque se muestra, pero sí se avisa
-// cuánta plata quedó ahí, que es lo accionable.
-const sectoresConMovimiento = computed(() =>
-  (store.dashboard?.por_unidad || []).filter(u => u.id != null && (u.ingresos || u.egresos || u.a_cobrar))
-)
-const sectoresComparables = computed(() => sectoresConMovimiento.value.length >= 2)
-const sinSectorMonto = computed(() => {
-  const sin = (store.dashboard?.por_unidad || []).find(u => u.id == null)
-  return sin ? (Number(sin.ingresos) || 0) + (Number(sin.egresos) || 0) : 0
+// «Octubre de 2026 · toda la organización»: de qué mes y de qué alcance es lo que se ve.
+const subtitulo = computed(() => {
+  const mes = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  const sede = sedes.value.find(x => x.id === dashboardSede.value)
+  return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} · ${sede ? sede.nombre : 'toda la organización'}`
 })
-const unidadAbierta  = ref(new Set()) // sectores expandidas para ver su desglose por sede
-function toggleUnidad(id) {
-  const k = id ?? 'sin'
-  const s = new Set(unidadAbierta.value)
-  s.has(k) ? s.delete(k) : s.add(k)
-  unidadAbierta.value = s
-}
+
 const todosLotes     = ref([])
 const loadingLotes   = ref(false)
 const pacientes      = ref([])
@@ -357,30 +343,6 @@ function tipoMeta(tipo) {
   }[tipo] || { label: tipo, color: "#64748b", bg: "rgba(100,116,139,.1)" }
 }
 
-function sedeTipoIcon(tipo) {
-  return tipo === 'social' ? 'bi-shop' : tipo === 'mixta' ? 'bi-arrow-left-right' : 'bi-flower2'
-}
-function sedeTipoColor(tipo) {
-  return tipo === 'social' ? '#0369a1' : tipo === 'mixta' ? '#7c3aed' : '#15803d'
-}
-function sedeTipoBg(tipo) {
-  return tipo === 'social' ? 'rgba(3,105,161,.1)' : tipo === 'mixta' ? 'rgba(124,58,237,.1)' : 'rgba(21,128,61,.1)'
-}
-function sedeTipoLabel(tipo) {
-  return { produccion: 'Producción', social: 'Dispensario', mixta: 'Mixta' }[tipo] || '—'
-}
-
-const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
-const MESES_EN = { january:"Enero", february:"Febrero", march:"Marzo", april:"Abril", may:"Mayo", june:"Junio", july:"Julio", august:"Agosto", september:"Septiembre", october:"Octubre", november:"Noviembre", december:"Diciembre" }
-function mesLabel(m) {
-  if (!m) return "—"
-  const num = parseInt(m)
-  if (!isNaN(num) && num >= 1 && num <= 12) return MESES_ES[num - 1]
-  if (/^\d{4}-\d{2}$/.test(String(m))) return MESES_ES[parseInt(m.split("-")[1]) - 1] || m
-  const en = MESES_EN[String(m).toLowerCase()]
-  if (en) return en
-  return m
-}
 
 // Las categorías del sistema y sus nombres los manda el servidor en el tablero
 // (`categorias_sistema`, de `MovimientoContable::CATEGORIA_LABELS`). Había una copia acá que se
@@ -406,19 +368,6 @@ function estadoStyle(estado) {
   return { color: m.color, background: m.bg }
 }
 
-const busquedaDash = ref("")
-const ultimosFiltrados = computed(() => {
-  const list = store.dashboard?.ultimos_movimientos || []
-  const q = busquedaDash.value.trim().toLowerCase()
-  const filtered = q
-    ? list.filter(m =>
-      m.descripcion?.toLowerCase().includes(q) ||
-      (m.categoria_label || catLabel(m.categoria)).toLowerCase().includes(q) ||
-      m.tipo?.toLowerCase().includes(q)
-    )
-    : list
-  return filtered.slice(0, 10)
-})
 
 const filtroQ         = ref("")
 const filtroTipo      = ref("")
@@ -771,7 +720,7 @@ onMounted(async () => {
     <div class="cv__header">
       <div class="cv__header-left">
         <h1 class="cv__title">Contabilidad</h1>
-        <p class="cv__sub">Libro diario · Ingresos · Egresos · Balance</p>
+        <p class="cv__sub">{{ subtitulo }}</p>
       </div>
       <div class="cv__header-right">
         <BotonesDescarga :generando="generandoLibro" @descargar="exportar" />
@@ -791,7 +740,7 @@ onMounted(async () => {
     <!-- Tabs -->
     <div class="cv__tabs">
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'dashboard' }" @click="vistaActiva = 'dashboard'">
-        <i class="bi bi-grid-1x2"></i> Dashboard
+        <i class="bi bi-grid-1x2"></i> Resumen
       </button>
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'libro' }" @click="irALibro">
         <i class="bi bi-journal-text"></i> Libro diario
@@ -959,353 +908,29 @@ onMounted(async () => {
     <div v-if="vistaActiva === 'categorias'" class="cv__embed"><FinanzasCatalogoView @cambio="recargarCatalogo" /></div>
     <div v-if="vistaActiva === 'recurrentes'" class="cv__embed"><GastosRecurrentesView /></div>
 
-    <!-- ══════════════ DASHBOARD ══════════════ -->
+    <!-- ══════════════ RESUMEN ══════════════ -->
     <div v-if="vistaActiva === 'dashboard'">
-
-      <div v-if="store.loadingDashboard" class="cv__loading">
-        <DsSpinner />
-      </div>
-
-      <template v-else-if="store.dashboard">
-
-        <!-- Selector de sede -->
-        <div class="cv__sede-selector">
-          <button
-            class="cv__sede-btn"
-            :class="{ 'cv__sede-btn--active': dashboardSede === null }"
-            @click="cambiarSedeDashboard(null)"
-          >
-            <i class="bi bi-building"></i> Club completo
-          </button>
-          <button
-            v-for="s in sedes"
-            :key="s.id"
-            class="cv__sede-btn"
-            :class="{ 'cv__sede-btn--active': dashboardSede === s.id }"
-            @click="cambiarSedeDashboard(s.id)"
-          >
-            <i class="bi" :class="sedeTipoIcon(s.tipo)"></i>
-            {{ s.nombre }}
-          </button>
-        </div>
-
-        <!-- Contexto de sede activa -->
-        <div v-if="dashboardSede" class="cv__dash-context">
-          <i class="bi bi-funnel-fill" style="color:#0369a1"></i>
-          Mostrando datos de
-          <strong>{{ sedes.find(s => s.id === dashboardSede)?.nombre }}</strong>
-          <button class="cv__dash-context-clear" @click="cambiarSedeDashboard(null)">
-            Ver {{ orgTxt.toda }} <i class="bi bi-x"></i>
-          </button>
-        </div>
-
-        <!-- Cierre de período -->
-        <div v-if="canEdit" class="cv__cierre">
-          <div class="cv__cierre-info">
-            <i class="bi" :class="cierreActual ? 'bi-lock-fill' : 'bi-unlock'"></i>
-            <span v-if="cierreActual">Libro cerrado hasta el <strong>{{ fmtFechaCorta(cierreActual) }}</strong> — los movimientos anteriores son inmutables.</span>
-            <span v-else>Sin cierre de período: todos los movimientos son editables.</span>
-          </div>
-          <div class="cv__cierre-actions">
-            <button v-if="puedeCerrarMesAnterior" class="cv__cierre-btn" :disabled="cerrandoPeriodo" @click="cerrarMesAnterior">
-              <i class="bi bi-lock"></i> Cerrar hasta {{ fmtFechaCorta(finMesAnterior) }}
-            </button>
-            <button v-if="cierreActual" class="cv__cierre-btn cv__cierre-btn--ghost" @click="reabrirPeriodo">
-              Reabrir
-            </button>
-          </div>
-        </div>
-
-        <!-- KPIs -->
-        <div class="cv__kpis">
-          <div class="cv__kpi">
-            <div class="cv__kpi-label">Ingresos este mes</div>
-            <div class="cv__kpi-val cv__kpi-val--green">{{ fmt(store.dashboard.mes_actual.ingresos) }}</div>
-            <div class="cv__kpi-bar cv__kpi-bar--green"></div>
-          </div>
-          <div class="cv__kpi">
-            <div class="cv__kpi-label">Egresos este mes</div>
-            <div class="cv__kpi-val" :class="store.dashboard.mes_actual.egresos > 0 ? 'cv__kpi-val--red' : ''">{{ fmt(store.dashboard.mes_actual.egresos) }}</div>
-            <div class="cv__kpi-bar" :class="store.dashboard.mes_actual.egresos > 0 ? 'cv__kpi-bar--red' : 'cv__kpi-bar--neutral'"></div>
-          </div>
-          <div class="cv__kpi">
-            <div class="cv__kpi-label">Balance del mes</div>
-            <div class="cv__kpi-val" :style="{ color: balanceColor(store.dashboard.mes_actual.balance) }">
-              {{ fmt(store.dashboard.mes_actual.balance) }}
-            </div>
-            <div class="cv__kpi-bar" :style="{ background: balanceColor(store.dashboard.mes_actual.balance) }"></div>
-          </div>
-          <!-- Clickeable: el número solo no dice QUIÉNES. Lleva a la solapa Deudores. -->
-          <button v-if="store.dashboard.por_cobrar > 0" type="button" class="cv__kpi cv__kpi--link" @click="irADeudores" title="Ver quiénes deben">
-            <div class="cv__kpi-label">Por cobrar (deuda de pacientes) <i class="bi bi-arrow-right-short"></i></div>
-            <div class="cv__kpi-val cv__kpi-val--amber">{{ fmt(store.dashboard.por_cobrar) }}</div>
-            <div class="cv__kpi-bar cv__kpi-bar--amber"></div>
-          </button>
-          <div class="cv__kpi cv__kpi--highlight">
-            <div class="cv__kpi-label">Balance del año</div>
-            <div class="cv__kpi-val" :style="{ color: balanceColor(store.dashboard.anio_actual.balance) }">
-              {{ fmt(store.dashboard.anio_actual.balance) }}
-            </div>
-            <div class="cv__kpi-bar" :style="{ background: balanceColor(store.dashboard.anio_actual.balance) }"></div>
-          </div>
-        </div>
-
-        <!-- Evolución + Por categoría -->
-        <div class="cv__row2">
-          <div class="cv__card cv__card--main">
-            <div class="cv__card-header">
-              <span class="cv__card-title">Evolución mensual {{ new Date().getFullYear() }}</span>
-            </div>
-            <div v-if="!store.dashboard.anio_actual.por_mes?.length" class="cv__empty-sm">
-              Sin datos para el año
-            </div>
-            <div v-else class="cv__table-wrap">
-              <table class="cv__table">
-                <thead>
-                <tr>
-                  <th>Mes</th>
-                  <th class="cv__th-right cv__th-green">Ingresos</th>
-                  <th class="cv__th-right cv__th-red">Egresos</th>
-                  <th class="cv__th-right">Balance</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr v-for="m in store.dashboard.anio_actual.por_mes" :key="m.mes">
-                  <td class="cv__td-mes">{{ mesLabel(m.mes_label || m.mes) }}</td>
-                  <td class="cv__td-right cv__td-green">{{ fmt(m.ingresos) }}</td>
-                  <td class="cv__td-right" :class="m.egresos > 0 ? 'cv__td-red' : ''">{{ fmt(m.egresos) }}</td>
-                  <td class="cv__td-right cv__td-bold" :style="{ color: balanceColor(m.balance) }">{{ fmt(m.balance) }}</td>
-                </tr>
-                </tbody>
-                <tfoot>
-                <tr>
-                  <td class="cv__td-bold">Total año</td>
-                  <td class="cv__td-right cv__td-green cv__td-bold">{{ fmt(store.dashboard.anio_actual.ingresos) }}</td>
-                  <td class="cv__td-right cv__td-bold" :class="store.dashboard.anio_actual.egresos > 0 ? 'cv__td-red' : ''">{{ fmt(store.dashboard.anio_actual.egresos) }}</td>
-                  <td class="cv__td-right cv__td-bold" :style="{ color: balanceColor(store.dashboard.anio_actual.balance) }">{{ fmt(store.dashboard.anio_actual.balance) }}</td>
-                </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <div class="cv__card">
-            <div class="cv__card-header">
-              <span class="cv__card-title">Por categoría (mes actual)</span>
-            </div>
-            <div v-if="!store.dashboard.mes_actual.por_categoria?.length" class="cv__empty-sm">
-              Sin movimientos este mes
-            </div>
-            <div v-else class="cv__cat-list">
-              <div v-for="c in store.dashboard.mes_actual.por_categoria" :key="c.categoria + c.tipo" class="cv__cat-item">
-                <div class="cv__cat-left">
-                  <span class="cv__tipo-pill" :style="{ background: tipoMeta(c.tipo).bg, color: tipoMeta(c.tipo).color }">
-                    {{ tipoMeta(c.tipo).label }}
-                  </span>
-                  <span class="cv__cat-name">{{ catLabel(c.categoria) }}</span>
-                </div>
-                <span class="cv__cat-monto" :style="{ color: tipoMeta(c.tipo).color }">{{ fmt(c.total) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Resultado por sector (mes actual).
-             Sólo aparece si hay DOS O MÁS sectores con movimientos: con uno solo no compara
-             nada, y lo que se veía era "Sin unidad +$180.000" contra "General −$120.000" —los
-             ingresos de un lado y los egresos del otro, porque nadie les asignó sector—. Eso
-             no es un resultado por sector: es el mismo total partido al azar. -->
-        <div v-if="sectoresComparables" class="cv__card cv__card--mt">
-          <div class="cv__card-header">
-            <span class="cv__card-title">
-              <i class="bi bi-diagram-3" style="margin-right:6px;color:#2f6b3d;font-size:.9rem"></i>
-              Resultado por sector — mes actual
-            </span>
-          </div>
-          <p v-if="sinSectorMonto" class="cv__unidad-aviso">
-            <i class="bi bi-info-circle"></i>
-            Hay {{ fmt(sinSectorMonto) }} sin sector asignado. Se clasifica eligiendo una
-            categoría que tenga sector, o asignándoselo a la categoría en Categorías.
-          </p>
-          <div class="cv__unidad-list">
-            <template v-for="u in store.dashboard.por_unidad" :key="u.id ?? 'sin-unidad'">
-              <div
-                class="cv__unidad-row"
-                :class="{ 'cv__unidad-row--exp': !dashboardSede && u.sedes?.length > 1 }"
-                @click="!dashboardSede && u.sedes?.length > 1 && toggleUnidad(u.id)"
-              >
-                <span class="cv__unidad-name">
-                  <i
-                    v-if="!dashboardSede && u.sedes?.length > 1"
-                    class="bi cv__unidad-caret"
-                    :class="unidadAbierta.has(u.id ?? 'sin') ? 'bi-caret-down-fill' : 'bi-caret-right-fill'"
-                  ></i>
-                  {{ u.nombre }}
-                  <span v-if="!dashboardSede && u.sedes?.length > 1" class="cv__unidad-sedes-badge">{{ u.sedes.length }} sedes</span>
-                </span>
-                <span class="cv__unidad-nums">
-                  <span class="cv__unidad-in">+{{ fmt(u.ingresos) }}</span>
-                  <!-- Lo entregado que todavía no se cobró (cuenta corriente). No suma al
-                       balance —la plata no está— pero tampoco se esconde: sin esto, una entrega
-                       a cuenta desaparecía del panel como si nunca hubiera ocurrido. -->
-                  <span v-if="u.a_cobrar" class="cv__unidad-deuda" title="Entregado y todavía sin cobrar (cuenta corriente)">
-                    ~{{ fmt(u.a_cobrar) }}
-                  </span>
-                  <span class="cv__unidad-out">−{{ fmt(u.egresos) }}</span>
-                  <strong class="cv__unidad-bal" :class="u.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(u.balance) }}</strong>
-                </span>
-              </div>
-              <div v-if="!dashboardSede && u.sedes?.length > 1 && unidadAbierta.has(u.id ?? 'sin')" class="cv__unidad-sedes">
-                <div v-for="s in u.sedes" :key="s.id ?? 'sin-sede'" class="cv__unidad-subrow">
-                  <span class="cv__unidad-subname"><i class="bi bi-geo-alt-fill"></i> {{ s.nombre }}</span>
-                  <span class="cv__unidad-nums">
-                    <span class="cv__unidad-in">+{{ fmt(s.ingresos) }}</span>
-                    <span class="cv__unidad-out">−{{ fmt(s.egresos) }}</span>
-                    <strong class="cv__unidad-bal" :class="s.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(s.balance) }}</strong>
-                  </span>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- Balance por sede (solo vista consolidada de la organización) -->
-        <div v-if="!dashboardSede && store.dashboard?.por_sede?.length" class="cv__card cv__card--mt">
-          <div class="cv__card-header">
-            <span class="cv__card-title">
-              <i class="bi bi-building" style="margin-right:6px;color:#0369a1;font-size:.9rem"></i>
-              Balance por sede — mes actual
-            </span>
-            <span class="cv__card-sub">
-              {{ new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }) }}
-            </span>
-          </div>
-          <div class="cv__sede-breakdown">
-            <div
-              v-for="sede in store.dashboard.por_sede"
-              :key="sede.id ?? 'sin-sede'"
-              class="cv__sede-card"
-              :class="{ 'cv__sede-card--clickable': sede.id }"
-              @click="sede.id && cambiarSedeDashboard(sede.id)"
-            >
-              <div class="cv__sede-card-header">
-                <div
-                  class="cv__sede-card-icon"
-                  :style="{
-                    background: sede.id ? sedeTipoBg(sede.tipo) : 'rgba(100,116,139,.1)',
-                    color:      sede.id ? sedeTipoColor(sede.tipo) : 'var(--c-slate-500)',
-                  }"
-                >
-                  <i class="bi" :class="sede.id ? sedeTipoIcon(sede.tipo) : 'bi-dash-circle'"></i>
-                </div>
-                <div class="cv__sede-card-info">
-                  <div class="cv__sede-card-nombre">{{ sede.nombre }}</div>
-                  <div v-if="sede.tipo" class="cv__sede-card-tipo">{{ sedeTipoLabel(sede.tipo) }}</div>
-                </div>
-                <i v-if="sede.id" class="bi bi-arrow-right cv__sede-card-arrow"></i>
-              </div>
-
-              <div class="cv__sede-card-stats">
-                <div class="cv__sede-stat cv__sede-stat--green">
-                  <span class="cv__sede-stat-lbl">Ingresos</span>
-                  <span class="cv__sede-stat-val">{{ fmt(sede.ingresos) }}</span>
-                </div>
-                <div class="cv__sede-stat cv__sede-stat--red">
-                  <span class="cv__sede-stat-lbl">Egresos</span>
-                  <span class="cv__sede-stat-val">{{ fmt(sede.egresos) }}</span>
-                </div>
-                <div class="cv__sede-stat">
-                  <span class="cv__sede-stat-lbl">Balance</span>
-                  <span class="cv__sede-stat-val" :style="{ color: balanceColor(sede.balance) }">{{ fmt(sede.balance) }}</span>
-                </div>
-              </div>
-
-              <div v-if="sede.ingresos + sede.egresos > 0" class="cv__sede-bar-wrap">
-                <div
-                  class="cv__sede-bar-fill"
-                  :style="{ width: `${Math.min(100, (sede.ingresos / (sede.ingresos + sede.egresos)) * 100)}%` }"
-                ></div>
-              </div>
-              <div v-if="sede.ingresos + sede.egresos > 0" class="cv__sede-bar-labels">
-                <span>Ing.</span><span>Egr.</span>
-              </div>
-
-              <div class="cv__sede-anio">
-                <span class="cv__sede-anio-lbl">Año {{ new Date().getFullYear() }}</span>
-                <span class="cv__sede-anio-val" :style="{ color: balanceColor(sede.anio.balance) }">
-                  {{ fmt(sede.anio.balance) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Últimos movimientos -->
-        <div class="cv__card cv__card--mt">
-          <div class="cv__card-header">
-            <span class="cv__card-title">Últimos movimientos</span>
-            <div class="cv__card-header-right">
-              <div class="cv__search-inline">
-                <i class="bi bi-search cv__search-icon-sm"></i>
-                <input v-model="busquedaDash" class="cv__search-sm" placeholder="Buscar…" />
-                <span v-if="busquedaDash" class="cv__search-x" @click="busquedaDash = ''"><i class="bi bi-x"></i></span>
-              </div>
-              <button class="cv__btn-link" @click="irALibro">Ver todos →</button>
-            </div>
-          </div>
-          <div v-if="!ultimosFiltrados.length" class="cv__empty-sm">
-            {{ busquedaDash ? 'Sin resultados para "' + busquedaDash + '"' : 'Sin movimientos todavía' }}
-          </div>
-          <!-- Tabla, no una lista de divs: son los mismos datos que el libro y leerlos en
-               columnas alineadas —sobre todo los montos— es lo que permite compararlos.
-               Categoría, subcategoría, sector y depósito son las cuatro que faltaban: sin
-               ellas no se podía saber de dónde salió ni a qué inventario entró un gasto. -->
-          <div v-else class="cv__table-wrap">
-            <table class="cv__table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Descripción</th>
-                  <th>Categoría</th>
-                  <th>Sector</th>
-                  <th>Depósito</th>
-                  <th class="cv__th-right">Monto ARS</th>
-                  <th v-if="canEdit"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="m in ultimosFiltrados" :key="m.id" class="cv__tr">
-                  <td class="cv__td-fecha">{{ m.fecha }}</td>
-                  <td>
-                    <div class="cv__desc-cell cv__desc-cell--link" @click="abrirDetalle(m)" title="Ver detalle">
-                      <span class="cv__tipo-pill cv__tipo-pill--sm" :style="{ background: tipoMeta(m.tipo).bg, color: tipoMeta(m.tipo).color }">
-                        {{ tipoMeta(m.tipo).label }}
-                      </span>
-                      <span class="cv__desc-text">{{ m.descripcion }}</span>
-                      <i class="bi bi-info-circle cv__mov-info"></i>
-                    </div>
-                  </td>
-                  <td class="cv__td-muted">{{ categoriaDe(m) }}</td>
-                  <td class="cv__td-muted">{{ m.unidad_negocio?.nombre || 'Sin sector' }}</td>
-                  <td class="cv__td-muted">{{ m.deposito?.nombre || 'Sin depósito' }}</td>
-                  <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
-                  <td v-if="canEdit">
-                    <div class="cv__row-actions">
-                      <template v-if="!esAutomatico(m) && !esCerrado(m)">
-                        <button class="cv__icon-btn" @click="openEdit(m)" title="Editar"><i class="bi bi-pencil"></i></button>
-                        <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)" title="Eliminar"><i class="bi bi-trash"></i></button>
-                      </template>
-                      <i v-else-if="esCerrado(m)" class="bi bi-lock-fill cv__auto-icon" title="Período cerrado — movimiento inmutable"></i>
-                      <i v-else class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </template>
+      <div v-if="store.loadingDashboard && !store.dashboard" class="cv__loading"><DsSpinner /></div>
+      <ResumenContable
+        v-else-if="store.dashboard"
+        :dashboard="store.dashboard"
+        :sedes="sedes"
+        :sede-id="dashboardSede"
+        :can-edit="canEdit"
+        :puede-cerrar="puedeCerrarMesAnterior"
+        :cerrando="cerrandoPeriodo"
+        :fin-mes-anterior="finMesAnterior"
+        :editable="m => !esAutomatico(m) && !esCerrado(m)"
+        @cambiar-sede="cambiarSedeDashboard"
+        @detalle="abrirDetalle"
+        @editar="openEdit"
+        @eliminar="confirmDelete"
+        @ir-libro="irALibro"
+        @ir-deudores="irADeudores"
+        @ir-recurrentes="vistaActiva = 'recurrentes'"
+        @cerrar-mes="cerrarMesAnterior"
+        @reabrir="reabrirPeriodo"
+      />
     </div>
 
     <!-- ══════════════ LIBRO DIARIO ══════════════ -->
@@ -1652,8 +1277,9 @@ onMounted(async () => {
 .cv__sub { font-size: .82rem; color: var(--c-slate-500); margin: 0; }
 .cv__header-right { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; }
 
-.cv__tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.75rem; }
-.cv__tab { display: flex; align-items: center; gap: .4rem; padding: .65rem 1.1rem; font-size: .875rem; font-weight: 600; color: var(--c-slate-500); background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all .15s; }
+.cv__tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.75rem; overflow-x: auto; scrollbar-width: none; }
+.cv__tabs::-webkit-scrollbar { display: none; }
+.cv__tab { display: flex; align-items: center; gap: .4rem; flex: 0 0 auto; white-space: nowrap; padding: .65rem 1.1rem; font-size: .875rem; font-weight: 600; color: var(--c-slate-500); background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all .15s; }
 .cv__tab:hover { color: var(--c-slate-900); }
 .cv__tab--active { color: #1b5e20; border-bottom-color: #1b5e20; }
 

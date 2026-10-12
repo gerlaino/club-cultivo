@@ -186,10 +186,6 @@
     "sd__input-pre",
     "sd__label-opt"
   ],
-  "views/admin/AdminStocksPendientesView.vue": [
-    "stk__kpi--error",
-    "stk__kpi-body"
-  ],
   "views/auditor/InformeDispensacionesView.vue": [
     "inf__hoja"
   ],

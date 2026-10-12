@@ -626,6 +626,10 @@ export const getEvolucionMostrador = (sedeId, params = {}) =>
   api.get(`/sedes/${sedeId}/mostrador/evolucion`, { params })
 export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
 // El panel de conducción: el inicio del administrador (`Panel::Conduccion`, 12-oct-2026).
+// Qué bloquea y qué cambia si a alguien se le cambia el rol (`Acceso::CambiarRol#efectos`).
+// Equipo: qué hizo hoy cada persona, horas del mes, pendientes, último acceso y cupo por rol.
+export const getEquipoActividad = () => api.get('/usuarios/actividad')
+export const getCambioDeRol = (userId, rol) => api.get(`/usuarios/${userId}/cambio_de_rol`, { params: { rol } })
 export const getPanelConduccion = (params = {}) => api.get('/panel_conduccion', { params })
 export const getDetalleCierrePanel = (id) => api.get(`/panel_conduccion/cierres/${id}`)
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)

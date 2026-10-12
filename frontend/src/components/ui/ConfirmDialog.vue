@@ -34,7 +34,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <textarea v-model="state.valor" rows="2" class="cd-campo-in" :placeholder="state.campo.placeholder || ''"></textarea>
           </label>
           <div class="cd-actions">
-            <button class="btn btn-sm" :class="state.neutralText ? 'cd-cancel-ghost' : 'btn-outline-secondary'" @click="cancel">{{ state.cancelText }}</button>
+            <button v-if="!state.soloAceptar" class="btn btn-sm" :class="state.neutralText ? 'cd-cancel-ghost' : 'btn-outline-secondary'" @click="cancel">{{ state.cancelText }}</button>
             <button v-if="state.neutralText" class="btn btn-sm btn-outline-secondary" @click="neutral">{{ state.neutralText }}</button>
             <button class="btn btn-sm" :class="VARIANT_BTN[state.variant] || 'btn-danger'" @click="accept" autofocus>
               {{ state.confirmText }}
