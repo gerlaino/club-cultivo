@@ -272,6 +272,7 @@ import RegistroCamaModal   from '../../components/camas/RegistroCamaModal.vue'
 import RegarCamaModal      from '../../components/camas/RegarCamaModal.vue'
 import PlantarEnCamaModal  from '../../components/camas/PlantarEnCamaModal.vue'
 import { getCama, listCamas, cambiarFaseSala } from '../../lib/api'
+import { mensajeLuzDelEspacio } from '../../composables/useLoteTransiciones.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 
@@ -324,7 +325,6 @@ const EG = {
   curado:     'linear-gradient(150deg,#0c1a33,#1d4ed8)',
 }
 const EE = { enraizado:'🌱', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', curado:'🫙' }
-const EL = { enraizado: 'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
 const PC = { germinacion:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb', cosechado:'#dc2626', descartada:'#94a3b8' }
 const PL = { enraizado:'Enraiz.', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }
 
@@ -362,7 +362,6 @@ const faseSiguiente = computed(() => {
 
 const estadoGradient = e => EG[e] || 'linear-gradient(150deg,#0f172a,#1e293b)'
 const estadoEmoji    = e => EE[e] || '📦'
-const estadoLabel    = e => EL[e] || e || '—'
 const plantaColor    = e => PC[e] || '#64748b'
 const plantaLabel    = e => PL[e] || e || '—'
 
@@ -375,7 +374,7 @@ const plantasPagina = computed(() => {
 // Las plantas también: un trasplante que prende el lote las pasa a vegetativo, y la lista seguía
 // diciendo «Enraiz.» hasta salir y volver a entrar.
 async function recargarLote() {
-  try { const { data } = await getLote(id); lote.value = data } catch {}
+  try { const { data } = await getLote(id); lote.value = data } catch { /* no bloquea: queda lo que había */ }
   await cargarPlantas()
 }
 
@@ -460,7 +459,7 @@ async function avanzarConElEspacio(confirmado = false) {
   const nombre = lote.value.sala?.nombre || 'el espacio'
   if (!confirmado && !(await confirm({
     title: `La luz es de ${nombre}`,
-    message: `El lote está plantado en la ${lote.value.cama?.nombre || 'cama'} y no se muda. ${nombre} pasa a floración (12/12) con todos sus lotes.`,
+    message: mensajeLuzDelEspacio(lote.value, nombre),
     confirmText: `Pasar a floración`, variant: 'warning',
   }))) return
   savingFase.value = true
@@ -491,7 +490,7 @@ onMounted(async () => {
     const [loteRes, plantasRes] = await Promise.all([getLote(id), listPlants({ lote_id: id })])
     lote.value    = loteRes.data
     plantas.value = plantasRes.data?.data || plantasRes.data || []
-  } catch {} finally { loading.value = false }
+  } catch { /* no bloquea: queda lo que había */ } finally { loading.value = false }
   listCamas().then(({ data }) => { hayCamas.value = (data || []).length > 0 }).catch(() => {})
   atenderAccion()
 })

@@ -341,7 +341,25 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **EN AUTOCULTIVO NINGÚN MODAL DICE SALA, LOTE NI SEDE** (11-oct-2026). Espacio, plantas (por su
   genética), todo el cultivo. Para nombrar un lote se usa `useUsoPersonal().nombreLote` (y
   `nombre_de_lote` en el asistente); nada de `l.codigo` a la vista. Vale en el teléfono y en la compu:
-  la forma de autocultivo queda aislada de la de organizaciones.
+  la forma de autocultivo queda aislada de la de organizaciones. **Lo vigila una prueba**:
+  `e2e/autocultivoVocabulario.spec.js` recorre las pantallas de `casa@e2e.test` (`rake
+  e2e:autocultivo`) en la compu y el teléfono y falla si aparece lote, sala, sede, paciente,
+  organización o un código. Pantalla nueva del autocultivo → se suma a esa lista.
+- **EN AUTOCULTIVO SE FLORECE CAMBIANDO LA LUZ** (11-oct-2026). Con una sola carpa, «Avanzar a
+  floración» no existe: la ficha de las plantas ofrece «Pasar <espacio> a floración», que da vuelta
+  el espacio (`LoteSerializer.avanza_con_el_espacio?`, la misma regla que la cama de suelo vivo). Con
+  una carpa de vege y otra de flora, se mudan como siempre.
+- **LA GUÍA DE NUTRIENTES ES UNA REFERENCIA, NO UNA RECETA** (11-oct-2026, Germán: «no me quiero
+  hacer responsable de que después no salga la cosecha»). Por fase y por nutriente, nunca por
+  marca; con el aviso siempre arriba y las fuentes abajo. «Aplicar» sólo copia los rangos de EC y
+  pH a SUS alertas (los de una genética puntual no se tocan): no crea tareas ni toca recetas. Los
+  rangos son los de `AlertaDetectorService::RANGOS`: una sola fuente. Sólo autocultivo
+  (`Nutricion::Guia`). Calcular «tu receta aporta X mg/L» exige el N-P-K de cada producto (esquema):
+  no se hizo.
+- **LOS DATOS DEL AUTOCULTIVO SON DE LA PERSONA**: «Exportar mis datos» arma un ZIP (informes de
+  todo el historial, plantas, diario, fotos) en segundo plano y se baja SÓLO con sesión, nunca por
+  URL pública (datos de salud). Vive 48 h y se purga. Los informes salen de
+  `Informes::AutocultivoDocumentos`, la misma definición que «Mis informes».
 - **LAS TAREAS LAS GENERAN LOS USUARIOS, NO LA APP** (11-oct-2026, Germán). Cambiar de fase (botón,
   voz, sala) no crea tareas: se retiró `TareasAutoService`, que agendaba una lista fija por fase sin
   mirar lo hecho. Las tareas salen de lo que la persona agenda, de sus planes de trabajo o de lo que
@@ -567,6 +585,9 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   hasta que toca «Lo vi»; moverlo lo vuelve a dejar sin ver. Lo que se da el propio médico nace
   visto. Los avisos se mandan desde los controllers, no desde el modelo: cancelar usa
   `update_columns`, que se saltea los callbacks.
+- **Un turno no se da ni se reprograma a un momento que ya pasó** (12-oct-2026): lo valida el
+  modelo (`Turno#no_en_el_pasado`, con `agendando` desde los controllers); la historia vieja
+  (realizados, demo) no pasa por ahí. Cambiar sólo el estado de un turno de ayer sí vale.
 - **«INICIÉ EL TRÁMITE»** (6-oct-2026, Javi): el médico (de sus pacientes) o administración. Pasa el
   REPROCANN a pendiente con la fecha (`reprocann_tramite_iniciado_el`) y avisa a administración
   (alerta `reprocann_tramite_iniciado`). «Que se replique» = es el mismo dato para toda la app, y
@@ -1689,6 +1710,14 @@ corregidas a `efectivo`; era una etiqueta, no movió plata).
   de ESLint ocupa un núcleo 13 s y mata por timeout a los de DOM que corren al lado).
 
 
+- **Código muerto en dos pantallas** (visto el 11-oct-2026 al limpiar el lint de lo tocado):
+  `SalaDetailView` arrastra el viejo formulario de crear lote en línea (madre, origen, código
+  heredado, `createLote`) que reemplazó `NuevoLoteModal`; `AdminStocksPendientesView` tiene
+  `openRepartir/Procesar/Ajustar/Descartar/Movimientos` y `abrirEditar` sin nadie que los llame (los
+  reemplazó el cajón del frasco). Sacarlos pide mirar la pantalla: el template puede tener modales
+  colgados de esos refs. Y `TareasDelLote` muta la prop `lote`. Regla: el lint se limpia en lo que
+  se toca, archivo por archivo.
+
 - **155 clases CSS sin estilo** en 81 archivos, congeladas en
   `frontend/src/__tests__/clasesSinEstilo.baseline.json`. El test impide que la lista crezca y
   falla si arreglás una sin sacarla del baseline. NO todas son bugs (hay nombres de
@@ -1702,6 +1731,11 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 - **REPROCANN declara la población REGISTRADA**: sin los que no iniciaron trámite (se informan
   aparte) y **sin corte por sede — un paciente es del club**, no de una sede.
 - **Producción** separa "del período" de "hoy en el cultivo".
+- **Un número con el mismo nombre es el mismo número en todas las pantallas** (12-oct-2026,
+  Mitocondria: Stock 2.865 g, informe 3.843 g). «Flor seca disponible» sale SÓLO de
+  `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
+  agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
+  repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
 - **Trazabilidad** cierra el balance: producido − dispensado − merma = en stock.
 - **INASE** agrupa por variedad acreditable, no por genética del club.
 - **Pérdidas** es informe nuevo: plantas descartadas por motivo, merma, vencido en góndola.

@@ -15,6 +15,12 @@ class Turno < ApplicationRecord
   validates :estado, inclusion: { in: ESTADOS }
   validate  :no_modificar_si_realizado, on: :update
   validate  :paciente_y_medico_de_la_organizacion
+  # Lo que se agenda desde una pantalla —dar un turno o REPROGRAMARLO— no puede caer en una fecha u
+  # hora que ya pasó (12-oct-2026: al crear lo frenaba sólo la pantalla y al reprogramar nadie).
+  # Lo marca el controller (`agendando = true`); los turnos viejos que se cargan como historia
+  # (realizados, la org de demo) no pasan por acá.
+  attr_accessor :agendando
+  validate  :no_en_el_pasado, if: -> { agendando && cambia_el_momento? }
 
   # «Lo vi» (6-oct-2026): el turno que se da el propio médico nace visto; el que le da
   # administración, no, hasta que lo confirma. Si se lo mueven, vuelve a quedar sin ver.
@@ -61,6 +67,18 @@ class Turno < ApplicationRecord
   def paciente_y_medico_de_la_organizacion
     errors.add(:paciente, 'no es de esta organización') if paciente && club_id && paciente.club_id != club_id
     errors.add(:medico, 'no es de esta organización')   if medico && club_id && medico.club_id != club_id
+  end
+
+  # Al minuto: la pantalla manda «HH:MM:00» y un turno guardado con segundos no se «reprograma»
+  # por eso (marcar como realizado el de ayer mandaba la misma hora y se rechazaba).
+  def cambia_el_momento?
+    return true if new_record?
+    antes, despues = fecha_hora_change_to_be_saved
+    antes.nil? || despues.nil? ? will_save_change_to_fecha_hora? : (despues - antes).abs >= 60
+  end
+
+  def no_en_el_pasado
+    errors.add(:base, 'No se puede agendar un turno en una fecha u hora que ya pasó') if fecha_hora && fecha_hora <= Time.current
   end
 
   # Un turno ya realizado no se puede reprogramar (cambiar fecha) ni cancelar.

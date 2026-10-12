@@ -8,11 +8,13 @@ const DATA = {
   resena: 'Qué hay hoy…',
   filtros: { activo: true, descripcion: 'sólo stock externo' },
   hoy: {
-    por_unidad: [
-      { unidad: 'g', origen: 'propio', stocks: 2, queda: 150, en_mesa: 20, comprometido: 15, libre: 135 },
-      { unidad: 'g', origen: 'externo', stocks: 1, queda: 50, en_mesa: 0, comprometido: 0, libre: 50 },
-      { unidad: 'un', origen: 'externo', stocks: 1, queda: 12, en_mesa: 0, comprometido: 0, libre: 12 },
+    por_producto: [
+      { producto: 'flor_seca', unidad: 'g', origen: 'propio', stocks: 2, queda: 150, en_mesa: 20, comprometido: 15, libre: 135 },
+      { producto: 'flor_seca', unidad: 'g', origen: 'externo', stocks: 1, queda: 50, en_mesa: 0, comprometido: 0, libre: 50 },
+      { producto: 'otro', unidad: 'g', origen: 'propio', stocks: 1, queda: 978, en_mesa: 0, comprometido: 0, libre: 978 },
+      { producto: 'preroll', unidad: 'un', origen: 'externo', stocks: 1, queda: 12, en_mesa: 0, comprometido: 0, libre: 12 },
     ],
+    flor_seca_disponible: 185,
     stocks_con_saldo: 4, valor_costo: 60000, valor_venta: 190000, sin_costo: 1, sin_precio: 0,
   },
   stocks: [{ id: 1, numero: 'ST-001', producto: 'flor_seca', unidad: 'g', genetica: 'Kush', origen: 'externo', de_donde: 'Coop Sur',
@@ -55,14 +57,25 @@ describe('Informe de stock — pantalla', () => {
     expect(det.text()).toContain('Ana')
   })
 
+  // AC (Germán, 12-oct-2026, Mitocondria): Stock decía 2.865 g de flor y el informe 3.843 g porque
+  // sumaba la flor con 978 g de «otro». La flor seca disponible es la que manda el backend, y los
+  // otros productos van cada uno aparte.
+  it('la flor seca disponible no se suma con otro producto en gramos', () => {
+    const kpis = w.findAll('.inf__kpi').map(k => k.text())
+    expect(kpis.find(t => t.includes('Flor seca disponible'))).toContain('185 g')
+    expect(kpis.find(t => t.includes('Otro (g)'))).toContain('978 g')
+    expect(kpis.some(t => t.includes('1.163'))).toBe(false)   // 185 + 978 sumados
+  })
+
   it('pide /informes/stock', () => {
     expect(get).toHaveBeenCalledWith('/informes/stock', expect.anything())
   })
 
-  it('queda por unidad: propio y externo juntos, gramos y unidades separados', () => {
+  it('cada producto aparte: propio y externo juntos, gramos y unidades separados', () => {
     const kpis = w.findAll('.inf__kpi').map(k => k.text())
-    expect(kpis.some(t => t.includes('200 g') && t.includes('Queda (g)'))).toBe(true)
-    expect(kpis.some(t => t.includes('12 un') && t.includes('Queda (un)'))).toBe(true)
+    expect(kpis.some(t => t.includes('12 un') && t.includes('Preroll (un)'))).toBe(true)
+    const filas = w.findAll('tbody tr').map(r => r.text())
+    expect(filas.some(t => t.startsWith('Otro (g)') && t.includes('978'))).toBe(true)
   })
 
   it('dice que está filtrado', () => {

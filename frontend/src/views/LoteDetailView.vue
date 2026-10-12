@@ -14,11 +14,10 @@ import TareasDelLote from '../components/TareasDelLote.vue'
 import ModalCosechaPartial from '../components/salas/ModalCosechaPartial.vue'
 import GraficosLote from '../components/GraficosLote.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
-import { em, estadoLoteLabel, verboArranque, sm, pgm, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
+import { em, estadoLoteLabel, verboArranque, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
 import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
@@ -127,7 +126,6 @@ const sedes = ref([])
 // ── Crear sala inline (desde modales de transición) ────────
 const crearSalaOpen    = ref(false)
 const crearSalaNombre  = ref('')
-const crearSalaKind    = ref('')
 const crearSalaLoading = ref(false)
 
 async function crearSalaInline(kind) {
@@ -256,9 +254,10 @@ async function eliminarAnalisis(a) {
   analisisLab.value = analisisLab.value.filter(x => x.id !== a.id)
 }
 
-const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
-const graficosExpanded  = ref(true)
+// En autocultivo la ficha arranca liviana: qué le toca, fotos, diario y lo que recibió. Los
+// gráficos quedan plegados y lo de laboratorio y «plan vs real» no se muestra (11-oct-2026).
+const graficosExpanded  = ref(!esPersonal.value)
 const nutricionExpanded = ref(true)
 const graficosKey       = ref(0)
 
@@ -273,16 +272,6 @@ const siguientePasada = computed(() => {
   const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
   return letras.find(l => !pasadasUsadas.value.includes(l)) || 'Z'
 })
-
-const contextoAsistente = computed(() => lote.value ? {
-  tipo:          'lote',
-  lote_id:       lote.value.id,
-  lote_codigo:   lote.value.codigo,
-  sala_id:       lote.value.sala?.id,
-  sala_nombre:   lote.value.sala?.nombre,
-  plantas_count: plantList.value.length,
-  estado:        lote.value.estado,
-} : null)
 
 // ── Registro modal (nuevo) ────────────────────────────────
 const showRegistroModalNew = ref(false)
@@ -368,13 +357,13 @@ async function onLoteEditado() {
 const {
   showTransicionModal, savingTransicion, transicionError, transicionForm, transicionSalaId,
   showAvanzarSalaModal, avanzarSalaId, transicionandoRapido,
-  avanzarMaceta, faltaMaceta, MACETAS,
+  avanzarMaceta, MACETAS,
   avanzarPrendieron, prendieronInvalido, noPrendieron, plantasDelLote,
   prendieronTodas, bloqueaAvance,
   showIniciarManicuraModal, showCompletarManicuraModal,
   showCosechaModal, cosechaSalaId, savingCosecha, cosechaError, cosechaForm,
   showCosechaPartialModal,
-  handleAvanzarFase, openTransicionModal, ejecutarTransicion,
+  handleAvanzarFase, ejecutarTransicion,
   avanzarFaseRapido, ejecutarCosecha, onCosechadoParcial,
   onManicuraIniciada, onManicuraCompletada,
 } = useLoteTransiciones(id, { onPhaseChange: loadHistorial, sedes })
@@ -415,9 +404,9 @@ onMounted(async () => {
     }
   } catch { error.value = 'No se pudo cargar el lote.' }
   try   { await plants.fetchByLote(id) }
-  catch {}
+  catch { /* no bloquea: queda lo que había */ }
   await loadHistorial()
-  try { const { data } = await listSedes(); sedes.value = data || [] } catch {}
+  try { const { data } = await listSedes(); sedes.value = data || [] } catch { /* no bloquea: queda lo que había */ }
   cargarAnalisisLab()
 })
 
@@ -508,7 +497,8 @@ onUnmounted(() => {
           >
             <DsSpinner v-if="transicionandoRapido" :size="14" />
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
-            Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
+            <template v-if="lote.avanza_con_el_espacio">Pasar {{ lote.sala?.nombre || 'el espacio' }} a floración</template>
+            <template v-else>Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}</template>
           </button>
           <button
             v-if="lote.codigo_qr"
@@ -560,6 +550,10 @@ onUnmounted(() => {
       <!-- Layout -->
       <div class="ld__layout">
         <div class="ld__main">
+          <!-- Autocultivo: las fotos primero, es el diario que más se mira. -->
+          <div v-if="esPersonal" class="ld__card">
+            <LoteGaleria :lote-id="id" :can-edit="canEdit" :plantas="plantList" />
+          </div>
 
           <!-- 1. Tareas -->
           <div class="ld__section">
@@ -629,7 +623,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Análisis de laboratorio -->
-          <div class="ld__section ld__section--mt">
+          <div v-if="!esPersonal" class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="labExpanded = !labExpanded">
               <div class="ld__section-toggle-left">
                 <span class="ld__section-emoji">🧪</span>
@@ -712,8 +706,8 @@ onUnmounted(() => {
           <!-- «Cómo salió»: el cierre del ciclo (sólo en curado/cerrado). -->
           <ResumenCiclo :lote-id="id" :estado="lote.estado" class="ld__card--mt" />
 
-          <!-- 6. Fotos: la galería por semana de vida, con comparar. -->
-          <div class="ld__card">
+          <!-- 6. Fotos: la galería por semana de vida, con comparar. En autocultivo va arriba. -->
+          <div v-if="!esPersonal" class="ld__card">
             <LoteGaleria :lote-id="id" :can-edit="canEdit" :plantas="plantList" />
           </div>
 
@@ -772,7 +766,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Plan vs Real -->
-          <div v-if="canAdmin" class="ld__card ld__card--mt">
+          <div v-if="canAdmin && !esPersonal" class="ld__card ld__card--mt">
             <div class="ld__card-header">
               <span class="ld__card-title">🎯 Plan vs Real</span>
             </div>

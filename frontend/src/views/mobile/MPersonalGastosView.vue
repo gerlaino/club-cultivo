@@ -37,7 +37,7 @@
         <span class="mpg__item-ico"><i class="bi bi-receipt"></i></span>
         <span class="mpg__item-txt">
           <span class="mpg__item-desc">{{ x.descripcion }}</span>
-          <span class="mpg__item-sub">{{ x.categoria_label || x.categoria }} · {{ g.fechaCorta(x.fecha) }}<template v-if="x.lote?.codigo"> · {{ x.lote.codigo }}</template></span>
+          <span class="mpg__item-sub">{{ x.categoria_label || x.categoria }} · {{ g.fechaCorta(x.fecha) }}<template v-if="x.lote"> · {{ x.lote.genetica_nombre || x.lote.genetica?.nombre || 'plantas' }}</template></span>
         </span>
         <span class="mpg__item-monto">{{ g.ars(x.monto_ars) }}</span>
       </li>

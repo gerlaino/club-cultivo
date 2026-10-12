@@ -391,7 +391,7 @@ class MovimientosContablesController < ApplicationController
 
     # Excel (todo, con tipos reales y totales) o PDF (lo que se lee en una hoja). Ya no hay CSV:
     # ver `DescargaProfesional`. El signo en el monto hace que el total sea el resultado real.
-    movs = scope.includes(:sede, :lote, :created_by).to_a
+    movs = scope.includes(:sede, { lote: :genetica }, :created_by).to_a
     ingresos = movs.select { |m| m.tipo == 'ingreso' }.sum { |m| m.monto_ars.to_f }
     egresos  = movs.select { |m| m.tipo == 'egreso'  }.sum { |m| m.monto_ars.to_f }
     monto = ->(m) { m.tipo == 'egreso' ? -m.monto_ars.to_f : m.monto_ars.to_f }
@@ -761,7 +761,7 @@ class MovimientosContablesController < ApplicationController
       # alta creó; un gasto común no entra a ningún inventario y devuelve nil (la vista muestra
       # "Sin depósito", que es un dato, no un hueco).
       deposito:             deposito_de(m),
-      lote:                 m.lote ? { id: m.lote.id, codigo: m.lote.codigo } : nil,
+      lote:                 m.lote ? { id: m.lote.id, codigo: m.lote.codigo, genetica_nombre: m.lote.genetica&.nombre } : nil,
       dispensacion_id:      m.dispensacion_id,
       paciente_id:          m.paciente_id,
       paciente:             m.paciente ? { id: m.paciente.id, nombre: m.paciente.nombre_completo } : nil,

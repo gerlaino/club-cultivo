@@ -53,7 +53,7 @@ api.interceptors.response.use(
         const { useAuthStore } = await import("../stores/auth");
         auth = useAuthStore();
         loggingOut = auth.loggingOut;
-      } catch {}
+      } catch { /* no bloquea: queda lo que había */ }
 
       // El 401 del bootstrap (/me) NO fuerza redirect acá: el router.beforeEach ya manda
       // a /login preservando la ruta de origen (?redirect=…) — así un QR escaneado sin
@@ -89,7 +89,7 @@ api.interceptors.response.use(
     if (status === 403 && error?.response?.data?.modulo_rol_apagado && !url.includes('/users/sign_in')) {
       try {
         sessionStorage.setItem('login_error', error.response.data.error || '');
-      } catch {}
+      } catch { /* no bloquea: queda lo que había */ }
       // Igual que con el 401: si la página se va al login, el usuario no se borra antes.
       if (window.location.pathname.startsWith('/login')) {
         try {
@@ -97,7 +97,7 @@ api.interceptors.response.use(
           const auth = useAuthStore();
           auth.user = null;
           auth.bootstrapped = true;
-        } catch {}
+        } catch { /* no bloquea: queda lo que había */ }
       } else {
         anotarReload('http-403-modulo-rol', { pedido: url });
         window.location.href = '/login';
@@ -117,7 +117,7 @@ api.interceptors.response.use(
         auth.clubSuspendidoMotivo = error.response.data.motivo || null;
         auth.clubSuspendidoPersonal = !!error.response.data.personal;
         auth.clubSuspendidoEmail = error.response.data.email || null;
-      } catch {}
+      } catch { /* no bloquea: queda lo que había */ }
       return Promise.reject(error);
     }
 
@@ -800,6 +800,12 @@ export const listSetpointsFase   = (params = {}) => api.get('/setpoints_fase', {
 export const createSetpointFase  = (payload)     => api.post('/setpoints_fase', { setpoint_fase: payload })
 export const updateSetpointFase  = (id, payload) => api.put(`/setpoints_fase/${id}`, { setpoint_fase: payload })
 export const deleteSetpointFase  = (id)          => api.delete(`/setpoints_fase/${id}`)
+// Autocultivo: la guía de nutrientes (referencia) y copiar sus rangos a las alertas propias.
+export const getGuiaNutricion     = ()            => api.get('/guia_nutricion')
+export const aplicarGuiaNutricion = ()            => api.post('/guia_nutricion/aplicar')
+// Autocultivo: exportar todos mis datos (se arma en segundo plano; se baja con `descargarArchivo`).
+export const getExportacionDatos   = ()            => api.get('/mis_datos/exportar')
+export const pedirExportacionDatos = ()            => api.post('/mis_datos/exportar')
 
 export const getLoteEventos    = (loteId)          => api.get(`/lotes/${loteId}/lote_eventos`)
 export const createLoteEvento  = (loteId, payload)  => api.post(`/lotes/${loteId}/lote_eventos`, { lote_evento: payload })
@@ -908,6 +914,8 @@ export const createPlantNota = (plantId, payload) => api.post(`/plants/${plantId
 export const deleteNota     = (id)       => api.delete(`/notas/${id}`)
 
 export const addPlantFoto       = (plantId, formData) => api.post(`/plants/${plantId}/add_foto`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+// Todas las fotos de una planta en orden, para verla crecer (`Plantas::LineaDeFotos`).
+export const getLineaFotosPlanta = (id) => api.get(`/plants/${id}/linea_fotos`)
 export const removePlantFoto    = (plantId, blobId)   => api.delete(`/plants/${plantId}/fotos/${blobId}`)
 export const registrarPesoPlanta      = (plantId, payload) => api.post(`/plants/${plantId}/registrar_peso`, payload)
 

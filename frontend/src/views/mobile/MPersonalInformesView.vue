@@ -3,11 +3,13 @@
     <!-- «Mis informes» en el teléfono: una tarjeta por informe, con PDF y Excel. -->
     <h1 class="mpi__t">Mis informes</h1>
     <MisInformes variante="telefono" />
+    <ExportarMisDatos />
   </div>
 </template>
 
 <script setup>
 import MisInformes from '../../components/personal/MisInformes.vue'
+import ExportarMisDatos from '../../components/personal/ExportarMisDatos.vue'
 </script>
 
 <style scoped>

@@ -685,7 +685,7 @@ onMounted(async () => {
       cargarSemana(),
       ambienteStore.cargarAlertas(),
     ])
-  } catch {} finally { loading.value = false }
+  } catch { /* no bloquea: queda lo que había */ } finally { loading.value = false }
 })
 </script>
 

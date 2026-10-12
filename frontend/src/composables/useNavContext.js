@@ -5,7 +5,7 @@
  * grupo activo. Badges (manicura/tareas) compartidos como singleton.
  */
 import { ref } from 'vue'
-import { listLotes, listPesajesManicuraAdmin, getTareasDashboard } from '../lib/api.js'
+import { listPesajesManicuraAdmin, getTareasDashboard } from '../lib/api.js'
 
 // ── Grupos primarios + sub-pestañas ────────────────────────────────────────────
 export const NAV_GROUPS = [
@@ -44,6 +44,7 @@ export const NAV_GROUPS = [
       // Recetas de nutrientes: en organización se arman con lo del depósito; el cultivador de
       // casa no tiene depósito, así que acá viven también sus nutrientes.
       { to: '/recetas', label: 'Recetas', labelPersonal: 'Nutrientes y recetas' },
+      { to: '/guia-nutrientes', label: 'Guía de nutrientes', soloPersonal: true },
     ],
   },
   {
@@ -63,10 +64,10 @@ export const NAV_GROUPS = [
     tabs: [],
   },
   {
-    // En autocultivo: lo cosechado y sus frascos (las mismas pantallas, con sus palabras).
-    key: 'produccion', label: 'Producción', labelPersonal: 'Cosechas', to: '/admin/stock', feature: 'cultivo',
+    // En autocultivo se llama «Stock», como en el teléfono (decisión de Germán, sep-2026).
+    key: 'produccion', label: 'Producción', labelPersonal: 'Stock', to: '/admin/stock', feature: 'cultivo',
     tabs: [
-      { to: '/admin/stock', label: 'Stock', labelPersonal: 'Frascos' },
+      { to: '/admin/stock', label: 'Stock' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       // La cola de pesajes que OTROS mandan a confirmar: en uso personal no hay otros.
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob', soloOrganizacion: true },
@@ -172,6 +173,19 @@ export function labelDe(entrada, clubData) {
   return (clubData?.personal && entrada.labelPersonal) || entrada.label
 }
 
+// La sub-pestaña de `grupo` que corresponde a la ruta (la de prefijo más largo), o null. La usan
+// el topbar (pestañas) y, en autocultivo, el menú lateral, que lleva las secciones adentro.
+export function tabActivaDe(grupo, tabs, path) {
+  // Una pantalla alias del grupo (la ficha de una cama) resalta la pestaña a la que pertenece.
+  const alias = (grupo.alias || []).find(a => path === a.to || path.startsWith(a.to + '/'))
+  if (alias) return tabs.find(t => t.to === alias.tab) || null
+  let best = null, len = -1
+  for (const x of tabs) {
+    if ((path === x.to || path.startsWith(x.to + '/')) && x.to.length > len) { best = x; len = x.to.length }
+  }
+  return best
+}
+
 // Grupo activo según la ruta: el tab cuyo `to` es el prefijo más largo del path gana
 // (así /auditor/trazabilidad cae en Reportes y resalta Informes, que es su tab).
 export function detectGroup(path) {
@@ -216,7 +230,7 @@ export function useNavContext() {
       if (dashRes.status === 'fulfilled') {
         tareasPendientes.value = dashRes.value.data?.stats?.pendientes || 0
       }
-    } catch {}
+    } catch { /* no bloquea: queda lo que había */ }
   }
 
   function badgeFor(key) {

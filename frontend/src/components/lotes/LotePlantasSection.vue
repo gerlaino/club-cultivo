@@ -287,7 +287,7 @@ const props = defineProps({
   canEdit:     { type: Boolean, default: false },
   isCultivador:{ type: Boolean, default: false },
 })
-const emit = defineEmits(['cosechar'])
+defineEmits(['cosechar'])
 
 const plantsStore  = usePlantsStore()
 const clubStore    = useClubStore()
@@ -330,15 +330,6 @@ const plantasMostradas  = computed(() => {
   const start = (plantasPage.value - 1) * plantasPerPage.value
   return plantasActivas.value.slice(start, start + plantasPerPage.value)
 })
-const layoutCols = computed(() => {
-  const n = plantList.value.length
-  if (n <= 6)  return n
-  if (n <= 12) return 4
-  if (n <= 30) return 6
-  if (n <= 60) return 8
-  return 10
-})
-
 const layoutLeyenda = computed(() => {
   const counts = {}
   for (const p of plantList.value) {

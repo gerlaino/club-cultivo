@@ -7,11 +7,13 @@
       <p class="mie__p">Lo que ves es lo que se descarga: mismo período, mismos números.</p>
     </header>
     <MisInformes variante="escritorio" />
+    <ExportarMisDatos />
   </div>
 </template>
 
 <script setup>
 import MisInformes from '../../components/personal/MisInformes.vue'
+import ExportarMisDatos from '../../components/personal/ExportarMisDatos.vue'
 </script>
 
 <style scoped>

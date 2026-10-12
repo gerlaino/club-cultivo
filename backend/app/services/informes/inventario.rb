@@ -9,7 +9,7 @@ module Informes
   #   3. Lo que no se mueve y lo que vence — stock con saldo sin salida hace un mes, y vencimientos.
   #
   # Reglas que no se rompen acá:
-  #   · Por unidad, nunca sumado entre unidades (gramos, unidades, ml). La plata sí se suma.
+  #   · Por producto y unidad, nunca sumado entre productos ni entre unidades. La plata sí se suma.
   #   · La mesa es un LUGAR, no un compromiso: «libre» es `disponible_para_entregar` (queda menos
   #     eventos y reservas), el mismo número que valida la dispensa. Si lo calculara distinto, el
   #     informe diría «hay» y el mostrador no dejaría entregar.
@@ -120,6 +120,9 @@ module Informes
         numero:       s.numero_lote_producto,
         producto:     s.forma_producto,
         unidad:       s.unidad,
+        # Un 'agotado' con saldo es un dato viejo: se lista, pero no cuenta en «Qué hay hoy» (el
+        # mismo criterio que la pantalla de Stock, `Stock.en_inventario`).
+        agotado:      s.estado == 'agotado',
         genetica:     s.genetica&.nombre || s.lote&.genetica&.nombre || s.descripcion,
         origen:       s.origen == 'compra_externa' ? 'externo' : 'propio',
         de_donde:     s.origen == 'compra_externa' ? s.proveedor : s.lote&.codigo,
@@ -208,15 +211,21 @@ module Informes
 
     # ── 1. Hoy ─────────────────────────────────────────────────────────────────
 
-    # Por unidad y origen: queda, en mesa, comprometido, libre. Y la plata, que sí se suma.
+    # Por PRODUCTO, unidad y origen: queda, en mesa, comprometido, libre. Y la plata, que sí se suma.
+    #
+    # Era por unidad y nada más, y «g» juntaba la flor con cualquier otro producto en gramos: en
+    # Mitocondria (12-oct-2026) decía 3.843 g donde había 2.865 g de flor y 978 g de «otro». La
+    # flor seca disponible es la misma cuenta que la pantalla de Stock (`Stock.flor_seca_disponible`).
     def hoy(filas)
-      con_saldo = filas.select { |f| f[:queda].positive? }
+      con_saldo = filas.select { |f| f[:queda].positive? && !f[:agotado] }
+      flor      = con_saldo.select { |f| f[:producto] == 'flor_seca' }
       {
-        por_unidad: con_saldo.group_by { |f| [f[:unidad], f[:origen]] }.sort.map { |(u, o), fs|
-          { unidad: u, origen: o, stocks: fs.size,
+        por_producto: con_saldo.group_by { |f| [f[:producto], f[:unidad], f[:origen]] }.sort_by { |(p, u, o), _| [p == 'flor_seca' ? 0 : 1, p.to_s, u.to_s, o.to_s] }.map { |(p, u, o), fs|
+          { producto: p, unidad: u, origen: o, stocks: fs.size,
             queda: suma(fs, :queda), en_mesa: suma(fs, :en_mesa),
             comprometido: suma(fs, :comprometido), libre: suma(fs, :libre) }
         },
+        flor_seca_disponible: suma(flor, :libre),
         stocks_con_saldo: con_saldo.size,
         valor_costo:  con_saldo.sum { |f| f[:valor_costo].to_f }.round(2),
         valor_venta:  con_saldo.sum { |f| f[:valor_venta].to_f }.round(2),
@@ -225,11 +234,11 @@ module Informes
       }
     end
 
-    # ── 2. El período, sumado por unidad ───────────────────────────────────────
+    # ── 2. El período, sumado por producto y unidad ───────────────────────────────────────
 
     def periodo(filas)
-      filas.group_by { |f| f[:unidad] }.sort.map do |u, fs|
-        { unidad: u, habia: suma(fs, :habia), ingreso: suma(fs, :ingreso), dispensado: suma(fs, :dispensado),
+      filas.group_by { |f| [f[:producto], f[:unidad]] }.sort_by { |(p, u), _| [p == 'flor_seca' ? 0 : 1, p.to_s, u.to_s] }.map do |(p, u), fs|
+        { producto: p, unidad: u, habia: suma(fs, :habia), ingreso: suma(fs, :ingreso), dispensado: suma(fs, :dispensado),
           merma: suma(fs, :merma), otras_salidas: suma(fs, :otras_salidas), ajustes: suma(fs, :ajustes),
           quedaba: suma(fs, :quedaba) }
       end

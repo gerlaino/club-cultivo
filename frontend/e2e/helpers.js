@@ -38,6 +38,8 @@ export const USUARIOS = {
   dispensador: 'dispensador@e2e.test',
   delivery:    'delivery@e2e.test',
   cultivador:  'cultivador@e2e.test',
+  // El autocultivo de pruebas (`rake e2e:autocultivo`): otra cuenta, no la org `e2e`.
+  casa:        'casa@e2e.test',
 }
 
 export async function entrar (page, quien) {

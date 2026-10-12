@@ -24,12 +24,17 @@
       <section class="inf__section">
         <div class="inf__section-head">
           <h2 class="inf__section-title">Qué hay hoy</h2>
-          <span class="inf__section-marco">la foto de ahora · cada unidad en lo suyo</span>
+          <span class="inf__section-marco">la foto de ahora · cada producto en lo suyo</span>
         </div>
         <div class="inf__kpis">
-          <div v-for="u in quedaPorUnidad" :key="u.unidad" class="inf__kpi inf__kpi--ok">
+          <!-- El mismo número que «Flor seca disponible» en la pantalla de Stock: lo calcula el backend. -->
+          <div class="inf__kpi inf__kpi--ok">
+            <span class="inf__kpi-valor">{{ cant(hoy.flor_seca_disponible, 'g') }}</span>
+            <span class="inf__kpi-label">Flor seca disponible</span>
+          </div>
+          <div v-for="u in otrosProductos" :key="`${u.producto}-${u.unidad}`" class="inf__kpi">
             <span class="inf__kpi-valor">{{ cant(u.queda, u.unidad) }}</span>
-            <span class="inf__kpi-label">Queda ({{ u.unidad }})</span>
+            <span class="inf__kpi-label">{{ nombreProducto(u.producto) }} ({{ u.unidad }})</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ plata(hoy.valor_costo) }}</span>
@@ -44,13 +49,13 @@
         </div>
         <!-- La mesa es un LUGAR, no un compromiso: lo libre descuenta eventos y reservas, no la
              mesa. Es el mismo número que valida la dispensa. -->
-        <table v-if="hoy.por_unidad?.length" class="inf__table">
+        <table v-if="hoy.por_producto?.length" class="inf__table">
           <thead>
-            <tr><th>Unidad</th><th>Origen</th><th class="num">Stocks</th><th class="num">Queda</th><th class="num">Sobre una mesa</th><th class="num">Comprometido</th><th class="num">Libre</th></tr>
+            <tr><th>Producto</th><th>Origen</th><th class="num">Stocks</th><th class="num">Queda</th><th class="num">Sobre una mesa</th><th class="num">Comprometido</th><th class="num">Libre</th></tr>
           </thead>
           <tbody>
-            <tr v-for="x in hoy.por_unidad" :key="`${x.unidad}-${x.origen}`">
-              <td>{{ x.unidad }}</td>
+            <tr v-for="x in hoy.por_producto" :key="`${x.producto}-${x.unidad}-${x.origen}`">
+              <td>{{ nombreProducto(x.producto) }} <span class="inf__dias">({{ x.unidad }})</span></td>
               <td><span class="inf__badge" :class="{ 'inf__badge--ext': x.origen === 'externo' }">{{ nombreOrigen(x.origen) }}</span></td>
               <td class="num">{{ x.stocks }}</td>
               <td class="num">{{ num(x.queda) }}</td>
@@ -147,8 +152,8 @@
         <table v-if="data.periodo?.length" class="inf__table inf__table--total">
           <thead><tr><th>En el período</th><th class="num">Había</th><th class="num">Ingresó</th><th class="num">Dispensado</th><th class="num">Merma</th><th class="num">Otras salidas</th><th class="num">Ajustes</th><th class="num">Quedaba</th></tr></thead>
           <tbody>
-            <tr v-for="x in data.periodo" :key="x.unidad">
-              <td>Total en {{ x.unidad }}</td>
+            <tr v-for="x in data.periodo" :key="`${x.producto}-${x.unidad}`">
+              <td>{{ nombreProducto(x.producto) }} <span class="inf__dias">({{ x.unidad }})</span></td>
               <td class="num">{{ num(x.habia) }}</td>
               <td class="num">{{ num(x.ingreso) }}</td><td class="num">{{ num(x.dispensado) }}</td>
               <td class="num">{{ num(x.merma) }}</td><td class="num">{{ num(x.otras_salidas) }}</td><td class="num">{{ num(x.ajustes) }}</td>
@@ -229,11 +234,17 @@ const data    = ref(null)
 const abierto = ref(null)
 
 const hoy = computed(() => data.value?.hoy || {})
-// Un KPI por unidad: lo propio y lo externo juntos, pero nunca gramos con unidades.
-const quedaPorUnidad = computed(() => {
+// Un KPI por producto que no es flor: lo propio y lo externo juntos, pero nunca un producto con
+// otro (sumar «g» de todo mezclaba la flor con otros productos, 12-oct-2026).
+const otrosProductos = computed(() => {
   const m = {}
-  for (const x of hoy.value.por_unidad || []) m[x.unidad] = (m[x.unidad] || 0) + x.queda
-  return Object.entries(m).map(([unidad, queda]) => ({ unidad, queda }))
+  for (const x of hoy.value.por_producto || []) {
+    if (x.producto === 'flor_seca') continue
+    const k = `${x.producto}|${x.unidad}`
+    m[k] = m[k] || { producto: x.producto, unidad: x.unidad, queda: 0 }
+    m[k].queda += x.queda
+  }
+  return Object.values(m)
 })
 
 async function cargar() {

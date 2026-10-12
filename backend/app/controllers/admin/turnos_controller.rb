@@ -6,6 +6,7 @@ module Admin
     # PATCH /api/admin/turnos/:id
     def update
       turno = club.turnos.find(params[:id])
+      turno.agendando = true
       if turno.update(turno_params)
         cambio = if turno.saved_change_to_estado? && turno.estado == 'cancelado' then :cancelado
                  elsif turno.saved_change_to_fecha_hora? then :movido

@@ -73,9 +73,8 @@ module Notificaciones
         desc: 'Una tarea del cultivo quedó sin hacer.',
         roles: %w[admin], feature: 'cultivo', default: false,
         desc_personal: 'Una tarea importante (prioridad alta o urgente) lleva más de dos días sin hacerse.' },
-      { clave: 'lote_critico',     grupo: RECORD, label: 'Lote en estado crítico',
-        desc: 'Un lote con plantas enfermas o con problemas serios.',
-        roles: %w[admin], feature: 'cultivo', personal: false, default: false },
+      # «Lote en estado crítico» salió el 11-oct-2026: se ofrecía y nada lo disparaba (la salud de la
+      # planta nunca se carga). Lo que no se manda no se ofrece; si vuelve, vuelve con su detector.
       { clave: 'ambiente',         grupo: RECORD, label: 'Ambiente fuera de rango',
         desc: 'Temperatura, humedad, pH o EC fuera de lo que configuraste, o un espacio sin registro.',
         roles: %w[admin], feature: 'cultivo', default: false,

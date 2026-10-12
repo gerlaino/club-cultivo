@@ -306,8 +306,14 @@ class AnalyticsController < ApplicationController
                   .includes(:lote)
 
     stock_bajo_umbral = club.umbral_stock_g.to_f
-    stocks_data = stocks.group_by(&:forma_producto).map do |forma, ss|
-      total = ss.sum { |s| s.cantidad.to_f }
+    # La flor seca es «Flor seca disponible» en el inicio: el MISMO número que la pantalla de Stock
+    # (`Stock.flor_seca_disponible`, toda la organización). Sumaba el frasco entero, sin restar lo
+    # reservado, y sólo lo que ya tenía sede (12-oct-2026).
+    flor_disponible = Stock.flor_seca_disponible(Stock.where(club_id: club.id)).to_f
+    por_forma = stocks.group_by(&:forma_producto)
+    por_forma['flor_seca'] ||= [] if flor_disponible.positive?   # flor que todavía no tiene sede
+    stocks_data = por_forma.map do |forma, ss|
+      total = forma == 'flor_seca' ? flor_disponible : ss.sum { |s| s.cantidad.to_f }
       # "Stock bajo" solo aplica a flor seca; los derivados son inventario, no disparan alerta.
       { forma: forma, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < stock_bajo_umbral }
     end.sort_by { |s| s[:cantidad_g] }

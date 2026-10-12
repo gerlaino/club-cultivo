@@ -16,6 +16,7 @@ module Medico
       return paciente_ajeno unless paciente_visible?(turno_params[:paciente_id])
 
       turno = club.turnos.new(turno_params.merge(medico_id: current_user.id))
+      turno.agendando = true
       if turno.save
         render json: serialize(turno), status: :created
       else
@@ -28,6 +29,7 @@ module Medico
       turno = club.turnos.del_medico(current_user.id).find(params[:id])
       return paciente_ajeno if turno_params.key?(:paciente_id) && !paciente_visible?(turno_params[:paciente_id])
 
+      turno.agendando = true
       if turno.update(turno_params)
         render json: serialize(turno)
       else

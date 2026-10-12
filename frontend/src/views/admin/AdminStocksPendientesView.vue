@@ -5,7 +5,7 @@
     <div class="stk__header">
       <div>
         <div class="stk__header-row">
-          <h1 class="stk__title">{{ esPersonal ? 'Frascos' : 'Stock' }}</h1>
+          <h1 class="stk__title">Stock</h1>
           <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
         </div>
         <p class="stk__sub">{{ esPersonal ? 'Lo que cosechaste y lo que hiciste con eso: flor, hash, aceite, prerolls.' : 'Inventario de la organización · asignación de sedes · stock externo' }}</p>
@@ -747,7 +747,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import Paginator from '../../components/ui/Paginator.vue'
 import TablaInventarioStock from '../../components/stock/TablaInventarioStock.vue'
 import {
-  listStocksPendientes, listStocks, listStocksHistorial, listStockInventario,
+  listStocksPendientes, listStocksHistorial, listStockInventario,
   asignarStock, ajustarStock, descartarStock, getStockMovimientos, listStocksVacios,
   listSedes, createStock, updateStock,
   getPreferences, updatePreferences, listGeneticas,
@@ -865,7 +865,7 @@ async function cargarPendientes() {
     const nuevos = data || []
     nuevos.forEach(s => { asignaciones.value[s.id] ??= ''; cantidades.value[s.id] ??= '' })
     pendientes.value = nuevos
-  } catch {}
+  } catch { /* no bloquea: queda lo que había */ }
 }
 useRecargaEnCambios(['stocks', 'pesajes'], async () => {
   liveConectado.value = true
@@ -1094,7 +1094,7 @@ async function cargarGeneticas() {
   try {
     const { data } = await listGeneticas({ solo_club: true })
     geneticas.value = data || []
-  } catch {}
+  } catch { /* no bloquea: queda lo que había */ }
 }
 
 async function openCrear() {

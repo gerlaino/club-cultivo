@@ -9,8 +9,8 @@
 
     <!-- Grupos primarios (1 click → su vista principal) -->
     <nav class="asb__nav">
+      <template v-for="g in visibleGroups" :key="g.key">
       <RouterLink
-        v-for="g in visibleGroups" :key="g.key"
         :to="toDe(g, club.data)" class="asb__link"
         :class="{ 'asb__link--active': activeKey === g.key }"
         :title="collapsed ? labelDe(g, club.data) : undefined"
@@ -19,6 +19,15 @@
         <span class="asb__label">{{ labelDe(g, club.data) }}</span>
         <span v-if="groupBadge(g)" class="asb__badge">{{ groupBadge(g) }}</span>
       </RouterLink>
+      <!-- Autocultivo: las secciones del grupo van adentro del menú, no como pestañas arriba
+           (un solo menú, 11-oct-2026). Se ven las del grupo en el que estás. -->
+      <div v-if="club.data?.personal && !collapsed && activeKey === g.key && subsDe(g).length > 1" class="asb__subs">
+        <RouterLink v-for="t in subsDe(g)" :key="t.to" :to="t.to" class="asb__sub"
+                    :class="{ 'asb__sub--active': subActiva(g) === t }">
+          {{ labelDe(t, club.data) }}
+        </RouterLink>
+      </div>
+      </template>
     </nav>
 
     <button class="asb__collapse" @click="toggleCollapse" :title="collapsed ? 'Expandir menú' : 'Contraer menú'">
@@ -37,7 +46,7 @@ import {
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
   Calculator, UserCog, Store,
 } from 'lucide-vue-next'
-import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, toDe, useNavContext } from '../../composables/useNavContext.js'
+import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, tabActivaDe, toDe, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
@@ -73,6 +82,8 @@ const ICONS = {
 const visibleGroups = computed(() => NAV_GROUPS.filter(g => entradaVisible(g, club.data)))
 
 const activeKey = computed(() => detectGroup(route.path).key)
+const subsDe     = (g) => (g.tabs || []).filter(t => entradaVisible(t, club.data))
+const subActiva  = (g) => tabActivaDe(g, subsDe(g), route.path)
 
 function groupBadge(g) {
   return g.tabs.reduce((s, t) => s + (t.badge ? badgeFor(t.badge) : 0), 0)
@@ -129,6 +140,10 @@ watch(() => route.path, (path, prev) => {
 .asb__link:hover { background: rgba(255,255,255,0.06); color: var(--c-paper); }
 .asb__link--active { background: rgba(255,255,255,0.14); color: var(--c-paper); font-weight: 600; border-left-color: var(--c-leaf-300); }
 .asb__link-ico { flex-shrink: 0; }
+.asb__subs { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 30px; }
+.asb__sub { padding: 6px 12px; border-radius: var(--r-md); font-size: var(--fs-13); color: var(--c-leaf-300); text-decoration: none; }
+.asb__sub:hover { background: rgba(255,255,255,0.06); color: var(--c-paper); }
+.asb__sub--active { color: var(--c-paper); font-weight: 600; background: rgba(255,255,255,0.08); }
 .asb__label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asb__badge { background: #d97706; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 10px; min-width: 16px; text-align: center; }
 

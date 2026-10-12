@@ -128,3 +128,11 @@ export function paraInputDatetime(date = new Date()) {
   const mm = String(d.getMinutes()).padStart(2, '0')
   return `${toISO(d)}T${hh}:${mm}`
 }
+
+// ¿Una fecha (YYYY-MM-DD) y hora (HH:MM) LOCALES ya pasaron? Para no agendar ni reprogramar un
+// turno en el pasado (12-oct-2026): el selector de fecha corta en hoy, pero la hora de hoy no.
+// El backend valida lo mismo (`Turno#no_en_el_pasado`); esto es para avisar antes de mandar.
+export function yaPaso(fecha, hora, ahora = new Date()) {
+  if (!fecha || !hora) return false
+  return new Date(`${fecha}T${hora}:00`) <= ahora
+}

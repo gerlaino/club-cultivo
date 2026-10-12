@@ -1,5 +1,64 @@
 # Changelog
 
+## Octubre 2026 (ey) — «Flor seca disponible» es un solo número; mostrador plegado; turnos no al pasado (12-oct)
+
+Germán, en Mitocondria ONG: Stock decía 2.865,4 g de flor seca disponible y el informe de stock
+3.843,4 g. Confirmado en producción: 2.865,4 g de flor y 978 g de un stock «otro», también en
+gramos. El informe sumaba por UNIDAD, así que «g» juntaba la flor con cualquier otro producto.
+
+- `Stock.flor_seca_disponible(scope)` + scope `Stock.en_inventario` (con saldo, no agotado): la
+  única cuenta. La usan la pantalla de Stock, el inicio del admin (que además sumaba el frasco
+  entero sin restar reservas y sólo lo que tenía sede) y el informe de stock.
+- `Informes::Inventario`: «Qué hay hoy» y «En el período» van por producto y unidad
+  (`hoy[:por_producto]`, antes `por_unidad`); `hoy[:flor_seca_disponible]`; un agotado con saldo
+  se lista pero no cuenta en lo de hoy (mismo criterio que Stock). KPIs del informe (pantalla, PDF
+  y Excel): «Flor seca disponible» y cada otro producto aparte.
+- Spec `informe_vs_pantalla_spec.rb` «la flor seca disponible»: el mismo número en los tres lados,
+  con una reserva, un «otro» en gramos y un agotado con saldo.
+
+**Mostrador — «Mientras la caja estuvo abierta»** (Germán: «un scroll larguísimo»): componente
+`MovimientosDelTurno.vue`, uno solo para compu y teléfono. Siempre plegado con un resumen (cuántos
+productos, quién, a qué hora el último); desplegado, de a 10 con «Ver 10 más». Arregla «Flor
+secaVita MacST-26-0049» (las palabras pegadas). Los cierres de otros días siguen en el calendario
+de la solapa Cierres.
+
+**Turnos: ni crear ni reprogramar en el pasado** (Germán: al dar un turno avisaba, al reprogramar
+no). La regla la tenía sólo la pantalla de crear. `Turno#no_en_el_pasado` (con `agendando`, que
+marcan los cuatro caminos: médico y administración, crear y actualizar), al minuto: cerrar como
+realizado un turno de ayer manda la misma hora y sigue andando. Las dos pantallas de reprogramar
+(`TurnoDetallePanel`, ficha del paciente) avisan y no dejan confirmar (`yaPaso` en `utils/dates.js`)
+y muestran el motivo del backend. Spec `turnos_no_en_el_pasado_spec.rb`.
+
+## Octubre 2026 (ex) — El plan del 11-oct: autocultivo blindado, guía de nutrientes, fotos en el tiempo y mis datos (11-oct)
+
+Germán aprobó el plan entero («hacé todo»), salvo el plan de cultivo («sería mentir»): la guía va
+como referencia opcional. El correo de producción queda para la semana, con Javi.
+1. **Autocultivo blindado.**
+   - `e2e/autocultivoVocabulario.spec.js` + `rake e2e:autocultivo` (`casa@e2e.test`, otra cuenta,
+     no la org `e2e`): recorre 23 pantallas en compu y teléfono y falla con lote/sala/sede/código. Ya
+     encontró uno: «Hoy», Stock y Gastos del teléfono mostraban `L-26-001`.
+   - Un solo gesto para florar: con una carpa, «Pasar <espacio> a floración» también en la compu
+     (`avanza_con_el_espacio?` ahora cubre el autocultivo sin otra carpa de flora).
+   - Ficha de las plantas liviana: fotos arriba, gráficos plegados, sin laboratorio ni plan vs real.
+   - Un solo menú en la compu: las secciones van adentro del menú lateral (con el menú contraído
+     vuelven las pestañas).
+2. **Guía de nutrientes** (`Nutricion::Guia`, `/guia-nutrientes`, `/m/personal/guia`): qué pide la
+   planta por fase (por nutriente), rangos de EC/pH (los de las alertas), suelo vivo aparte, fuentes
+   (Guelph 2021/2024, Saloner 2020), comparación con los registros de 14 días y «Usar estos rangos en
+   mis alertas». Sin marcas, sin tareas.
+3. **Cómo creció** (`Plantas::LineaDeFotos`, `GET /plants/:id/linea_fotos`): las fotos de la planta
+   (ficha + galería que la nombra + las del espacio, marcadas) pasando con su día y fase.
+   **Exportar mis datos** (`Autocultivo::ExportarDatos`, `ExportarDatosJob`, `/mis_datos/exportar`):
+   ZIP con informes PDF/Excel de todo el historial, plantas, diario y fotos; estado en Redis, blob
+   que se purga a las 48 h, descarga con sesión. Los tres informes salieron a
+   `Informes::AutocultivoDocumentos` (el controller y el ZIP usan la misma definición).
+4. **Orden.** «Lote en estado crítico» salió del catálogo de avisos también en organizaciones
+   (nada lo disparaba: la salud de la planta nunca se carga). Lint limpio en lo tocado salvo dos
+   bloques de código muerto anotados en Deuda técnica. El menú de la compu en autocultivo dice
+   «Stock», como el teléfono (decisión de Germán de sep-2026; el bloque (ew) lo había cambiado).
+Tests: `autocultivo_floracion_con_la_luz_spec`, `guia_nutricion_spec`, `linea_fotos_planta_spec`,
+`exportar_mis_datos_spec`, e2e `autocultivoVocabulario`.
+
 ## Octubre 2026 (ew) — Avisos, fichas y configuración del autocultivo sin lotes, salas ni sedes (11-oct)
 
 Germán: «lo que es autocultivo tiene que ser lo más customizable posible, sin tocar lo de
@@ -18,8 +77,8 @@ organizaciones». Segunda pasada después de los modales (ev), con Playwright co
   de vege» (`loteHelpers`), historial «Registro» (backend). Planta: miga Mi cultivo › espacio.
   Cama: plantas por genética.
 - **Configuración**: «Tu plan» muestra espacios y plantas (decía Sedes 1 de 1 y Pacientes 0 de 0
-  en rojo); sin razón social, sitio web ni correo de la organización. Menú: Inicio, Cosechas
-  (Frascos), Informes. Stock sin columna Lote.
+  en rojo); sin razón social, sitio web ni correo de la organización. Menú: Inicio,
+  Stock (como en el teléfono), Informes. Stock sin columna Lote.
 Tests: `alerta_detector_personal_spec`, `notificaciones_preferencias_spec`, `proximoPasoAutocultivo`.
 
 ## Octubre 2026 (ev) — Los modales de autocultivo hablan de espacios y plantas (11-oct)

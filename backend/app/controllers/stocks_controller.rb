@@ -162,7 +162,7 @@ class StocksController < ApplicationController
     flor = base.where(forma_producto: 'flor_seca').to_a
     Stock.precargar_apartados(flor)
     reservado_flor  = flor.sum { |s| s.apartado_para_reservas.to_f }
-    flor_disponible = flor.sum { |s| s.disponible_para_entregar.to_f }
+    flor_disponible = Stock.flor_seca_disponible(base).to_f   # el mismo número que el inicio y el informe
     # Dónde está esa flor: guardada o sobre la mesa. Los dos juntos son lo que hay; los KPIs del
     # Depósito los muestran por separado y no los recalculan en el navegador.
     flor_en_deposito = flor.sum { |s| s.en_deposito.to_f }

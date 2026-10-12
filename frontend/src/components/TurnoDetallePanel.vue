@@ -1,12 +1,12 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppDatePicker from './ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
 import { updateMedicoTurno, updateAdminTurno } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { X, CheckCircle2, XCircle, AlertCircle, Pencil } from 'lucide-vue-next'
-import { hoyISO } from '../utils/dates.js'
+import { hoyISO, yaPaso } from '../utils/dates.js'
 
 const props = defineProps({
   turno:     { type: Object,  required: true },
@@ -75,7 +75,11 @@ function abrirReprogramar() {
   editingFecha.value = true
 }
 
+// Elegir hoy a una hora que ya pasó: se avisa y no se manda (lo rechaza también el backend).
+const reprogramaAlPasado = computed(() => yaPaso(reprogramForm.value.fecha, reprogramForm.value.hora))
+
 async function guardarReprogramacion() {
+  if (reprogramaAlPasado.value) return
   reprogramSaving.value = true
   try {
     const fecha_hora = new Date(`${reprogramForm.value.fecha}T${reprogramForm.value.hora}:00`).toISOString()
@@ -86,7 +90,7 @@ async function guardarReprogramacion() {
     emit('updated', data)
     editingFecha.value = false
     toast.success('Turno reprogramado')
-  } catch { toast.error('No se pudo reprogramar') }
+  } catch (e) { toast.error(e?.response?.data?.errors?.[0] || 'No se pudo reprogramar') }
   finally { reprogramSaving.value = false }
 }
 
@@ -211,9 +215,12 @@ function irFicha() {
               </select>
             </div>
           </div>
+          <p v-if="reprogramaAlPasado" class="tdp__reprog-warn" role="alert">
+            Esa fecha y hora ya pasaron. Elegí un momento que todavía no haya llegado.
+          </p>
           <div class="tdp__row-btns">
             <button class="tdp__btn-ghost tdp__btn-xs" @click="editingFecha = false">Cancelar</button>
-            <button class="tdp__btn-primary tdp__btn-xs" :disabled="reprogramSaving" @click="guardarReprogramacion">
+            <button class="tdp__btn-primary tdp__btn-xs" :disabled="reprogramSaving || reprogramaAlPasado" @click="guardarReprogramacion">
               <DsSpinner v-if="reprogramSaving" :size="12" /> Confirmar
             </button>
           </div>
@@ -378,4 +385,5 @@ function irFicha() {
 }
 .tdp__btn-ghost:hover { background: var(--c-slate-50); }
 .tdp__btn-xs { padding: .3rem .7rem !important; font-size: .73rem !important; }
+.tdp__reprog-warn { margin: 0; font-size: var(--fs-12); color: var(--c-rust-600); }
 </style>

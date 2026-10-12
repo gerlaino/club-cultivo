@@ -38,6 +38,7 @@ module Admin
       turno = club.turnos.new(
         turno_params.merge(medico_id: medico.id)
       )
+      turno.agendando = true
 
       if turno.save
         # El turno vincula solo al paciente con el médico (`Turno#vincular_paciente_con_medico`).

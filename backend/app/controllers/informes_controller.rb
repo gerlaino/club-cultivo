@@ -250,90 +250,9 @@ class InformesController < ApplicationController
   # Las mismas cuentas que el resto de los informes, dichas como las dice quien cultiva en casa:
   # plantas y frascos. Sólo en uso personal: una organización tiene Producción, Trazabilidad y
   # Contabilidad, por lote y por sede.
-  def mi_cosecha
-    return solo_autocultivo! unless current_user.club.personal?
-
-    desde, hasta = periodo_rango
-    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).mi_cosecha
-    g = ->(n) { n.nil? ? '—' : "#{num(n)} g" }
-    responder_informe(
-      titulo: 'Mi cosecha', nombre: 'mi_cosecha', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
-      resena: '¿Cuánto rindió cada planta y cada genética? Cuenta las plantas cosechadas en el período. Si varias se pesaron juntas, a cada una le toca su parte y se aclara.',
-      kpis: [
-        { label: 'Plantas cosechadas', valor: d[:total_plantas] },
-        { label: 'Seco', valor: g.call(d[:seco_g]), tono: :ok },
-        { label: 'Por planta', valor: g.call(d[:por_planta_g]) },
-      ],
-      secciones: [
-        { titulo: 'Planta por planta',
-          headers: ['Planta', 'Genética', 'Tipo', 'Cosechada', 'Días', 'Húmedo (g)', 'Seco (g)', ''],
-          rows: d[:plantas].map { |f| [f[:nombre], f[:genetica], f[:tipo], fmt_fecha(f[:cosechada]), f[:dias] || '—',
-                                       f[:humedo_g] || '—', f[:seco_g] || 'sin peso', f[:repartido] ? 'repartido' : ''] },
-          formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :numero, :texto],
-          aligns: { 4 => :right, 5 => :right, 6 => :right },
-          vacio: 'No se cosechó ninguna planta en el período elegido.' },
-        { titulo: 'Por genética',
-          headers: ['Genética', 'Plantas', 'Seco (g)', 'Por planta (g)'],
-          rows: d[:por_genetica].map { |x| [x[:genetica], x[:plantas], x[:seco_g] || 'sin peso', x[:por_planta_g] || '—'] },
-          formatos: [:texto, :numero, :numero, :numero], aligns: { 1 => :right, 2 => :right, 3 => :right },
-          vacio: 'Sin cosechas en el período.' },
-      ],
-    )
-  end
-
-  def de_donde_salio
-    return solo_autocultivo! unless current_user.club.personal?
-
-    desde, hasta = periodo_rango
-    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).de_donde_salio
-    responder_informe(
-      titulo: 'De dónde salió', nombre: 'de_donde_salio', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
-      resena: 'Cada frasco del período con las plantas de las que salió, su genética y el QR de cada planta: escaneándolo se abre su diario entero.',
-      kpis: [
-        { label: 'Frascos', valor: d[:total_frascos] },
-        { label: 'Gramos', valor: "#{num(d[:gramos])} g" },
-        { label: 'Plantas de origen', valor: d[:plantas_de_origen] },
-      ],
-      secciones: [
-        { titulo: 'Frasco por frasco',
-          headers: ['Frasco', 'Producto', 'Cantidad', 'Quedan', 'Plantas', 'Genética', 'Cosechada', 'QR de las plantas'],
-          rows: d[:frascos].map { |f| [f[:codigo], f[:producto], "#{num(f[:gramos])} #{f[:unidad]}", "#{num(f[:quedan])} #{f[:unidad]}",
-                                       f[:plantas].join(', ').presence || '—', f[:genetica] || '—', fmt_fecha(f[:cosechada]),
-                                       f[:qr_plantas].join(', ').presence || '—'] },
-          aligns: { 2 => :right, 3 => :right },
-          vacio: 'No se armó ningún frasco en el período elegido.' },
-      ],
-    )
-  end
-
-  def mis_gastos
-    return solo_autocultivo! unless current_user.club.personal?
-
-    desde, hasta = periodo_rango
-    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).mis_gastos
-    pesos = ->(n) { n.nil? ? '—' : "$ #{ActiveSupport::NumberHelper.number_to_delimited(n.round, delimiter: '.')}" }
-    responder_informe(
-      titulo: 'Mis gastos', nombre: 'mis_gastos', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
-      resena: 'Lo que anotaste como gasto en el período, por mes y por tipo, y cuánto costó cada gramo: lo gastado dividido por lo que se cosechó en el mismo período.',
-      kpis: [
-        { label: 'Gastado', valor: pesos.call(d[:total]) },
-        { label: 'Seco cosechado', valor: d[:seco_g].to_f.positive? ? "#{num(d[:seco_g])} g" : '—' },
-        { label: 'Cada gramo', valor: pesos.call(d[:por_gramo]), tono: :ok },
-      ],
-      secciones: [
-        { titulo: 'Mes por mes',
-          headers: ['Mes', *d[:tipos], 'Total'],
-          rows: d[:por_mes].map { |m| [I18n.l(m[:mes], format: '%B %Y').capitalize, *d[:tipos].map { |t| pesos.call(m[:por_tipo][t]) }, pesos.call(m[:total])] },
-          aligns: (1..d[:tipos].size + 1).to_h { |i| [i, :right] },
-          vacio: 'No anotaste gastos en el período elegido.' },
-        { titulo: 'Por cosecha (gastos asignados a esas plantas)',
-          headers: ['Plantas', 'Genética', 'Gastado', 'Seco (g)', 'Cada gramo'],
-          rows: d[:por_cosecha].map { |c| [c[:plantas].join(', '), c[:genetica] || '—', pesos.call(c[:gastado]), c[:gramos] || 'sin peso', pesos.call(c[:por_gramo])] },
-          aligns: { 2 => :right, 3 => :right, 4 => :right },
-          vacio: 'Ningún gasto del período está asignado a una cosecha.' },
-      ],
-    )
-  end
+  def mi_cosecha     = informe_autocultivo('mi_cosecha')
+  def de_donde_salio = informe_autocultivo('de_donde_salio')
+  def mis_gastos     = informe_autocultivo('mis_gastos')
 
   # Tres preguntas del período: QUÉ salió (por unidad, contra el anterior), A QUIÉN y POR DÓNDE.
   # El cálculo vive en `Informes::Dispensaciones`; acá sólo se arma cómo se muestra.
@@ -438,10 +357,13 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de stock', nombre: 'informe_stock',
-      resena: 'Qué hay hoy de cada producto —cuánto está sobre una mesa, cuánto comprometido y cuánto libre para entregar— y cuánto vale; qué le pasó a cada stock en el período elegido; qué vence pronto y qué hace más de un mes que no sale. Cada unidad en lo suyo: gramos, unidades y mililitros no se suman entre sí.',
+      resena: 'Qué hay hoy de cada producto —cuánto está sobre una mesa, cuánto comprometido y cuánto libre para entregar— y cuánto vale; qué le pasó a cada stock en el período elegido; qué vence pronto y qué hace más de un mes que no sale. Cada producto en lo suyo: la flor no se suma con otros productos, ni los gramos con unidades o mililitros.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
-      kpis: hoy[:por_unidad].group_by { |x| x[:unidad] }.map { |u, xs|
-              { label: "Queda (#{u})", valor: "#{num.call(xs.sum { |x| x[:queda] })} #{u}", tono: :ok }
+      # La flor seca disponible es el mismo número que la pantalla de Stock; lo demás, cada
+      # producto por separado (sumar «g» de todo mezclaba flor con otros productos, 12-oct-2026).
+      kpis: [{ label: 'Flor seca disponible', valor: "#{num.call(hoy[:flor_seca_disponible])} g", tono: :ok }] +
+            hoy[:por_producto].reject { |x| x[:producto] == 'flor_seca' }.group_by { |x| [x[:producto], x[:unidad]] }.map { |(p, u), xs|
+              { label: "#{p.to_s.tr('_', ' ').capitalize} (#{u})", valor: "#{num.call(xs.sum { |x| x[:queda] })} #{u}" }
             } +
             # Sin «stocks con saldo»: el dato está en la tabla y con un cuadro más la plata no entra.
             [{ label: 'Valor a costo',    valor: plata.call(hoy[:valor_costo]) },
@@ -465,9 +387,9 @@ class InformesController < ApplicationController
         },
         {
           titulo: 'Hoy, por producto',
-          headers: ['Unidad', 'Origen', 'Stocks', 'Queda', 'En una mesa', 'Comprometido', 'Libre'],
-          rows: hoy[:por_unidad].map { |x|
-            [x[:unidad], origen.call(x[:origen]), x[:stocks], num.call(x[:queda]), num.call(x[:en_mesa]),
+          headers: ['Producto', 'Origen', 'Stocks', 'Queda', 'En una mesa', 'Comprometido', 'Libre'],
+          rows: hoy[:por_producto].map { |x|
+            [prod.call(x), origen.call(x[:origen]), x[:stocks], num.call(x[:queda]), num.call(x[:en_mesa]),
              num.call(x[:comprometido]), num.call(x[:libre])]
           },
           aligns: { 2 => :right, 3 => :right, 4 => :right, 5 => :right, 6 => :right },
@@ -475,10 +397,10 @@ class InformesController < ApplicationController
           vacio: 'No hay stock con saldo.',
         },
         {
-          titulo: 'En el período, por unidad',
-          headers: ['Unidad', 'Había', 'Ingresó', 'Dispensado', 'Merma', 'Otras salidas', 'Ajustes', 'Quedaba'],
+          titulo: 'En el período, por producto',
+          headers: ['Producto', 'Había', 'Ingresó', 'Dispensado', 'Merma', 'Otras salidas', 'Ajustes', 'Quedaba'],
           rows: datos[:periodo].map { |x|
-            [x[:unidad], num.call(x[:habia]), num.call(x[:ingreso]), num.call(x[:dispensado]), num.call(x[:merma]),
+            [prod.call(x), num.call(x[:habia]), num.call(x[:ingreso]), num.call(x[:dispensado]), num.call(x[:merma]),
              num.call(x[:otras_salidas]), num.call(x[:ajustes]), num.call(x[:quedaba])]
           },
           aligns: (1..7).to_h { |i| [i, :right] },
@@ -883,6 +805,15 @@ class InformesController < ApplicationController
 
   def filtros
     @filtros ||= Informes::Filtros.desde_params(params, current_user.club)
+  end
+
+  # La definición vive en `Informes::AutocultivoDocumentos` (también la usa «Exportar mis datos»).
+  def informe_autocultivo(tipo)
+    return solo_autocultivo! unless current_user.club.personal?
+
+    desde, hasta = periodo_rango
+    doc = Informes::AutocultivoDocumentos.new(club: current_user.club, desde: desde, hasta: hasta).para(tipo)
+    responder_informe(**doc, periodo: etiqueta_periodo(desde, hasta), vista: true)
   end
 
   def solo_autocultivo!

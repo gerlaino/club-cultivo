@@ -7,7 +7,6 @@ import { useSalasStore } from "../stores/salas"
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
-import { useClubStore } from "../stores/club"
 import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
@@ -20,9 +19,8 @@ import NuevaPlantaSheet       from '../components/personal/NuevaPlantaSheet.vue'
 import EtiquetasLotesModal    from '../components/lotes/EtiquetasLotesModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
-import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
@@ -36,7 +34,6 @@ const router = useRouter()
 const salas  = useSalasStore()
 const lotes  = useLotesStore()
 const auth   = useAuthStore()
-const club   = useClubStore()
 const toast  = useToast()
 const { confirm } = useConfirm()
 
@@ -88,7 +85,7 @@ async function cargarFotosSala() {
   try { const { data } = await listFotosSala(salaId); fotosSala.value = data || [] } catch { fotosSala.value = [] }
 }
 async function borrarFoto(f) {
-  try { await deleteFotoSala(salaId, f.id); await cargarFotosSala() } catch {}
+  try { await deleteFotoSala(salaId, f.id); await cargarFotosSala() } catch { /* no bloquea: queda lo que había */ }
 }
 
 const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]

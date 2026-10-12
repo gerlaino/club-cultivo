@@ -67,6 +67,9 @@
       <p class="mpd__viene">{{ textoProximoPaso(lote) }}</p>
     </div>
 
+    <!-- Autocultivo: sus fotos pasando una tras otra (se vuelve a pedir al sacar una nueva). -->
+    <LineaDeFotos v-if="esPersonal" :key="versionFotos" :plant-id="id" class="mpd__linea" />
+
     <!-- Fotos de la planta -->
     <div v-if="planta.fotos?.length" class="mpd__card">
       <div class="mpd__card-title">Fotos <span class="mpd__count">{{ planta.fotos.length }}</span></div>
@@ -209,6 +212,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import LineaDeFotos from '../../components/personal/LineaDeFotos.vue'
 import { getPlant, getPlantActivities, getLote, addPlantFoto, updatePlant, descartarPlant, cosecharPlantas } from '../../lib/api'
 import { estadoPlantaLabel, textoProximoPaso } from '../../lib/loteHelpers'
 import { achicarImagen } from '../../lib/imagenes.js'
@@ -324,6 +328,7 @@ function formatFecha(ts) {
 // todos los días: tiene que estar acá. Se achica antes de subir (`lib/imagenes.js`).
 const inputFoto = ref(null)
 const subiendoFoto = ref(false)
+const versionFotos = ref(0)
 function pedirFoto() { inputFoto.value?.click() }
 async function subirFoto(e) {
   const file = e.target.files?.[0]
@@ -335,6 +340,7 @@ async function subirFoto(e) {
     fd.append('foto', await achicarImagen(file))
     await addPlantFoto(id, fd)
     planta.value = (await getPlant(id)).data
+    versionFotos.value++
     toast.success('Foto guardada')
   } catch (err) {
     toast.error(err?.response?.data?.mensaje || err?.response?.data?.error || 'No se pudo subir la foto')
@@ -433,6 +439,7 @@ async function cosechar(conEtiqueta) {
 .mpd__btn-acciones { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--c-ink-300); background: var(--c-slate-50); font: inherit; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 
 .mpd__card { margin: 12px 16px 0; padding: 14px; background: var(--c-slate-50); border: 1px solid var(--c-leaf-100); border-radius: 14px; }
+.mpd__linea { margin: 12px 16px 0; }
 .mpd__card-title { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--c-ink-700); margin-bottom: 8px; }
 .mpd__count { font-weight: 600; color: var(--c-ink-500); }
 .mpd__viene { margin: 0; font-weight: 600; color: var(--c-ink-900); }

@@ -135,11 +135,30 @@ RSpec.describe Informes::Inventario do
     expect(fila(informe, s)).to include(merma: 5.0, otras_salidas: 10.0)
   end
 
-  it 'por unidad, nunca sumado entre unidades' do
+  it 'por producto y unidad, nunca sumado entre unidades' do
     propio!(cantidad: 100)
     externo!(cantidad: 12, forma: 'preroll')
-    hoy = informe[:hoy][:por_unidad]
-    expect(hoy.map { |x| [x[:unidad], x[:origen], x[:queda]] }).to contain_exactly(['g', 'propio', 100.0], ['un', 'externo', 12.0])
+    hoy = informe[:hoy][:por_producto]
+    expect(hoy.map { |x| [x[:producto], x[:unidad], x[:origen], x[:queda]] })
+      .to contain_exactly(['flor_seca', 'g', 'propio', 100.0], ['preroll', 'un', 'externo', 12.0])
+  end
+
+  # AC (Germán, 12-oct-2026, Mitocondria): «si veo que tengo 3 kg de algo y en realidad tengo 2,
+  # está pésimo». 2.865 g de flor y 978 g de «otro», los dos en gramos: el informe decía 3.843 g.
+  it 'la flor no se suma con otro producto en gramos' do
+    propio!(cantidad: 2865.4)
+    externo!(cantidad: 978, forma: 'otro')
+    hoy = informe[:hoy]
+    expect(hoy[:flor_seca_disponible]).to eq(2865.4)
+    expect(hoy[:por_producto].map { |x| [x[:producto], x[:queda]] }).to contain_exactly(['flor_seca', 2865.4], ['otro', 978.0])
+    expect(informe[:periodo].map { |x| x[:producto] }).to contain_exactly('flor_seca', 'otro')
+  end
+
+  it 'un agotado que quedó con saldo no cuenta en lo que hay hoy (como en la pantalla de Stock)' do
+    propio!(cantidad: 100)
+    viejo = propio!(cantidad: 40)
+    viejo.update_columns(estado: 'agotado')
+    expect(informe[:hoy][:flor_seca_disponible]).to eq(100.0)
   end
 
   it 'el valor de lo que queda, a costo y a precio de venta, y avisa lo que no tiene costo' do

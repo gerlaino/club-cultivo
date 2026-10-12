@@ -85,9 +85,9 @@
       </div>
       <div class="mph__fotos">
         <RouterLink v-for="f in fotosRecientes" :key="f.id" :to="`/m/lote-m/${f.lote_id}`" class="mph__foto">
-          <img :src="f.url" :alt="f.nota || f.genetica_nombre || f.lote_codigo" loading="lazy" />
+          <img :src="f.url" :alt="f.nota || f.genetica_nombre || 'Foto'" loading="lazy" />
           <span class="mph__foto-cap">
-            <b>{{ f.genetica_nombre || f.lote_codigo }}</b>{{ f.dia ? ` · día ${f.dia}` : '' }}
+            <b>{{ f.genetica_nombre || 'Tus plantas' }}</b>{{ f.dia ? ` · día ${f.dia}` : '' }}
           </span>
         </RouterLink>
       </div>
@@ -108,8 +108,8 @@
         <RouterLink v-for="l in lotesEnCurso" :key="l.id" :to="`/m/lote-m/${l.id}`" class="mph__lote">
           <span class="mph__lote-ico" :style="{ background: meta(l.estado).bg, color: meta(l.estado).color }"><i class="bi" :class="icono(l.estado)"></i></span>
           <span class="mph__lote-txt">
-            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}<span v-if="l.automatica" class="chip-auto">Auto</span></span>
-            <span class="mph__lote-sub">{{ l.codigo }} · {{ l.plants_count || 0 }} {{ l.plants_count === 1 ? 'planta' : 'plantas' }}</span>
+            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || 'Plantas' }}<span v-if="l.automatica" class="chip-auto">Auto</span></span>
+            <span class="mph__lote-sub">{{ l.plants_count || 0 }} {{ l.plants_count === 1 ? 'planta' : 'plantas' }}</span>
             <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
           </span>
           <span class="mph__lote-fase">
@@ -131,8 +131,8 @@
                     :to="l.estado === 'en_manicura' ? `/m/mnc/lotes/${l.id}` : `/m/lote-m/${l.id}`" class="mph__lote">
           <span class="mph__lote-ico" :style="{ background: meta(l.estado).bg, color: meta(l.estado).color }"><i class="bi" :class="icono(l.estado)"></i></span>
           <span class="mph__lote-txt">
-            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
-            <span class="mph__lote-sub">{{ l.codigo }}<template v-if="l.estado === 'en_manicura'"> · por pesar</template></span>
+            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || 'Cosecha' }}</span>
+            <span class="mph__lote-sub">{{ estadoCosechaLabel(l) }}</span>
             <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
             <!-- Ya pesado: los gramos y la puerta a la tarjeta completa. Sin días acá: `dias_ciclo`
                  sigue corriendo en curado y contradecía el total de la tarjeta. -->
@@ -228,6 +228,8 @@ const EN_CURSO = ['enraizado', 'vegetativo', 'floracion']
 const POST     = ['cosecha', 'en_manicura', 'curado']
 const lotesEnCurso     = computed(() => (lotes.items || []).filter(l => EN_CURSO.includes(l.estado)))
 const lotesPostCosecha = computed(() => (lotes.items || []).filter(l => POST.includes(l.estado)))
+// La fase de lo cosechado, con su nombre (sin el código del lote, que en autocultivo no se nombra).
+function estadoCosechaLabel(l) { return l.estado === 'en_manicura' ? 'Por pesar' : meta(l.estado).label }
 function meta(estado) { return ESTADO_META[estado] || { label: estado, color: '#475569', bg: '#f1f5f9' } }
 // Íconos por estado del lote (Bootstrap Icons, no emoji: el emoji depende de la fuente del
 // teléfono y en algunos aparece como un cuadrado).

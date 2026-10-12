@@ -34,7 +34,7 @@ import SocioTabDirecciones     from '../components/pacientes/SocioTabDirecciones
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
-import { hoyISO } from '../utils/dates.js'
+import { hoyISO, yaPaso } from '../utils/dates.js'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -243,7 +243,20 @@ function abrirEdicion(t) {
   turnoEditando.value = t
 }
 
+// Reprogramar a una fecha y hora que ya pasaron se avisa y no se manda (12-oct-2026). Sólo si se
+// CAMBIÓ: marcar como realizado un turno de ayer manda la misma fecha y eso sí vale.
+const editaAlPasado = computed(() => {
+  const t = turnoEditando.value
+  if (!t) return false
+  const d = new Date(t.fecha_hora)
+  const pad = n => String(n).padStart(2, '0')
+  const igual = editForm.value.fecha === `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` &&
+                editForm.value.hora  === `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return !igual && yaPaso(editForm.value.fecha, editForm.value.hora)
+})
+
 async function guardarEdicion() {
+  if (editaAlPasado.value) return
   editSaving.value = true
   try {
     const fecha_hora = `${editForm.value.fecha}T${editForm.value.hora}:00`
@@ -258,7 +271,7 @@ async function guardarEdicion() {
     if (idx !== -1) turnosList.value[idx] = { ...turnosList.value[idx], ...data }
     turnoEditando.value = null
     toast.success('Turno actualizado')
-  } catch { toast.error('No se pudo guardar') }
+  } catch (e) { toast.error(e?.response?.data?.errors?.[0] || 'No se pudo guardar') }
   finally  { editSaving.value = false }
 }
 
@@ -386,7 +399,7 @@ onMounted(async () => {
   try {
     await store.fetchOne(socioId)
     await store.fetchNotas(socioId)
-  } catch (e) {
+  } catch {
     error.value = store.error || 'No se pudo cargar el paciente'
   } finally {
     loading.value = false
@@ -836,9 +849,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 </div>
               </div>
 
+              <p v-if="editaAlPasado" class="sd__edit-warn" role="alert">
+                Esa fecha y hora ya pasaron. Elegí un momento que todavía no haya llegado.
+              </p>
               <div class="sd__edit-footer">
                 <button class="sd__btn-ghost" @click="turnoEditando = null">Cancelar</button>
-                <button class="sd__btn-primary" :disabled="editSaving" @click="guardarEdicion">
+                <button class="sd__btn-primary" :disabled="editSaving || editaAlPasado" @click="guardarEdicion">
                   <DsSpinner v-if="editSaving" :size="13" />
                   <template v-else><RotateCcw :size="13" /> Guardar cambios</template>
                 </button>
@@ -1196,4 +1212,5 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
   padding: .85rem 1.25rem; border-top: 1px solid var(--c-slate-200);
 }
 
+.sd__edit-warn { margin: 0 20px 8px; font-size: var(--fs-12); color: var(--c-rust-600); }
 </style>

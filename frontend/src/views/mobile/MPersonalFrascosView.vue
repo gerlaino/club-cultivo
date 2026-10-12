@@ -16,8 +16,8 @@
                       :to="l.estado === 'en_manicura' ? `/m/mnc/lotes/${l.id}` : `/m/lote-m/${l.id}`" class="mpf__card mpf__card--pesar">
             <span class="mpf__card-ico"><i class="bi" :class="icono(l.estado)"></i></span>
             <span class="mpf__card-txt">
-              <span class="mpf__card-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
-              <span class="mpf__card-sub">{{ l.codigo }} · {{ meta(l.estado).label }}<template v-if="l.dias_en_estado != null"> · día {{ l.dias_en_estado + 1 }}</template></span>
+              <span class="mpf__card-nombre">{{ l.genetica?.nombre || l.strain || 'Cosecha' }}</span>
+              <span class="mpf__card-sub">{{ meta(l.estado).label }}<template v-if="l.dias_en_estado != null"> · día {{ l.dias_en_estado + 1 }}</template></span>
             </span>
             <span class="mpf__card-cta">{{ l.estado === 'en_manicura' ? 'Pesar' : 'Ver' }} <i class="bi bi-chevron-right"></i></span>
           </RouterLink>
@@ -36,7 +36,7 @@
             <span class="mpf__card-ico"><i class="bi bi-archive"></i></span>
             <span class="mpf__card-txt">
               <span class="mpf__card-nombre">{{ s.genetica_nombre || s.lote?.genetica?.nombre || s.nombre_producto || s.numero_lote_producto }}</span>
-              <span class="mpf__card-sub">{{ s.numero_lote_producto || `#${s.id}` }}<template v-if="s.lote_codigo"> · {{ s.lote_codigo }}</template><template v-if="s.forma_producto"> · {{ formaLabel(s.forma_producto) }}</template></span>
+              <span class="mpf__card-sub">{{ s.numero_lote_producto || `#${s.id}` }}<template v-if="s.forma_producto"> · {{ formaLabel(s.forma_producto) }}</template></span>
             </span>
             <span class="mpf__card-cant">
               <span class="mpf__cant-num">{{ fmt(s.cantidad) }}</span>

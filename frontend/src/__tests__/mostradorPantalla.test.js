@@ -662,8 +662,9 @@ describe('Lo que administración tocó durante el turno', () => {
       puedo: { cargar: false, abrir: true, cerrar: true },
     }
     const w = await montar('dispensador')
+    await w.find('.mdt__hd').trigger('click')
 
-    const movs = w.find('.mst__movs')
+    const movs = w.find('.mdt')
     expect(movs.exists()).toBe(true)
     expect(movs.text()).toContain('Germán')
     expect(movs.text()).toContain('bajó')
@@ -692,12 +693,57 @@ describe('Lo que administración tocó durante el turno', () => {
       puedo: { cargar: false, abrir: true, cerrar: true },
     }
     const w = await montar('dispensador')
+    await w.find('.mdt__hd').trigger('click')
 
-    const lineas = w.findAll('.mst__mov').map(l => l.text().replace(/\s+/g, ' '))
+    const lineas = w.findAll('.mdt__mov').map(l => l.text().replace(/\s+/g, ' '))
     expect(lineas).toHaveLength(2)
     expect(lineas.find(l => l.includes('ST-26-0031'))).toMatch(/de 46 a 150/)
     expect(lineas.find(l => l.includes('ST-26-0032'))).toMatch(/de 0 a 150/)
-    expect(w.find('.mst__movs').text()).not.toContain('254')
+    expect(w.find('.mdt').text()).not.toContain('254')
+  })
+
+  // AC (Germán, 12-oct-2026): con la mesa cargada de una vez eran 25 renglones y la pantalla era
+  // «un scroll larguísimo». Siempre plegado, con un resumen; desplegado, de a 10.
+  describe('con muchos productos movidos', () => {
+    const muchos = (n) => Array.from({ length: n }, (_, i) => ({
+      ...FLOR, stock_id: 100 + i, numero: `ST-26-${String(100 + i).padStart(4, '0')}`, genetica: 'Vita Mac', mostrador: 28,
+      movimientos_del_turno: [{ tipo: 'carga', cantidad: 28, motivo: 'Se pidió del depósito', usuario: 'Admin',
+                                cuando: `2026-10-12T17:${String(i).padStart(2, '0')}:00Z` }],
+    }))
+
+    it('arranca plegado y dice cuántos productos, quién y a qué hora', async () => {
+      respuesta = { ...respuesta, turno: TURNO, mesa: muchos(25), puedo: { cargar: false, abrir: true, cerrar: true } }
+      const w = await montar('dispensador')
+
+      expect(w.findAll('.mdt__mov')).toHaveLength(0)
+      expect(w.find('.mdt__hd').attributes('aria-expanded')).toBe('false')
+      expect(w.find('.mdt__resumen').text()).toContain('25 productos movidos')
+      expect(w.find('.mdt__resumen').text()).toContain('por Admin')
+    })
+
+    it('desplegado muestra 10 y «Ver 10 más» trae los siguientes', async () => {
+      respuesta = { ...respuesta, turno: TURNO, mesa: muchos(25), puedo: { cargar: false, abrir: true, cerrar: true } }
+      const w = await montar('dispensador')
+      await w.find('.mdt__hd').trigger('click')
+
+      expect(w.findAll('.mdt__mov')).toHaveLength(10)
+      expect(w.find('.mdt__cuenta').text()).toBe('10 de 25')
+      await w.find('.mdt__mas').trigger('click')
+      expect(w.findAll('.mdt__mov')).toHaveLength(20)
+      expect(w.find('.mdt__mas').text()).toContain('Ver 5 más')
+      await w.find('.mdt__mas').trigger('click')
+      expect(w.findAll('.mdt__mov')).toHaveLength(25)
+      expect(w.find('.mdt__mas').exists()).toBe(false)
+    })
+
+    // En producción se leía «Flor secaVita MacST-26-0049».
+    it('el producto se lee con sus espacios: forma, genética y número', async () => {
+      respuesta = { ...respuesta, turno: TURNO, mesa: muchos(1), puedo: { cargar: false, abrir: true, cerrar: true } }
+      const w = await montar('dispensador')
+      await w.find('.mdt__hd').trigger('click')
+
+      expect(w.find('.mdt__mov').text().replace(/\s+/g, ' ')).toContain('Flor seca Vita Mac · ST-26-0100')
+    })
   })
 })
 

@@ -87,6 +87,46 @@ RSpec.describe 'Los informes dicen lo mismo que las pantallas', type: :request d
     end
   end
 
+  # AC (Germán, 12-oct-2026, Mitocondria): Stock decía 2.865 g de flor seca disponible y el
+  # informe de stock 3.843 g. El informe sumaba en «g» la flor con 978 g de otro producto. «Flor
+  # seca disponible» es UN número: el mismo en Stock, en el inicio del admin y en el informe.
+  describe 'la flor seca disponible' do
+    let(:paciente) { create(:paciente, club: club, created_by: admin) }
+
+    def stock!(forma: 'flor_seca', cantidad:, sede_id: sede.id, estado: 'asignado')
+      ActsAsTenant.with_tenant(club) do
+        Stock.create!(club: club, sede_id: sede_id, origen: 'compra_externa', proveedor: 'Coop', forma_producto: forma,
+                      unidad: 'g', cantidad: cantidad, estado: estado)
+      end
+    end
+
+    before do
+      flor = stock!(cantidad: 2000)
+      stock!(cantidad: 865.4)
+      stock!(forma: 'otro', cantidad: 978)                     # otro producto en gramos
+      stock!(cantidad: 50).update_columns(estado: 'agotado')   # dato viejo: agotado con saldo
+      ActsAsTenant.with_tenant(club) do
+        Reserva.create!(club: club, paciente: paciente, stock: flor, user: admin, cantidad: 15,
+                        estado: 'pendiente', fecha_entrega_estimada: Time.zone.today + 3, sena_ars: 0)
+      end
+    end
+
+    it 'es el mismo número en Stock, en el inicio y en el informe, y no incluye otros productos' do
+      get '/api/stocks/inventario'
+      en_stock = json['totales']['total_g'].to_f
+
+      get '/api/analytics/dispensador'
+      en_inicio = json['stocks'].find { |s| s['forma'] == 'flor_seca' }['cantidad_g'].to_f
+
+      get '/api/informes/stock'
+      en_informe = json['hoy']['flor_seca_disponible'].to_f
+
+      expect(en_stock).to eq(2850.4)   # 2.000 + 865,4 − 15 reservados; sin el «otro» ni el agotado
+      expect(en_inicio).to eq(en_stock)
+      expect(en_informe).to eq(en_stock)
+    end
+  end
+
   describe 'el informe de dispensaciones' do
     let(:paciente) { create(:paciente, club: club, created_by: admin) }
     let(:stock)    { create(:stock, club: club, sede: sede, cantidad: 500) }

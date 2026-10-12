@@ -310,6 +310,14 @@ const routes = [
     beforeEnter: () => (esUsoPersonal() ? true : '/salas'),
   },
 
+  // Autocultivo: la guía de nutrientes (referencia por fase; aplicar = rangos de sus alertas).
+  {
+    path: "/guia-nutrientes",
+    name: "guia-nutrientes",
+    component: () => import("../views/personal/GuiaNutrientesView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: () => (esUsoPersonal() ? true : '/salas'),
+  },
   {
     path: "/mis-informes",
     name: "mis-informes",
@@ -507,7 +515,7 @@ const routes = [
     alias: ["/socios/:id"],
     name: "paciente-detail",
     component: () => import("../views/SocioDetailView.vue"),
-    props: route => ({ backPath: '/pacientes' }),
+    props: () => ({ backPath: '/pacientes' }),
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
       const role = auth.user?.role
@@ -1146,6 +1154,7 @@ const routes = [
       // saltaba a la pantalla de la sede, que lista lotes; quien cultiva en casa piensa en plantas.
       { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue') },
       { path: 'personal/informes', component: () => import('../views/mobile/MPersonalInformesView.vue') },
+      { path: 'personal/guia',     component: () => import('../views/personal/GuiaNutrientesView.vue') },
       { path: 'personal/stock',   component: () => import('../views/mobile/MPersonalFrascosView.vue') },
       { path: 'personal/gastos',  component: () => import('../views/mobile/MPersonalGastosView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },

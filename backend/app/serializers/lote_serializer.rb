@@ -275,10 +275,20 @@ class LoteSerializer
 
   # En una cama, si la fase siguiente no la admite el espacio (floración en una sala de vege), lo
   # que se da vuelta es el espacio. La regla de qué admite cada sala es la del modelo.
+  #
+  # En AUTOCULTIVO también cuando no hay otro espacio que la admita (11-oct-2026): una sola carpa
+  # florece cambiando la luz, no mudando las plantas. Con dos carpas (vege y flora) se mudan, como
+  # siempre. Así la ficha de las plantas y la del espacio ofrecen el mismo gesto, no dos botones.
   def self.avanza_con_el_espacio?(lote, proxima_fase)
-    return false unless lote.en_cama? && proxima_fase.present? && lote.sala
-    permitidos = Lote.kinds_sala_para(proxima_fase, automatica: lote.automatica?, personal: lote.club&.personal?)
+    return false unless proxima_fase.present? && lote.sala
+    personal = lote.club&.personal?
+    return false unless lote.en_cama? || personal
+    permitidos = Lote.kinds_sala_para(proxima_fase, automatica: lote.automatica?, personal: personal)
     kind = lote.sala.kind.presence || lote.sala.tipo
-    permitidos.present? && kind.present? && !permitidos.include?(kind)
+    return false unless permitidos.present? && kind.present? && !permitidos.include?(kind)
+    return true if lote.en_cama?
+
+    otras = Sala.where(club_id: lote.club_id).where.not(id: lote.sala_id).where.not(state: 'cerrada')
+    otras.none? { |s| permitidos.include?(s.kind.presence || s.tipo) }
   end
 end

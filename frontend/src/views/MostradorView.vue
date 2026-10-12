@@ -174,22 +174,7 @@
         Al abrir: {{ turno.notas_apertura }}
       </p>
 
-      <!-- Lo que el admin tocó mientras la caja estaba abierta. Quien atiende lo tiene que ver o
-           cierra con un faltante que no es suyo y encima no lo puede explicar. -->
-      <div v-if="movimientosDelTurno.length" class="mst__movs">
-        <span class="mst__movs-lbl">Mientras la caja estuvo abierta</span>
-        <p v-for="m in movimientosDelTurno" :key="m.stock_id" class="mst__mov">
-          <b>{{ m.usuarios.join(' y ') }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
-          <b class="mst__mov-num">{{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }}</b>
-          de {{ formaLabel(m.forma) }}<template v-if="m.genetica"> {{ m.genetica }}</template>
-          <span v-if="m.numero" class="mst__mov-num">{{ m.numero }}</span>:
-          de {{ fmt(m.antes) }} a <b class="mst__mov-num">{{ fmt(m.ahora) }} {{ m.unidad }}</b><template
-            v-if="m.motivos.length"> — {{ m.motivos.join(' · ') }}</template>
-          <span class="mst__mov-hora">
-            {{ m.veces > 1 ? `${m.veces} cargas, última ` : '' }}{{ hora(m.cuando) }}
-          </span>
-        </p>
-      </div>
+      <MovimientosDelTurno v-if="movimientosDelTurno.length" :movimientos="movimientosDelTurno" />
 
       <!-- ══ LA MESA ═══════════════════════════════════════════════════════════
            Para administración es editable: escribe cuánto tiene que haber de cada producto y
@@ -301,10 +286,10 @@ import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
 import TablaMostrador from '../components/mostrador/TablaMostrador.vue'
+import MovimientosDelTurno from '../components/mostrador/MovimientosDelTurno.vue'
 import ModalCargarMesa from '../components/mostrador/ModalCargarMesa.vue'
 import ModalContarItem from '../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../components/mostrador/ModalConteo.vue'
-import { formaLabel } from '../lib/formatters.js'
 import { listMostradores } from '../lib/api.js'
 import { useMostrador } from '../composables/useMostrador.js'
 
@@ -380,7 +365,6 @@ const revisando = ref(false)
 // producto sigue ahí, lo que no hay es nadie atendiendo.
 const ESTADO_LABEL = { cerrado: 'Caja cerrada', abierto: 'Caja abierta' }
 
-const fmt  = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 // La plata va SIN decimales: "$784.920,5 sobre la mesa" es un número que nadie lee y que además
 // sugiere una precisión que no existe (sale de multiplicar gramos por precio).
 const pesos = (n) => Math.round(Number(n ?? 0)).toLocaleString('es-AR')
@@ -422,16 +406,6 @@ async function confirmarPlata () {
 .mst__btn--guardar { padding: 7px 15px; font-size: var(--fs-13); }
 .mst__exceso { font-size: var(--fs-12); color: var(--c-amber-500); font-weight: 600; }
 
-/* Lo que administración tocó mientras la caja estaba abierta: quien atiende lo tiene que ver o
-   cierra con un faltante que no es suyo. */
-.mst__movs {
-  background: var(--c-sky-100); border-radius: 11px; padding: 12px 16px;
-  display: flex; flex-direction: column; gap: 4px;
-}
-.mst__movs-lbl { font-size: var(--fs-12); font-weight: 700; color: var(--c-sky-600); text-transform: uppercase; letter-spacing: .04em; }
-.mst__mov { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
-.mst__mov-num  { font-family: var(--font-mono); color: var(--c-ink-900); }
-.mst__mov-hora { color: var(--c-ink-500); font-size: var(--fs-12); margin-left: 4px; white-space: nowrap; }
 
 /* ── Solapas ────────────────────────────────────────────────────────────────── */
 .mst__tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--c-slate-200); }

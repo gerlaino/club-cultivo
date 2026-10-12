@@ -96,6 +96,9 @@ class Stock < ApplicationRecord
   scope :pendientes_asignacion,    -> { where(estado: 'pendiente_asignacion') }
   scope :asignados,                -> { where(estado: 'asignado') }
   scope :del_club,                 -> { where(sede_id: nil) }
+  # Lo que HAY en el inventario: con saldo y no cerrado. Un 'agotado' con saldo es un dato viejo
+  # y no cuenta. Es la base de todo «cuánta flor hay» (Stock, inicio del admin, informe de stock).
+  scope :en_inventario,            -> { where('cantidad > 0').where.not(estado: 'agotado') }
   # Habilitado para... (la disponibilidad 'ambas' entra en ambos).
   scope :para_dispensa,            -> { where(disponibilidad: %w[dispensa ambas]) }
   scope :para_produccion,          -> { where(disponibilidad: %w[produccion ambas]) }
@@ -325,6 +328,17 @@ class Stock < ApplicationRecord
   # Las reservas que incluyen este stock en alguna línea (no sólo las que lo tienen de primera).
   def reservas_que_lo_incluyen
     Reserva.where(id: ReservaItem.where(stock_id: id).select(:reserva_id))
+  end
+
+  # «FLOR SECA DISPONIBLE», Y SE CALCULA ACÁ (12-oct-2026). La pantalla de Stock, el inicio del
+  # admin y el informe de stock decían tres números distintos con el mismo nombre: el informe
+  # sumaba en «g» la flor con cualquier otro producto en gramos (978 g de «otro» en Mitocondria) y
+  # el inicio no restaba lo reservado. Es SÓLO flor seca y es lo que se puede entregar
+  # (`disponible_para_entregar`: el frasco menos eventos y reservas; la mesa no se resta).
+  def self.flor_seca_disponible(scope)
+    flor = scope.en_inventario.where(forma_producto: 'flor_seca').to_a
+    precargar_apartados(flor)
+    flor.sum(0.to_d) { |s| s.disponible_para_entregar }
   end
 
   # Las tres precargas juntas: lo que necesita cualquier listado que muestre disponibilidad.

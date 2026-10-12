@@ -258,6 +258,7 @@ Rails.application.routes.draw do
       end
       member do
         post   :add_foto
+        get    :linea_fotos
         post   :registrar_peso
         delete 'fotos/:blob_id', to: 'plants#remove_foto', as: :remove_foto
       end
@@ -720,6 +721,13 @@ Rails.application.routes.draw do
     end
 
     resources :setpoints_fase,    only: [:index, :show, :create, :update, :destroy]
+    # Autocultivo: la guía de nutrientes (referencia; aplicar = copiar los rangos a sus alertas).
+    get  'guia_nutricion',         to: 'guia_nutricion#show'
+    # Autocultivo: exportar todos mis datos (ZIP armado en segundo plano, se baja con sesión).
+    get  'mis_datos/exportar',           to: 'mis_datos#estado'
+    post 'mis_datos/exportar',           to: 'mis_datos#exportar'
+    get  'mis_datos/exportar/descargar', to: 'mis_datos#descargar'
+    post 'guia_nutricion/aplicar', to: 'guia_nutricion#aplicar'
     resources :reglas_ambientales, only: [:index, :show, :create, :update, :destroy]
     resources :alertas, only: [:index, :show] do
       member do

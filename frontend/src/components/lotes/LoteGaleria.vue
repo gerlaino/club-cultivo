@@ -234,7 +234,7 @@ async function cargar() {
 onMounted(cargar)
 watch(() => props.loteId, cargar)
 // Otra pestaña o el teléfono sacó una foto: aparece sola.
-useRecargaEnCambios('fotos', cargar, { filtro: ev => true })
+useRecargaEnCambios('fotos', cargar, { filtro: () => true })
 
 const FASES = { enraizado: 'Enraizando', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', en_manicura: 'Manicura', finalizado: 'Finalizado' }
 const faseLabel = f => FASES[f] || f

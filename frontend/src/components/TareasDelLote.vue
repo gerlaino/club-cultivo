@@ -262,7 +262,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useNoSeHizo } from '../composables/useNoSeHizo.js'
-import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento, completarTareasMasivo, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
+import { listTareas, createRegistroAmbiental, createLoteEvento, completarTareasMasivo, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -410,7 +410,7 @@ async function cargarTareas() {
   try {
     const res = await listTareas({ lote_id: props.lote.id })
     tareas.value = res.data
-  } catch {}
+  } catch { /* no bloquea: queda lo que había */ }
   finally { loading.value = false }
 }
 
@@ -518,7 +518,7 @@ async function iniciar(t) {
     await tareasStore.iniciar(t.id)
     const found = tareas.value.find(x => x.id === t.id)
     if (found) found.estado = 'en_progreso'
-  } catch {}
+  } catch { /* no bloquea: queda lo que había */ }
   finally { procesando.value = null }
 }
 
@@ -550,7 +550,7 @@ async function confirmarCompletar() {
     if (found) found.estado = 'completada'
     emit('tarea-completada', tareaCompletando.value)
     tareaCompletando.value = null
-  } catch {}
+  } catch { /* no bloquea: queda lo que había */ }
   finally { guardando.value = false }
 }
 

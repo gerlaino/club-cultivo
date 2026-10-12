@@ -132,7 +132,7 @@ function validate() {
   let ok = true
   if (!form.name.trim()) { errors.name = 'El nombre de la organización es obligatorio'; ok = false }
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { errors.email = 'Email inválido'; ok = false }
-  if (form.phone && !/^[\d\s\+\-\(\)]{7,20}$/.test(form.phone)) { errors.phone = 'Teléfono inválido'; ok = false }
+  if (form.phone && !/^[\d\s+\-()]{7,20}$/.test(form.phone)) { errors.phone = 'Teléfono inválido'; ok = false }
   if (form.website && !/^https?:\/\/.+\..+/.test(form.website)) { errors.website = 'Debe comenzar con https:// o http://'; ok = false }
   if (form.cuit && !/^\d{2}-\d{8}-\d$/.test(form.cuit)) { errors.cuit = 'Formato inválido (XX-XXXXXXXX-X)'; ok = false }
   return ok
@@ -146,7 +146,7 @@ async function save() {
     await club.update(payload)
     pristine.value = true
     showToast('success', 'Preferencias guardadas correctamente')
-  } catch (_) {
+  } catch {
     showToast('danger', club.error || 'Error al guardar')
   }
 }
@@ -168,7 +168,7 @@ async function removeLogo() {
   const ok = await confirm({ title: '¿Quitar el logo de la organización?', message: 'El logo será eliminado permanentemente.', confirmText: 'Quitar logo' })
   if (!ok) return
   try { await club.removeLogo(); logoPreview.value = null; showToast('success', 'Logo eliminado') }
-  catch (_) { showToast('danger', club.error || 'Error al eliminar el logo') }
+  catch { showToast('danger', club.error || 'Error al eliminar el logo') }
 }
 
 function showToast(type, msg) {

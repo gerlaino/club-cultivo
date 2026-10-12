@@ -16,7 +16,9 @@
       <span class="atb__club-sep" aria-hidden="true"></span>
 
       <!-- Sub-pestañas del grupo activo, pegadas al club (el grupo primario vive en el sidebar) -->
-      <nav v-if="visibleTabs.length" class="atb__tabs" aria-label="Secciones">
+      <!-- En autocultivo las secciones viven en el menú lateral: un solo menú (11-oct-2026). Con el
+           menú contraído no se ven ahí, así que vuelven las pestañas. -->
+      <nav v-if="visibleTabs.length && (!club.data?.personal || collapsed)" class="atb__tabs" aria-label="Secciones">
         <RouterLink
           v-for="t in visibleTabs" :key="t.to"
           :to="t.to" class="atb__tab"
@@ -26,7 +28,7 @@
           <span v-if="t.badge && badgeFor(t.badge)" class="atb__tab-badge">{{ badgeFor(t.badge) }}</span>
         </RouterLink>
       </nav>
-      <span v-else class="atb__page-title">{{ labelDe(activeGroup, club.data) }}</span>
+      <span v-else class="atb__page-title">{{ labelDe(tituloActual, club.data) }}</span>
 
       <!-- Right actions -->
       <div class="atb__right">
@@ -120,7 +122,7 @@ import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
-import { detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
+import { detectGroup, entradaVisible, labelDe, tabActivaDe, useNavContext } from '../../composables/useNavContext.js'
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle, Sparkles } from 'lucide-vue-next'
@@ -187,24 +189,18 @@ function openHelp() {
 const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value.length)
 
 // Grupo activo + tab activo para las sub-pestañas (badges del singleton del sidebar).
-const { badgeFor } = useNavContext()
+const { badgeFor, collapsed } = useNavContext()
 const activeGroup = computed(() => detectGroup(route.path))
 // Tabs visibles: oculta las que dependen de un feature flag apagado de la organización (insumos, bar…)
 const visibleTabs = computed(() =>
   (activeGroup.value.tabs || []).filter(t => entradaVisible(t, club.data))
 )
 function isTabActive(t) {
-  // Una pantalla alias del grupo (la ficha de una cama) resalta la pestaña a la que pertenece.
-  const alias = (activeGroup.value.alias || []).find(a => route.path === a.to || route.path.startsWith(a.to + '/'))
-  if (alias) return t.to === alias.tab
-  let best = null, len = -1
-  for (const x of visibleTabs.value) {
-    if ((route.path === x.to || route.path.startsWith(x.to + '/')) && x.to.length > len) {
-      best = x; len = x.to.length
-    }
-  }
-  return best === t
+  return tabActivaDe(activeGroup.value, visibleTabs.value, route.path) === t
 }
+// Sin pestañas a la vista, el título: la sección en la que está (o el grupo).
+const tituloActual = computed(() =>
+  tabActivaDe(activeGroup.value, visibleTabs.value, route.path) || activeGroup.value)
 
 async function handleLogout() {
   await auth.logOut()

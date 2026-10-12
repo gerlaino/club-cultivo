@@ -74,19 +74,7 @@
       <!-- Lo que administración tocó mientras la caja estuvo abierta. Se muestra COLAPSADO: hay
            que poder verlo —si no, se cierra con un faltante que no es suyo y no lo puede
            explicar— pero desplegado empuja la mesa hacia abajo, que es lo que se vino a mirar. -->
-      <div v-if="movimientosDelTurno.length" class="mmo__movs">
-        <button class="mmo__movs-hd" @click="movsAbiertos = !movsAbiertos">
-          <span>Administración movió la mesa ({{ movimientosDelTurno.length }})</span>
-          <i class="bi" :class="movsAbiertos ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-        </button>
-        <p v-for="m in (movsAbiertos ? movimientosDelTurno : [])" :key="m.stock_id" class="mmo__mov">
-          <b>{{ formaLabel(m.forma) }}<template v-if="m.genetica"> {{ m.genetica }}</template></b>
-          <template v-if="m.numero"> {{ m.numero }}</template>:
-          de {{ fmt(m.antes) }} a <b>{{ fmt(m.ahora) }} {{ m.unidad }}</b>
-          ({{ m.usuarios.join(' y ') }}<template v-if="m.motivos.length"> — {{ m.motivos.join(' · ') }}</template>)
-          <span class="mmo__mov-hora">{{ hora(m.cuando) }}</span>
-        </p>
-      </div>
+      <MovimientosDelTurno v-if="movimientosDelTurno.length" :movimientos="movimientosDelTurno" />
 
       <div v-if="cargando" class="mmo__skel-wrap">
         <div v-for="n in 4" :key="n" class="mmo__skel" />
@@ -235,16 +223,15 @@
 import { ref, computed } from 'vue'
 import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
 import MostradorTurnos from '../../components/mostrador/MostradorTurnos.vue'
+import MovimientosDelTurno from '../../components/mostrador/MovimientosDelTurno.vue'
 import ModalContarItem from '../../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../../components/mostrador/ModalConteo.vue'
 import SheetBottom from '../../components/cultivador/SheetBottom.vue'
 import { formaLabel } from '../../lib/formatters.js'
-import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useMostrador } from '../../composables/useMostrador.js'
 
 const auth  = useAuthStore()
-const toast = useToast()
 const {
   sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, agotados, estado,
   fondoSugerido, esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
@@ -256,7 +243,6 @@ const busqueda     = ref('')
 const detalle      = ref(null)
 const conteo       = ref(null)   // 'apertura' | 'cierre'
 const itemAContar  = ref(null)
-const movsAbiertos = ref(false)
 
 // Lo ya pedido HOY lo dice el backend en cada producto: uno por producto y por día, para que la
 // campana de administración no se llene del mismo aviso.
@@ -375,20 +361,6 @@ async function onConfirmarConteoDeUno (payload) {
 }
 .mmo__aviso--error { background: var(--c-rust-100); color: var(--c-rust-600); }
 
-.mmo__movs {
-  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px; overflow: hidden;
-}
-.mmo__movs-hd {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
-  border: 0; background: transparent; padding: .7rem .8rem;
-  font-size: .85rem; font-weight: 600; color: var(--c-ink-900);
-  cursor: pointer; font-family: inherit;
-}
-.mmo__mov {
-  margin: 0; padding: .55rem .8rem; font-size: .82rem; color: var(--c-slate-600);
-  border-top: 1px solid var(--c-slate-100);
-}
-.mmo__mov-hora { color: var(--c-slate-400); margin-left: .35rem; }
 
 /* ── Buscador y lista ── */
 .mmo__buscar {

@@ -7,6 +7,7 @@ import { transicionarLote, avanzarFaseLote, cambiarFaseSala } from '../lib/api'
 import { useConfirm } from './useConfirm.js'
 import { textoCambioDeFase } from '../lib/textoCambioDeFase.js'
 import { MACETA_OPCIONES } from '../lib/loteHelpers'
+import { esUsoPersonal } from './useUsoPersonal.js'
 
 const ESTADO_META = {
   enraizado:            { label: 'Enraizado',          emoji: '🌱' },
@@ -19,7 +20,18 @@ const ESTADO_META = {
 }
 function em(e) { return ESTADO_META[e] || { label: e || '—', emoji: '•' } }
 
-export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null } = {}) {
+// Por qué florece el espacio y no las plantas: en una cama no se mudan; en un autocultivo con una
+// sola carpa, la floración es cambiar la luz (`LoteSerializer.avanza_con_el_espacio?`).
+export function mensajeLuzDelEspacio(lote, salaNombre) {
+  if (!lote.cama && esUsoPersonal()) {
+    return `La floración la da la luz: ${salaNombre} pasa a 12/12 y florecen todas las plantas fotoperiódicas ` +
+           'que tenga. Las automáticas siguen su reloj.'
+  }
+  return `El lote está plantado en la ${lote.cama?.nombre || 'cama'} y no se muda. Para pasarlo a floración, ` +
+         `${salaNombre} pasa a floración (12/12) con todos sus lotes.`
+}
+
+export function useLoteTransiciones(loteId, { onPhaseChange = null } = {}) {
   const toast  = useToast()
   const lotes  = useLotesStore()
   const plants = usePlantsStore()
@@ -114,8 +126,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     if (!confirmado) {
       const ok = await confirm({
         title: `La luz es de ${salaNombre}`,
-        message: `El lote está plantado en la ${lote.cama?.nombre || 'cama'} y no se muda. Para pasarlo a floración, ` +
-                 `${salaNombre} pasa a floración (12/12) con todos sus lotes.`,
+        message: mensajeLuzDelEspacio(lote, salaNombre),
         confirmText: `Pasar ${salaNombre} a floración`, variant: 'warning',
       })
       if (!ok) return
@@ -148,7 +159,7 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
       // Un solo modal, tenga o no plantas individuales cargadas: antes se abrían dos
       // formularios distintos según un dato que el cultivador no eligió ni ve.
       if (!plants.itemsByLote[String(loteId)]) {
-        try { await plants.fetchByLote(loteId) } catch {}
+        try { await plants.fetchByLote(loteId) } catch { /* no bloquea: queda lo que había */ }
       }
       showCosechaPartialModal.value = true
     } else if (lote?.estado === 'cosecha') {

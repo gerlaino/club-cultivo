@@ -5,7 +5,7 @@ class PlantsController < ApplicationController
   before_action :authenticate_user!
 
   before_action -> { require_feature!(:cultivo) }
-  before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso]
+  before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso, :linea_fotos]
 
   # GET /plants/por_qr/:codigo_qr
   # Resuelve una planta por su código QR, scoped al club. Mismo patrón que
@@ -209,6 +209,12 @@ class PlantsController < ApplicationController
   end
 
   # POST /plants/:id/add_foto
+  # GET /plants/:id/linea_fotos — todas las fotos de la planta en orden, para verla crecer
+  # (`Plantas::LineaDeFotos`).
+  def linea_fotos
+    render json: Plantas::LineaDeFotos.new(@plant, url_para: ->(x) { url_for(x) }).call
+  end
+
   def add_foto
     unless params[:foto].present?
       return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity

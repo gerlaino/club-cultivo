@@ -65,6 +65,59 @@ namespace :e2e do
     end
   end
 
+  # Un AUTOCULTIVO aparte (`casa@e2e.test`), para la prueba que recorre sus pantallas buscando
+  # palabras de organización (lote, sala, sede, códigos). No es la org `e2e`: es otra cuenta, del
+  # plan personal, creada por la misma puerta que el autoregistro. Idempotente: si ya existe, sólo
+  # le repone la clave y lo que falte (un espacio con una cama, plantas en vege y una cosecha).
+  desc 'Crea o rehace el autocultivo de pruebas e2e (casa@e2e.test)'
+  task autocultivo: :environment do
+    user = ActsAsTenant.without_tenant { User.find_by(email: 'casa@e2e.test') }
+    unless user
+      Registros::CrearPersonal.new(nombre: 'Casa E2E', email: 'casa@e2e.test', password: CLAVE_E2E,
+                                   acepta_terminos: true, mayor_de_edad: true).call
+      user = ActsAsTenant.without_tenant { User.find_by!(email: 'casa@e2e.test') }
+    end
+    user.update!(password: CLAVE_E2E, password_confirmation: CLAVE_E2E)
+    club = user.club
+    # Confirmado y sin vencer: si no, a los 7 días la cuenta se pausa y la prueba falla por eso.
+    club.update_columns(plan_activo_hasta: Time.zone.today + 30, activo: true)
+    RegistroPersonal.where(club_id: club.id).update_all(confirmado_at: Time.current)
+
+    ActsAsTenant.with_tenant(club) do
+      sede = club.sedes.first
+      sala = club.salas.find_by(nombre: 'Carpa E2E') ||
+             Sala.create!(club: club, sede: sede, nombre: 'Carpa E2E', kind: 'vegetativo', m2: 1, created_by: user)
+      gen  = club.geneticas.find_by(nombre: 'E2E Ananda') ||
+             Genetica.create!(club: club, nombre: 'E2E Ananda')
+
+      unless club.lotes.where(estado: 'vegetativo').exists?
+        lote = Lote.new(club: club, sala: sala, sede: sede, genetica: gen, estado: 'vegetativo',
+                        start_date: 20.days.ago.to_date, tamanio_maceta: 10, dias_vegetativo_objetivo: 30,
+                        plants_count: 2)
+        Lotes::Plantar.new(lote: lote, usuario: user, plantas: 2).call
+      end
+      unless club.lotes.where(estado: 'curado').exists?
+        cos = Lote.new(club: club, sede: sede, genetica: gen, estado: 'curado', start_date: 120.days.ago.to_date,
+                      plants_count: 1)
+        Lotes::Plantar.new(lote: cos, usuario: user, plantas: 1).call
+        Stock.create!(club: club, sede: sede, lote: cos, genetica: gen, origen: 'lote',
+                      forma_producto: 'flor_seca', unidad: 'g', cantidad: 40, estado: 'asignado')
+      end
+      lote = club.lotes.find_by(estado: 'vegetativo')
+      cos  = club.lotes.find_by(estado: 'curado')
+      # Tres fotos de la primera planta, para «Cómo creció» (cada vez más verde).
+      planta = lote.plants.order(:id).first
+      if LoteFoto.where(lote_id: lote.id).none?
+        [[15, 120], [8, 160], [1, 200]].each do |dias, verde|
+          f = LoteFoto.new(club: club, lote: lote, plant: planta, user: user, tomada_el: dias.days.ago.to_date)
+          f.imagen.attach(io: StringIO.new(png_liso(40, verde, 60)), filename: "dia-#{dias}.png", content_type: 'image/png')
+          f.save!
+        end
+      end
+      puts "Autocultivo e2e ##{club.id} · espacio ##{sala.id} · plantas ##{lote.id} · cosecha ##{cos.id} · planta ##{lote.plants.first.id}"
+    end
+  end
+
   # Deja al repartidor con plata cobrada en la calle y un paquete sin entregar, que es el estado
   # desde el que arranca la prueba de la rendición. Hacerlo por la app llevaría media prueba
   # armando el escenario en vez de probar lo que interesa.
@@ -191,6 +244,14 @@ def limpiar_operativo_e2e!(club)
   RendicionCaja.unscoped.where(ids).delete_all
   CajaTurno.unscoped.where(ids).delete_all
   Stock.unscoped.where(ids).delete_all
+end
+
+# Un PNG de un solo color, sin gemas: alcanza para que una prueba tenga fotos que mostrar.
+def png_liso(r, g, b, ancho = 64, alto = 48)
+  chunk = ->(tipo, datos) { [datos.bytesize].pack('N') + tipo + datos + [Zlib.crc32(tipo + datos)].pack('N') }
+  filas = ([0] + [r, g, b] * ancho).pack('C*') * alto
+  "\x89PNG\r\n\x1a\n".b + chunk.('IHDR', [ancho, alto, 8, 2, 0, 0, 0].pack('NNCCCCC')) +
+    chunk.('IDAT', Zlib::Deflate.deflate(filas)) + chunk.('IEND', '')
 end
 
 def usuario_e2e!(club, rol, nombre, apellido)

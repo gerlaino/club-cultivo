@@ -1,4 +1,5 @@
 <script setup>
+import LineaDeFotos from '../components/personal/LineaDeFotos.vue'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 const { esPersonal } = useUsoPersonal()
 import { ref, computed, watch, onMounted } from 'vue'
@@ -7,7 +8,6 @@ import { useQRCode } from '../composables/useQRCode'
 import { useEtiquetaPlanta } from '../composables/useEtiquetaPlanta.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
-import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto, quitarPlantaPesajeManicura } from '../lib/api'
 import { achicarImagen } from '../lib/imagenes.js'
 import { estadoPlantaLabel } from '../lib/loteHelpers.js'
@@ -29,7 +29,6 @@ const route  = useRoute()
 const router = useRouter()
 const plants = usePlantsStore()
 const auth   = useAuthStore()
-const club   = useClubStore()
 const toast   = useToast()
 const { confirm } = useConfirm()
 const conAvisoDeCierre = useUltimaPlanta()
@@ -714,6 +713,8 @@ onMounted(async () => {
       <!-- Layout -->
       <div class="pd__layout">
         <div class="pd__main">
+          <!-- Autocultivo: sus fotos pasando una tras otra. -->
+          <LineaDeFotos v-if="esPersonal" :key="fotos.length" :plant-id="id" class="pd__linea-fotos" />
 
           <!-- Historial completo -->
           <div class="pd__section">
@@ -1487,6 +1488,7 @@ onMounted(async () => {
 }
 .pd__mnc-cancel:hover { color: var(--c-slate-500); }
 
+.pd__linea-fotos { margin-bottom: 1.25rem; }
 .pd__layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.25rem; align-items: start; }
 @media (max-width: 900px) { .pd__layout { grid-template-columns: 1fr; } }
 

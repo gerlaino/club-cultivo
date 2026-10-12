@@ -9,9 +9,14 @@
         <h1 class="mmc__titulo">Mi cultivo</h1>
         <p class="mmc__sub">{{ resumen }}</p>
       </div>
-      <RouterLink to="/m/personal/informes" class="mmc__informes">
-        <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Mis informes
-      </RouterLink>
+      <div class="mmc__links">
+        <RouterLink to="/m/personal/informes" class="mmc__informes">
+          <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Mis informes
+        </RouterLink>
+        <RouterLink to="/m/personal/guia" class="mmc__informes">
+          <i class="bi bi-droplet-half" aria-hidden="true"></i> Guía de nutrientes
+        </RouterLink>
+      </div>
     </header>
 
     <div v-if="cargando && !salas.length" class="mmc__vacio"><i class="bi bi-arrow-repeat mmc__spin"></i> Cargando…</div>
@@ -132,6 +137,7 @@ const resumen = computed(() => {
 .mmc__cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .mmc__titulo { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--c-ink-900); }
 .mmc__sub { margin: 2px 0 0; font-size: .9rem; color: var(--c-ink-700); }
+.mmc__links { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .mmc__informes {
   display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 999px;
   border: 1px solid var(--c-leaf-300); color: var(--c-leaf-800); font-size: .84rem; font-weight: 600; text-decoration: none; white-space: nowrap;
