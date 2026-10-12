@@ -155,7 +155,7 @@
           <label class="mta__label">Tipo</label>
           <select v-model="form.tipo" class="mta__input">
             <option v-for="tp in TIPOS" :key="tp.value" :value="tp.value">
-              {{ tp.emoji }} {{ tp.label }}
+              {{ tp.label }}
             </option>
           </select>
         </div>

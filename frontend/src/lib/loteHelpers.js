@@ -19,13 +19,13 @@ export const LOTE_ESTADOS = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 
 export const PLANT_STATES = ['enraizado', 'vegetativo', 'floracion', 'secado', 'cosechado', 'descartada']
 
 export const ESTADO_META = {
-  enraizado:            { label: 'Enraizado',          color: '#0891b2', bg: '#e0f2fe', emoji: '🌱' },
-  vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃' },
-  floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸' },
-  cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿' },
-  en_manicura:        { label: 'En manicura',        color: '#7c3aed', bg: '#ede9fe', emoji: '✂️'  },
-  curado:             { label: 'Curado',             color: '#2563eb', bg: '#dbeafe', emoji: '🫙' },
-  finalizado:         { label: 'Finalizado',         color: '#1b5e20', bg: '#dcfce7', emoji: '✅' },
+  enraizado:            { label: 'Enraizado',          color: '#0891b2', bg: '#e0f2fe', emoji: '🌱', icon: 'bi-moisture' },
+  vegetativo:         { label: 'Vegetativo',          color: '#16a34a', bg: '#dcfce7', emoji: '🍃', icon: 'bi-tree' },
+  floracion:          { label: 'Floración',          color: '#d97706', bg: '#fef3c7', emoji: '🌸', icon: 'bi-flower1' },
+  cosecha:            { label: 'Cosecha',            color: '#059669', bg: '#d1fae5', emoji: '🌿', icon: 'bi-scissors' },
+  en_manicura:        { label: 'En manicura',        color: '#7c3aed', bg: '#ede9fe', emoji: '✂️' , icon: 'bi-scissors' },
+  curado:             { label: 'Curado',             color: '#2563eb', bg: '#dbeafe', emoji: '🫙', icon: 'bi-archive' },
+  finalizado:         { label: 'Finalizado',         color: '#1b5e20', bg: '#dcfce7', emoji: '✅', icon: 'bi-check2-circle' },
 }
 
 // Meta de los estados de PLANTA. Claves == PLANT_STATES (canónico backend).
@@ -149,7 +149,7 @@ export function desglosarCiclo(diasPorEstado = {}) {
   }).filter(b => b.total > 0)
 }
 
-export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
+export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•', icon: 'bi-circle' } }
 // Cómo se dice el estado de UN lote. Lo decide el backend (`estado_label`): el estado `enraizado`
 // es uno solo, pero una semilla que todavía no fue a maceta dice «Germinación» (Germán,
 // 29-sep-2026). Sin `estado_label` (payloads viejos), la palabra del estado.
@@ -276,7 +276,7 @@ function porQueToca(p) {
     return f ? `cosecha estimada para el ${f}${lleva ? `${lleva} de ${FASE_ANTERIOR[p.fase]}` : ''}` : null
   }
   if (!p.objetivo_dias) return null
-  if (p.automatica) return `${quien} un ciclo de ${p.objetivo_dias}${lleva}`
+  if (p.automatica) return `${quien} ${p.objetivo_dias} días de cultivo${lleva}`
   return `${quien} ${p.objetivo_dias} de ${FASE_ANTERIOR[p.fase] || 'esta fase'}${lleva}`
 }
 export function textoProximoPaso(lote) {
@@ -285,7 +285,7 @@ export function textoProximoPaso(lote) {
   const que = PROXIMO_PASO_LABEL[p.fase] || p.fase
   const n   = p.faltan_dias
   // Automática: el reloj es el ciclo (desde que va a maceta), y conviene decir de dónde sale.
-  if (p.automatica && lote.dias_ciclo_objetivo && n > 1) return `Faltan ${n} días para la cosecha (ciclo de ${lote.dias_ciclo_objetivo})`
+  if (p.automatica && lote.dias_ciclo_objetivo && n > 1) return `Faltan ${n} días para la cosecha (${lote.dias_ciclo_objetivo} días de cultivo)`
   if (n > 1)   return `Faltan ${n} días para ${que}`
   if (n === 1) return `Mañana toca ${que}`
   if (n === 0) return `Hoy toca ${que}`

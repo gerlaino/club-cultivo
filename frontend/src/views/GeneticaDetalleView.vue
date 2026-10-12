@@ -231,8 +231,8 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
                 <span class="gdv__badge" :style="{ background: tipoMeta.color + '22', color: tipoMeta.color, border: '1px solid ' + tipoMeta.color + '44' }">
                   {{ tipoMeta.label }}
                 </span>
-                <span v-if="gen.registrada_inase" class="gdv__badge gdv__badge--inase">🏛️ INASE</span>
-                <span v-if="gen.automatica" class="gdv__badge gdv__badge--auto" title="Florece sola, sin pasar a 12/12; se cosecha desde vegetativo">⚡ Automática{{ gen.dias_ciclo_objetivo ? ` · ciclo de ${gen.dias_ciclo_objetivo} días` : '' }}</span>
+                <span v-if="gen.registrada_inase" class="gdv__badge gdv__badge--inase"><i class="bi bi-bank" aria-hidden="true"></i> INASE</span>
+                <span v-if="gen.automatica" class="gdv__badge gdv__badge--auto" title="Florece sola, sin pasar a 12/12; se cosecha desde vegetativo"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Automática{{ gen.dias_ciclo_objetivo ? ` · ciclo de ${gen.dias_ciclo_objetivo} días` : '' }}</span>
                 <span v-if="!gen.activa"     class="gdv__badge gdv__badge--muted">Inactiva</span>
                 <span v-if="!gen.disponible" class="gdv__badge gdv__badge--muted">No disponible</span>
               </div>
@@ -254,20 +254,20 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
               <div class="kpi-cell__label">THC</div>
               <div class="kpi-cell__value" style="color:#e53935">
                 <template v-if="gen.thc != null">{{ gen.thc }}%</template>
-                <button v-else class="gdv__completar" @click="editar">＋ Cargar</button>
+                <button v-else class="gdv__completar" @click="editar"><i class="bi bi-plus-lg" aria-hidden="true"></i> Cargar</button>
               </div>
             </div>
             <div class="kpi-cell">
               <div class="kpi-cell__label">CBD</div>
               <div class="kpi-cell__value" style="color:#16a34a">
                 <template v-if="gen.cbd != null">{{ gen.cbd }}%</template>
-                <button v-else class="gdv__completar" @click="editar">＋ Cargar</button>
+                <button v-else class="gdv__completar" @click="editar"><i class="bi bi-plus-lg" aria-hidden="true"></i> Cargar</button>
               </div>
             </div>
             <!-- En una automática el ciclo es uno solo (desde que va a maceta): vege y flora
                  por separado no dicen nada. -->
             <div v-if="gen.automatica" class="kpi-cell">
-              <div class="kpi-cell__label">Ciclo obj.</div>
+              <div class="kpi-cell__label">Duración obj.</div>
               <div class="kpi-cell__value">{{ gen.dias_ciclo_objetivo ? gen.dias_ciclo_objetivo + 'd' : '—' }}</div>
             </div>
             <template v-else>
@@ -314,15 +314,15 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
             <h6 class="section-title">Datos de cultivo</h6>
             <div class="dato-grid">
               <div v-if="gen.rendimiento" class="dato-item">
-                <span class="dato-item__icon">⚖️</span>
+                <span class="dato-item__icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                 <div><div class="dato-item__label">Rendimiento</div><div class="dato-item__val">{{ gen.rendimiento }} g/m²</div></div>
               </div>
               <div v-if="gen.altura" class="dato-item">
-                <span class="dato-item__icon">📏</span>
+                <span class="dato-item__icon"><i class="bi bi-rulers" aria-hidden="true"></i></span>
                 <div><div class="dato-item__label">Altura</div><div class="dato-item__val">{{ gen.altura }} cm</div></div>
               </div>
               <div v-if="gen.origen" class="dato-item">
-                <span class="dato-item__icon">🌍</span>
+                <span class="dato-item__icon"><i class="bi bi-globe" aria-hidden="true"></i></span>
                 <div><div class="dato-item__label">Origen</div><div class="dato-item__val">{{ gen.origen }}</div></div>
               </div>
             </div>
@@ -340,7 +340,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 
           <!-- Reseñas de pacientes (feedback interno) -->
           <div v-if="resumenResena && resumenResena.total > 0" class="gdv__card gdv__card--mb">
-            <h6 class="section-title">⭐ Reseñas de pacientes ({{ resumenResena.total }})</h6>
+            <h6 class="section-title"><i class="bi bi-star" aria-hidden="true"></i> Reseñas de pacientes ({{ resumenResena.total }})</h6>
             <div class="rend-stats">
               <div class="rend-stat">
                 <div class="rend-stat__label">General</div>
@@ -377,7 +377,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 
           <!-- Rendimiento real -->
           <div class="gdv__card gdv__card--mb">
-            <h6 class="section-title">📊 Rendimiento real ({{ rendimientoStats.n }} lotes)</h6>
+            <h6 class="section-title"><i class="bi bi-bar-chart" aria-hidden="true"></i> Rendimiento real ({{ rendimientoStats.n }} lotes)</h6>
             <div v-if="rendimientoStats.n > 0" class="rend-stats">
               <div class="rend-stat">
                 <div class="rend-stat__label">Promedio</div>
@@ -406,7 +406,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 
           <!-- P&L por genética -->
           <div v-if="plResumen && plResumen.lotes_con_datos > 0" class="gdv__card gdv__card--mb">
-            <h6 class="section-title">💰 Rentabilidad ({{ plResumen.lotes_con_datos }} lotes)</h6>
+            <h6 class="section-title"><i class="bi bi-cash" aria-hidden="true"></i> Rentabilidad ({{ plResumen.lotes_con_datos }} lotes)</h6>
             <div class="rend-stats">
               <div class="rend-stat">
                 <div class="rend-stat__label">Ingresos prom.</div>
@@ -439,7 +439,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
               <span class="gdv__count-badge">{{ lotesTotal }}</span>
             </div>
 
-            <EmptyState v-if="lotesTotal === 0" icon="🌱" title="Sin lotes registrados" compact />
+            <EmptyState v-if="lotesTotal === 0" icon="bi-flower2" title="Sin lotes registrados" compact />
 
             <div v-else>
               <div class="gdv__table-wrap">
@@ -534,7 +534,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
                 </button>
               </div>
             </div>
-            <EmptyState v-else icon="📷" title="Sin fotos" compact />
+            <EmptyState v-else icon="bi-camera" title="Sin fotos" compact />
           </div>
 
           <!-- Configuración (solo admin) -->

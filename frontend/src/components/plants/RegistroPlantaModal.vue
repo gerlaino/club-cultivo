@@ -23,7 +23,7 @@
         <!-- Barra "ya registraste hoy" -->
         <div v-if="registrosHoy.length" class="rps__today-bar">
           Hoy ya registraste:
-          <span v-for="r in registrosHoy" :key="r" class="rps__today-chip">{{ getAccion(r)?.emoji }} {{ getAccion(r)?.label }}</span>
+          <span v-for="r in registrosHoy" :key="r" class="rps__today-chip">{{ getAccion(r)?.label }}</span>
         </div>
 
         <!-- Body -->
@@ -63,7 +63,7 @@
                         :class="{ 'rps__radio-btn--sel': formData.estado_general === key }"
                         :style="formData.estado_general === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.estado_general = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
 
@@ -75,7 +75,7 @@
                         :class="{ 'rps__radio-btn--sel': formData.plagas_observadas === key }"
                         :style="formData.plagas_observadas === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.plagas_observadas = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
             </div>
@@ -86,7 +86,7 @@
 
               <div v-for="accionId in seleccionadas" :key="accionId" class="rps__seccion">
                 <div class="rps__seccion-header">
-                  <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
+                  <span>{{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rps__seccion-body">
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />

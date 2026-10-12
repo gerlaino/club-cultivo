@@ -218,7 +218,7 @@ class DispensacionesController < ApplicationController
     if usa_cobros
       # El precio/total ya se calculó arriba; los cobros validan crédito por su cuenta.
       if @dispensacion.aporte_socio_ars.to_d <= 0
-        return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
+        return render json: { error: 'El aporte del paciente debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
       end
       # OJO con el placeholder: "mixto" significa que se pagó de DOS FORMAS distintas. Si nada
       # lo afina después, queda mintiendo — y eso es exactamente lo que pasa en CONTRA ENTREGA:
@@ -1093,7 +1093,7 @@ class DispensacionesController < ApplicationController
   def validar_y_calcular_credito(dispensacion, cc)
     monto = dispensacion.aporte_socio_ars.to_d
     if monto <= 0 && !%w[credito_gramos regalo].include?(dispensacion.medio_pago)
-      return 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
+      return 'El aporte del paciente debe ser mayor a $0. Verificá que el stock tenga precio configurado.'
     end
     credito_disp = cc ? [cc.saldo_disponible.to_d + cc.limite_credito.to_d, 0].max : 0
     dispensacion.monto_credito_ars = 0

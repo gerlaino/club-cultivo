@@ -471,7 +471,7 @@ async function handleSubmit() {
 .snv__opt   { font-size: .72rem; font-weight: 500; color: var(--c-slate-400); }
 .snv__envio { margin-top: 1rem; border-top: 1px dashed var(--c-slate-200); padding-top: .75rem; }
 .snv__envio-sum { cursor: pointer; font-size: .85rem; font-weight: 700; color: #b45309; list-style: none; display: flex; align-items: center; gap: .4rem; }
-.snv__envio-sum::before { content: '＋'; font-weight: 800; }
+.snv__envio-sum::before { content: '+'; font-weight: 800; }
 .snv__envio[open] .snv__envio-sum::before { content: '−'; }
 .snv__hint  { font-size: .7rem; color: var(--c-slate-400); }
 

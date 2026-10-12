@@ -1044,7 +1044,7 @@ class Lote < ApplicationRecord
     return if cama_ciclo_id_was.nil?
     return unless CamaRegistro.where(cama_ciclo_id: cama_ciclo_id_was).exists?
 
-    errors.add(:cama, 'no se puede corregir: ya hay registros de suelo en este ciclo de la cama')
+    errors.add(:cama, 'no se puede corregir: ya hay registros de suelo en esta siembra de la cama')
   end
 
   def m2_entran_en_la_cama

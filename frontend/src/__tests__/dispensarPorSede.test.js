@@ -100,6 +100,6 @@ describe('Dispensar — primero la sede, después su stock', () => {
   it('el stock sin sede (pool del club) es una opción más', async () => {
     const w = await montar([...STOCKS, { id: 9, cantidad: 20, unidad: 'g', forma_producto: 'flor_seca', sede: null }])
 
-    expect(w.vm.sedesConStock.map((s) => s.nombre)).toContain('Sin sede (club)')
+    expect(w.vm.sedesConStock.map((s) => s.nombre)).toContain('Sin sede (toda la organización)')
   })
 })

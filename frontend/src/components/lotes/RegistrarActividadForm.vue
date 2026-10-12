@@ -8,7 +8,7 @@
     </button>
     <div class="raf__row">
       <select v-model="form.categoria" class="raf__sel">
-        <option v-for="t in categorias" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
+        <option v-for="t in categorias" :key="t.value" :value="t.value">{{ t.label }}</option>
       </select>
       <AppDatePicker v-model="form.fecha" :max="hoy" class="raf__date" />
     </div>

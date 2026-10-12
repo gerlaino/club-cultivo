@@ -72,6 +72,6 @@ describe('Reservas agrupadas por sede', () => {
   it('las que no tienen sede van al final, en su propio grupo', async () => {
     const w = await montar([reserva(1, null), reserva(2, NORTE)])
 
-    expect(w.vm.gruposPorSede.at(-1).nombre).toBe('Sin sede (club)')
+    expect(w.vm.gruposPorSede.at(-1).nombre).toBe('Sin sede (toda la organización)')
   })
 })

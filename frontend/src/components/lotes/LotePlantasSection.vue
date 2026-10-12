@@ -3,7 +3,7 @@
     <!-- Toggle header -->
     <button class="lps__toggle" @click="expanded = !expanded">
       <div class="lps__toggle-left">
-        <span class="lps__emoji">🪴</span>
+        <span class="lps__emoji"><i class="bi bi-flower2" aria-hidden="true"></i></span>
         <span class="lps__title">{{ esPersonal ? 'Plantas' : 'Plantas del lote' }}</span>
         <span class="lps__pill">{{ plantasActivas.length }}</span>
         <span v-if="plantasCosechadas.length" class="lps__pill lps__pill--cosechada">{{ plantasCosechadas.length }} cosechadas</span>
@@ -14,7 +14,7 @@
           class="lps__btn-sm lps__btn-sm--cosecha"
           title="Registrar cosecha parcial"
           @click="$emit('cosechar')"
-        >🌿 Cosechar</button>
+        ><i class="bi bi-flower3" aria-hidden="true"></i> Cosechar</button>
         <!-- Toggle vista -->
         <div v-if="plantList.length > 0" class="lps__view-toggle">
           <button class="lps__view-btn" :class="{ 'lps__view-btn--active': viewMode === 'lista' }" title="Vista lista" @click="viewMode = 'lista'">
@@ -52,7 +52,7 @@
     <!-- Body -->
     <div v-show="expanded" class="lps__body">
       <div v-if="plantsStore.loading" class="lps__placeholder">Cargando plantas…</div>
-      <EmptyState v-else-if="!plantList.length" icon="🪴" title="Sin plantas" :message="esPersonal ? 'Todavía no hay plantas cargadas.' : 'Sin plantas registradas en este lote.'" compact>
+      <EmptyState v-else-if="!plantList.length" icon="bi-flower2" title="Sin plantas" :message="esPersonal ? 'Todavía no hay plantas cargadas.' : 'Sin plantas registradas en este lote.'" compact>
         <template #actions>
           <button v-if="canEdit || isCultivador" class="lps__btn-outline" @click="openAddPlanta">
             <i class="bi bi-plus-lg"></i> Agregar primera planta
@@ -129,7 +129,7 @@
             <div class="lps__pcard-footer">
               <div class="lps__pcard-nombre">{{ p.nombre || `Planta #${i + 1}` }}</div>
               <div class="lps__pcard-estado" :style="{ background: estadoPlanta(p).color + '33', color: estadoPlanta(p).color === '#64748b' ? '#cbd5e1' : '#fff' }">
-                {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
+                {{ estadoPlanta(p).label }}
               </div>
             </div>
 
@@ -140,7 +140,7 @@
         <div v-if="layoutLeyenda.length" class="lps__layout-legend">
           <div v-for="item in layoutLeyenda" :key="item.state" class="lps__legend-item">
             <span class="lps__legend-dot" :style="{ background: item.color }"></span>
-            <span class="lps__legend-label">{{ item.emoji }} {{ item.label }}</span>
+            <span class="lps__legend-label">{{ item.label }}</span>
             <span class="lps__legend-cnt">{{ item.count }}</span>
           </div>
         </div>
@@ -161,7 +161,7 @@
               <div class="lps__planta-qr">{{ p.codigo_qr || '—' }}</div>
             </div>
             <span class="lps__planta-estado" :style="{ background: estadoPlanta(p).color + '18', color: estadoPlanta(p).color }">
-              {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
+              {{ estadoPlanta(p).label }}
             </span>
             <i class="bi bi-chevron-right lps__planta-arrow"></i>
           </RouterLink>
@@ -178,7 +178,7 @@
         <!-- Cosechadas: lista plana paginada (la pasada se muestra por fila) -->
         <template v-if="plantasCosechadas.length">
           <div class="lps__cosecha-grupo-header">
-            <span class="lps__cosecha-grupo-label">🌿 Cosechadas</span>
+            <span class="lps__cosecha-grupo-label"><i class="bi bi-flower3" aria-hidden="true"></i> Cosechadas</span>
             <span class="lps__cosecha-grupo-count">{{ plantasCosechadas.length }} planta{{ plantasCosechadas.length !== 1 ? 's' : '' }}</span>
           </div>
           <div class="lps__list">
@@ -193,7 +193,7 @@
                 <div class="lps__planta-qr">{{ p.codigo_qr || '—' }}<span v-if="p.pasada_cosecha"> · Cosecha {{ p.pasada_cosecha }}</span></div>
               </div>
               <span class="lps__planta-estado" :style="{ background: estadoPlanta(p).color + '18', color: estadoPlanta(p).color }">
-                {{ estadoPlanta(p).emoji }} {{ estadoPlanta(p).label }}
+                {{ estadoPlanta(p).label }}
               </span>
               <i class="bi bi-chevron-right lps__planta-arrow"></i>
             </RouterLink>
@@ -215,7 +215,7 @@
         <div class="lps__modal">
           <div class="lps__modal-header">
             <div>
-              <h3 class="lps__modal-title">🪴 Agregar planta</h3>
+              <h3 class="lps__modal-title"><i class="bi bi-flower2" aria-hidden="true"></i> Agregar planta</h3>
               <p class="lps__modal-sub">{{ lote?.codigo }} · ID autogenerado</p>
             </div>
             <button class="lps__modal-close" @click="showAddPlanta = false"><i class="bi bi-x-lg"></i></button>
@@ -223,23 +223,23 @@
           <div class="lps__modal-body">
             <div v-if="plantaError" class="lps__alert">{{ plantaError }}</div>
             <div v-if="lote?.genetica" class="lps__info-box">
-              <span>🧬 Genética heredada del lote:</span>
+              <span><i class="bi bi-tag" aria-hidden="true"></i> Genética heredada del lote:</span>
               <strong>{{ lote.genetica.nombre }}</strong>
             </div>
             <div class="lps__grid">
               <div class="lps__field">
                 <label class="lps__label">Estado inicial</label>
                 <select class="lps__input" v-model="plantaForm.state">
-                  <option value="enraizado">🌱 Enraizado</option>
-                  <option value="vegetativo">🍃 Vegetativo</option>
-                  <option value="floracion">🌸 Floración</option>
+                  <option value="enraizado"><i class="bi bi-flower2" aria-hidden="true"></i> Enraizado</option>
+                  <option value="vegetativo"><i class="bi bi-tree" aria-hidden="true"></i> Vegetativo</option>
+                  <option value="floracion"><i class="bi bi-flower1" aria-hidden="true"></i> Floración</option>
                 </select>
               </div>
               <div class="lps__field">
                 <label class="lps__label">Origen</label>
                 <select class="lps__input" v-model="plantaForm.origen">
-                  <option value="enraizado">🌱 Enraizado</option>
-                  <option value="division">🪴 División</option>
+                  <option value="enraizado"><i class="bi bi-flower2" aria-hidden="true"></i> Enraizado</option>
+                  <option value="division"><i class="bi bi-flower2" aria-hidden="true"></i> División</option>
                 </select>
               </div>
             </div>

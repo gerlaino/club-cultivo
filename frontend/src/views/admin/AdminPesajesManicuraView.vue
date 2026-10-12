@@ -181,7 +181,7 @@
                   <span class="apm-suffix">g</span>
                 </div>
                 <span class="apm-hint">
-                  Manicura declaró {{ (pesajeActivo?.peso_total_g || pesajeActivo?.peso_calculado_g || 0).toFixed(1) }}g
+                  Manicura declaró {{ formatG((pesajeActivo?.peso_total_g || pesajeActivo?.peso_calculado_g || 0), 1) }}
                   — podés ajustarlo
                 </span>
               </div>
@@ -221,7 +221,7 @@
                     <span class="apm-cont__body">
                       <span class="apm-cont__title">
                         {{ s.numero_lote_producto || `Contenedor #${s.id}` }}
-                        <span class="apm-cont__qty">{{ (s.cantidad || 0).toFixed(0) }}g</span>
+                        <span class="apm-cont__qty">{{ formatG((s.cantidad || 0), 0) }}</span>
                       </span>
                       <span class="apm-cont__tags">
                         <span class="apm-cont__tag apm-cont__tag--gen"><Leaf :size="11" :stroke-width="2" /> {{ s.genetica_nombre || '—' }}</span>
@@ -265,6 +265,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -403,7 +404,7 @@ const eliminandoId = ref(null)
 async function eliminar(p) {
   const ok = await confirm({
     title:       'Eliminar peso declarado',
-    message:     `Se descartará el pesaje del lote ${p.lote_codigo} (${(p.peso_total_g || p.peso_calculado_g || 0).toFixed(1)}g declarados por ${p.manicurador_nombre}). Esta acción no se puede deshacer.`,
+    message:     `Se descartará el pesaje del lote ${p.lote_codigo} (${formatG((p.peso_total_g || p.peso_calculado_g || 0), 1)} declarados por ${p.manicurador_nombre}). Esta acción no se puede deshacer.`,
     confirmText: 'Eliminar',
     variant:     'danger',
   })

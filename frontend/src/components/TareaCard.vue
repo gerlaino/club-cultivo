@@ -117,14 +117,14 @@ defineEmits(['click', 'completar', 'editar', 'cancelar', 'cancelar-serie'])
 const authStore = useAuthStore()
 
 const TIPO_LABELS = {
-  riego: '💧 Riego',
-  poda: '✂️ Poda',
+  riego: 'Riego',
+  poda: 'Poda',
   medicion: '📏 Medición',
-  limpieza: '🧹 Limpieza',
-  cosecha: '🌿 Cosecha',
-  trasplante: '🪴 Trasplante',
-  inspeccion: '🔍 Inspección',
-  otro: '📋 Otro'
+  limpieza: 'Limpieza',
+  cosecha: 'Cosecha',
+  trasplante: 'Trasplante',
+  inspeccion: 'Inspección',
+  otro: 'Otro'
 }
 
 const puedeEditar = computed(() => {

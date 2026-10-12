@@ -16,7 +16,7 @@
       <div class="sd__hero">
         <div class="sd__hero-left">
           <div class="sd__forma-ico" :class="`sd__forma-ico--${stock.forma_producto}`">
-            {{ formaIco(stock.forma_producto) }}
+            <i :class="['bi', formaIco(stock.forma_producto)]" aria-hidden="true"></i>
           </div>
           <div class="sd__hero-info">
             <h1 class="sd__hero-forma">{{ formaLabel(stock.forma_producto) }}</h1>
@@ -255,7 +255,7 @@
                   <div class="sd__mov-row">
                     <span class="sd__mov-tipo" :class="`sd__mov-tipo--${m.tipo}`">{{ movTipoLabel(m.tipo) }}</span>
                     <span class="sd__mov-g" :class="Number(m.gramos) >= 0 ? 'sd__mov-g--pos' : 'sd__mov-g--neg'">
-                      {{ Number(m.gramos) >= 0 ? '+' : '' }}{{ Number(m.gramos).toFixed(2) }}g
+                      {{ Number(m.gramos) >= 0 ? '+' : '' }}{{ formatG(Number(m.gramos), 2) }}
                     </span>
                   </div>
                   <div class="sd__mov-notas">{{ m.notas || '—' }}</div>
@@ -410,7 +410,7 @@
     </template>
 
     <div v-else class="sd__not-found">
-      <span>📦</span>
+      <span><i class="bi bi-box-seam" aria-hidden="true"></i></span>
       <p>Stock no encontrado</p>
       <RouterLink to="/admin/stock" class="sd__btn-ghost">← Volver al inventario</RouterLink>
     </div>
@@ -511,8 +511,8 @@
                 (Manicura → reajustar peso) y el stock se actualiza solo.
               </div>
               <div v-if="ajustarPreview !== null" class="sd__ajuste-preview" :class="ajustarDelta >= 0 ? 'sd__ajuste-preview--pos' : 'sd__ajuste-preview--neg'">
-                <span>Queda: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
-                <span class="sd__ajuste-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ ajustarDelta.toFixed(2) }}g</span>
+                <span>Queda: <strong>{{ formatG(ajustarPreview, 2) }}</strong></span>
+                <span class="sd__ajuste-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ formatG(ajustarDelta, 2) }}</span>
               </div>
             </div>
             <div class="sd__modal-ft">
@@ -743,7 +743,7 @@
                 <textarea class="sd__input" rows="2" v-model="procesarForm.observaciones" placeholder="notas de la producción…"></textarea>
               </div>
               <div v-if="costoDerivado" class="sd__merma">
-                <span>🧮</span>
+                <span><i class="bi bi-calculator" aria-hidden="true"></i></span>
                 <span>Costo: <strong>${{ Math.round(costoDerivado.total) }}</strong> total · <strong>${{ costoDerivado.unitario.toFixed(2) }}</strong> por {{ procesarForm.unidad === 'un' ? 'unidad' : procesarForm.unidad }}</span>
               </div>
             </div>
@@ -780,7 +780,7 @@
                 <div class="sd__reajuste-info">
                   <strong>{{ p.lote_codigo || ('Pesaje #' + p.id) }}</strong>
                   <!-- Si el pesaje se repartió (copones/bajos), lo que le tocó a ESTE frasco. -->
-                  <span>a este frasco: {{ Number(p._gramosFrasco).toFixed(1) }}g<template v-if="p._repartido"> (de {{ Number(p.peso_confirmado_g).toFixed(1) }}g repartidos)</template></span>
+                  <span>a este frasco: {{ formatG(Number(p._gramosFrasco), 1) }}<template v-if="p._repartido"> (de {{ formatG(Number(p.peso_confirmado_g), 1) }} repartidos)</template></span>
                 </div>
                 <div class="sd__input-row sd__reajuste-input">
                   <input type="number" min="0.1" step="0.1" class="sd__input" v-model.number="p._nuevoPeso" />
@@ -798,6 +798,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRoute, useRouter } from 'vue-router'
@@ -1315,16 +1316,16 @@ const FORMA_MAP = {
   preroll: 'Preroll', otro: 'Otro', externo: 'Externo',
 }
 const FORMA_ICO = {
-  flor_seca: '🌿', hash: '🪨', aceite: '💧', tintura: '🧪',
-  crema: '🫙', capsula: '💊', comestible: '🍬', prensado: '🟫', preroll: '🚬',
-  otro: '📦', externo: '📦',
+  flor_seca: 'bi-flower3', hash: 'bi-gem', aceite: 'bi-droplet', tintura: 'bi-eyedropper',
+  crema: 'bi-droplet-half', capsula: 'bi-capsule', comestible: 'bi-cup-hot', prensado: 'bi-square', preroll: 'bi-box',
+  otro: 'bi-box-seam', externo: 'bi-box-seam',
 }
 const ORIGEN_MAP = { lote: 'Producción propia', derivado_lote: 'Derivado de lote', compra_externa: 'Compra externa' }
 const ESTADO_MAP = { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }
 const MOV_TIPO_MAP = { ingreso: 'Entró mercadería', produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento', consumo: 'Consumo', salida: 'Salida' }
 
 function formaLabel(f)    { return FORMA_MAP[f]  || f || 'Stock' }
-function formaIco(f)      { return FORMA_ICO[f]  || '📦' }
+function formaIco(f)      { return FORMA_ICO[f]  || 'bi-box-seam' }
 function origenLabel(o)   { return ORIGEN_MAP[o] || o }
 function estadoLabel(e)   { return ESTADO_MAP[e] || e }
 function movTipoLabel(t)  { return MOV_TIPO_MAP[t] || t }

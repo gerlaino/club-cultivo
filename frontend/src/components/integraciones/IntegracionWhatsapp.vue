@@ -17,7 +17,7 @@
               Activo · <span class="iwa__number">{{ data.twilio_whatsapp_from }}</span>
             </template>
             <template v-else>
-              Notificá a tus socios cuando el delivery salga o entregue su paquete
+              Notificá a tus pacientes cuando el delivery salga o entregue su paquete
             </template>
           </div>
         </div>

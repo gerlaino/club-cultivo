@@ -101,7 +101,7 @@ const dias = (n) => n == null ? '—' : `${Math.round(n)} d`
 function tablaDeLaSolapa() {
   let headers = [], rows = []
   if (tab.value === 'geneticas') {
-    headers = ['Genética', 'Lotes', 'Plantas', 'g/planta', 'Flor seca (g)', 'Prendió %', 'Se perdió en el ciclo %', 'Ciclo (días)']
+    headers = ['Genética', 'Lotes', 'Plantas', 'g/planta', 'Flor seca (g)', 'Prendió %', 'Descartadas %', 'Duración (días)']
     rows = geneticas.value.map(g => [g.nombre, g.lotes, g.plantas, g.g_por_planta, g.gramos, g.prendio_pct, g.perdida_pct, g.ciclo_dias])
   } else if (tab.value === 'fases') {
     const fs = fases.value?.fases || []
@@ -188,8 +188,8 @@ async function descargar(formato) {
                   <th class="an__th-r" title="Sobre los lotes que tienen los m² del espacio cargados">g/m²</th>
                   <th class="an__th-r">Flor seca</th>
                   <th class="an__th-r" title="De todas las plantas que arrancaron, cuántas enraizaron">Prendió</th>
-                  <th class="an__th-r" title="De las que prendieron, cuántas se descartaron después">Se perdió en el ciclo</th>
-                  <th class="an__th-r" title="Del arranque a que existe el frasco">Ciclo</th>
+                  <th class="an__th-r" title="De las que prendieron, cuántas se descartaron después">Descartadas</th>
+                  <th class="an__th-r" title="Del arranque a que existe el frasco">Duración</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,7 +234,7 @@ async function descargar(formato) {
               </thead>
               <tbody>
                 <tr v-for="f in fases.filas" :key="f.genetica_id" :class="{ 'an__row--pocos': !f.suficientes }">
-                  <td class="an__td-bold">{{ f.nombre }}<span v-if="f.automatica" class="chip-auto" title="Automática: sin floración anotada, el vegetativo es el ciclo entero">Auto</span><span class="an__origen">{{ f.origen_label }}</span><span v-if="!f.suficientes" class="an__pocos">pocos lotes: sin conclusión</span></td>
+                  <td class="an__td-bold">{{ f.nombre }}<span v-if="f.automatica" class="chip-auto" title="Automática: sin floración anotada, el vegetativo es todo el cultivo">Auto</span><span class="an__origen">{{ f.origen_label }}</span><span v-if="!f.suficientes" class="an__pocos">pocos lotes: sin conclusión</span></td>
                   <td class="an__td-r">{{ f.lotes }}</td>
                   <td class="an__td-r">{{ pc(f.prendio_pct) }}</td>
                   <td v-for="x in fases.fases" :key="x" class="an__td-r"><span class="an__fase" :class="`an__fase--${x}`">{{ dias(f.dias[x]) }}</span></td>

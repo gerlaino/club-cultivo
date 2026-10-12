@@ -155,7 +155,7 @@
           <button v-for="m in METODOS" :key="m.value" type="button"
                   class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': f.metodo_nutricion === m.value }"
                   @click="setMetodo(m.value)">
-            {{ m.emoji }} {{ m.label }}
+            {{ m.label }}
           </button>
         </div>
       </div>

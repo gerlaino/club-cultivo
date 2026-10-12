@@ -84,7 +84,7 @@
                 class="tf__radio-btn" :class="{ 'tf__radio-btn--sel': f.estado_raices === r.value }"
                 :style="f.estado_raices === r.value ? { borderColor: r.color, background: r.color + '18', color: r.color } : {}"
                 @click="f.estado_raices = r.value">
-          {{ r.emoji }} {{ r.label }}
+          {{ r.label }}
         </button>
       </div>
     </div>

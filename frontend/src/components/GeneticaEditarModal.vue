@@ -129,9 +129,9 @@
                  (el reloj, Plan vs. real y «Cómo salió» miran el ciclo). El enraizado se
                  informa aparte, y no se declara: se mide solo. Germán, 22-sep-2026. -->
             <div v-if="form.automatica" class="gem-form__field gem-form__field--full">
-              <label class="gem-form__label">Ciclo completo (días) <span class="gem-form__label-hint">desde que va a maceta, sin contar el enraizado</span></label>
+              <label class="gem-form__label">Duración total (días) <span class="gem-form__label-hint">desde que va a maceta, sin contar el enraizado</span></label>
               <input v-model.number="form.dias_ciclo_objetivo" type="number" min="1" class="gem-form__input" placeholder="75" :disabled="editingInase" />
-              <p class="gem-form__hint">El lote va a decir «faltan N días para la cosecha (ciclo de {{ form.dias_ciclo_objetivo || 75 }})», contando desde que prendió. Los días de enraizado se miden solos y se informan aparte.</p>
+              <p class="gem-form__hint">El lote va a decir «faltan N días para la cosecha ({{ form.dias_ciclo_objetivo || 75 }} días de cultivo)», contando desde que prendió. Los días de enraizado se miden solos y se informan aparte.</p>
             </div>
 
             <!-- Días objetivo por fase / Rendimiento / Altura -->

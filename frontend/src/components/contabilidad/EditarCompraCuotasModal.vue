@@ -167,7 +167,7 @@ async function guardar() {
 
           <div class="ecc__field">
             <label class="ecc__label">Responsable / tarjeta <span class="ecc__opt">opcional</span></label>
-            <input v-model="form.responsable" class="ecc__input" placeholder="Ej: Tarjeta Visa club" />
+            <input v-model="form.responsable" class="ecc__input" placeholder="Ej: Tarjeta Visa de la organización" />
           </div>
           <div class="ecc__field">
             <label class="ecc__label">Proveedor <span class="ecc__opt">opcional</span></label>

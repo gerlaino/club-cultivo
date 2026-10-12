@@ -236,7 +236,7 @@ const sedesConStock = computed(() => {
   const mapa = new Map()
   for (const s of stockLibre.value) {
     const id = s.sede?.id ?? null
-    if (!mapa.has(id)) mapa.set(id, { id, nombre: s.sede?.nombre || 'Sin sede (club)', items: 0 })
+    if (!mapa.has(id)) mapa.set(id, { id, nombre: s.sede?.nombre || 'Sin sede (toda la organización)', items: 0 })
     mapa.get(id).items += 1
   }
   return [...mapa.values()].sort((a, b) => (a.id === null) - (b.id === null) || a.nombre.localeCompare(b.nombre))

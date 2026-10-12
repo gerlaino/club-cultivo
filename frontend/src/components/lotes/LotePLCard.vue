@@ -77,7 +77,7 @@
             <span v-if="pl.costo_mano_obra">M.O. {{ formatARS(pl.costo_mano_obra) }}</span>
             <span v-if="pl.costo_otros">Otros {{ formatARS(pl.costo_otros) }}</span>
             <span v-if="pl.costo_prorrateado">Prorrateado {{ formatARS(pl.costo_prorrateado) }}</span>
-            <span v-if="pl.gramos_en_stock > 0">{{ pl.gramos_en_stock.toFixed(1) }} g en stock</span>
+            <span v-if="pl.gramos_en_stock > 0">{{ formatG(pl.gramos_en_stock, 1) }} en stock</span>
           </div>
           <div v-if="!pl.tiene_costos" class="plc__hints">
             <span class="plc__hint">Anotá gastos para estas plantas en Gastos y el costo por gramo sale solo.</span>
@@ -114,7 +114,7 @@
             <span class="plc__col-label">Ingresos</span>
             <span class="plc__col-val plc__col-val--green">{{ formatARS(pl.ingresos) }}</span>
             <div v-if="pl.tiene_ingresos" class="plc__col-detail">
-              <span>{{ pl.gramos_dispensados.toFixed(1) }}g dispensados</span>
+              <span>{{ formatG(pl.gramos_dispensados, 1) }} dispensados</span>
             </div>
             <span v-else class="plc__col-none">Sin dispensaciones con precio</span>
           </div>
@@ -132,7 +132,7 @@
           </div>
           <div v-if="pl.gramos_en_stock > 0" class="plc__gpg-item">
             <span class="plc__gpg-label">En stock</span>
-            <span class="plc__gpg-val">{{ pl.gramos_en_stock.toFixed(1) }}g</span>
+            <span class="plc__gpg-val">{{ formatG(pl.gramos_en_stock, 1) }}</span>
           </div>
         </div>
 
@@ -151,6 +151,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, onMounted } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import { useLoteCostos } from '../../composables/useLoteCostos.js'

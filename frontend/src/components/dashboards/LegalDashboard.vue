@@ -164,7 +164,7 @@ onMounted(async () => {
 
         <div class="ld__kpi">
           <div class="ld__kpi-icon" style="background:rgba(3,105,161,.1);color:#0369a1">
-            <i class="bi bi-calendar-year"></i>
+            <i class="bi bi-calendar3"></i>
           </div>
           <div class="ld__kpi-body">
             <div class="ld__kpi-val" :style="(contable?.anio_actual?.balance || 0) >= 0 ? 'color:#15803d' : 'color:#dc2626'">

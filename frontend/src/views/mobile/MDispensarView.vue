@@ -148,7 +148,7 @@ async function abrirPorCarnet(token) {
     const p = data.data ?? data
     if (p?.id) { await abrir(p); return }
   } catch {
-    toast.error('Ese carnet no es de este club')
+    toast.error('Ese carnet no es de esta organización')
   }
   // La URL se limpia igual: si se recarga la pantalla, no vuelve a abrir la misma ficha sola.
   router.replace('/m/dispensar')

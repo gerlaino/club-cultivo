@@ -374,7 +374,7 @@
           <div class="trz__node trz__node--aplic">
             <div class="trz__node-head">
               <span class="trz__node-badge trz__node-badge--aplic">🧱 SUELO VIVO</span>
-              <span class="trz__node-code">{{ data.suelo.cama.nombre }}<template v-if="data.suelo.ciclo"> · ciclo {{ data.suelo.ciclo.numero }}</template></span>
+              <span class="trz__node-code">{{ data.suelo.cama.nombre }}<template v-if="data.suelo.ciclo"> · siembra {{ data.suelo.ciclo.numero }}</template></span>
             </div>
             <div class="trz__node-body">
               <div class="trz__fields">
@@ -400,7 +400,7 @@
                   <div v-for="r in data.suelo.registros" :key="r.id" class="trz__detalle-row" :class="{ 'trz__detalle-row--ciclo': r.del_ciclo }">
                     <span class="trz__detalle-fecha">{{ fecha(r.registrado_en) }}</span>
                     <span class="trz__detalle-cuerpo">
-                      <strong>{{ r.tipo_label }}</strong><span v-if="r.del_ciclo"> · este ciclo</span>
+                      <strong>{{ r.tipo_label }}</strong><span v-if="r.del_ciclo"> · esta siembra</span>
                       <span v-if="r.detalle"> · {{ r.detalle }}</span>
                       <span v-if="r.nutricion?.items?.length"> · {{ r.nutricion.items.map(i => `${i.nombre} ${cantidadSuelo(i)}`).join(', ') }}</span>
                       <span v-if="r.observaciones"> · {{ r.observaciones }}</span>

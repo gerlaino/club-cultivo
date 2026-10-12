@@ -58,7 +58,7 @@ module Notificaciones
       { clave: 'recordatorio_tarea', grupo: RECORD, label: 'Recordatorios de tareas',
         desc: 'Los que marcás con «Recordarme» al crear una tarea: te llegan ese día o el día antes, a las 8.',
         roles: EQUIPO, feature: nil, personal: true, default: true },
-      { clave: 'hitos_cultivo',    grupo: RECORD, label: 'Próximos pasos del ciclo',
+      { clave: 'hitos_cultivo',    grupo: RECORD, label: 'Próximos pasos del cultivo',
         desc: 'Cuándo un lote llega a sus días de vegetativo (¿pasa a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y del curado. Te avisa unos días antes.',
         roles: %w[admin], feature: 'cultivo', default: false, default_personal: true,
         desc_personal: 'Cuándo tus plantas llegan a los días de vegetativo que les pusiste (¿pasan a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y del curado. Te avisa unos días antes.' },

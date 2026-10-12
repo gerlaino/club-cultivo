@@ -1,4 +1,5 @@
 <script setup>
+import { formatG } from '../lib/formatters.js'
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
@@ -639,7 +640,7 @@ const FORMAS = [
         </table>
 
         <div class="hd__summary">
-          <span class="hd__summary-count">{{ vigentes.length }} dispensaciones<template v-if="dispensaciones.length - vigentes.length"> · {{ dispensaciones.length - vigentes.length }} anuladas</template> · {{ totalGramos.toFixed(1) }}g</span>
+          <span class="hd__summary-count">{{ vigentes.length }} dispensaciones<template v-if="dispensaciones.length - vigentes.length"> · {{ dispensaciones.length - vigentes.length }} anuladas</template> · {{ formatG(totalGramos, 1) }}</span>
           <span class="hd__summary-total">
             Cobrado <strong>{{ formatARS(totalCobrado) }}</strong>
             <span v-if="totalCredito > 0" class="hd__summary-credito"> · a cuenta corriente {{ formatARS(totalCredito) }}</span>

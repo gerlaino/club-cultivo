@@ -315,13 +315,13 @@ function showToast(type, msg) {
         <div class="pv__card">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(3,105,161,.1);color:#0369a1"><i class="bi bi-envelope"></i></div>
-            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">{{ esPersonal ? 'Tu mail y tu teléfono' : 'Datos visibles para los socios de la organización' }}</div></div>
+            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">{{ esPersonal ? 'Tu mail y tu teléfono' : 'Datos visibles para los pacientes de la organización' }}</div></div>
           </div>
           <div class="pv__card-body">
             <div class="pv__grid">
               <div class="pv__field">
                 <label class="pv__label">Email de contacto</label>
-                <input type="email" class="pv__input" :class="{ 'pv__input--err': errors.email }" v-model.trim="form.email" @input="onChange" :placeholder="esPersonal ? 'tu@mail.com' : 'contacto@miclub.org'" />
+                <input type="email" class="pv__input" :class="{ 'pv__input--err': errors.email }" v-model.trim="form.email" @input="onChange" :placeholder="esPersonal ? 'tu@mail.com' : 'contacto@organizacion.org'" />
                 <span v-if="errors.email" class="pv__err">{{ errors.email }}</span>
               </div>
               <div class="pv__field">
@@ -333,7 +333,7 @@ function showToast(type, msg) {
                 <label class="pv__label">Sitio web</label>
                 <div class="pv__input-group">
                   <span class="pv__input-prefix"><i class="bi bi-globe"></i></span>
-                  <input type="url" class="pv__input pv__input--prefixed" :class="{ 'pv__input--err': errors.website }" v-model.trim="form.website" @input="onChange" placeholder="https://miclub.org" />
+                  <input type="url" class="pv__input pv__input--prefixed" :class="{ 'pv__input--err': errors.website }" v-model.trim="form.website" @input="onChange" placeholder="https://organizacion.org" />
                 </div>
                 <span v-if="errors.website" class="pv__err">{{ errors.website }}</span>
                 <span v-else class="pv__hint">Opcional — debe incluir https://</span>
@@ -381,7 +381,7 @@ function showToast(type, msg) {
                    organismo: REPROCANN es del Ministerio de Salud, ARICCAME es otro —y su
                    transmisión todavía está simulada, así que prometer que enviamos algo sería
                    directamente falso. -->
-              Estos datos salen impresos en el informe semestral de REPROCANN, que presenta la organización. Podés completarlos después del onboarding: no bloquean ninguna funcionalidad.
+              Estos datos salen impresos en el informe semestral de REPROCANN, que presenta la organización. Podés completarlos después de la puesta en marcha: no bloquean ninguna funcionalidad.
             </div>
             <div class="pv__grid">
               <div class="pv__field">
@@ -433,7 +433,7 @@ function showToast(type, msg) {
             <div class="pv__card-icon" style="background:rgba(180,83,9,.1);color:#b45309"><i class="bi bi-bell"></i></div>
             <div>
               <div class="pv__card-title">Alertas</div>
-              <div class="pv__card-sub">{{ esPersonal ? 'Los rangos de ambiente de cada fase y cuándo avisarte' : 'Setpoints por fase y cuándo avisarte de stock, REPROCANN y ambiente' }}</div>
+              <div class="pv__card-sub">{{ esPersonal ? 'Los rangos de ambiente de cada fase y cuándo avisarte' : 'Umbrales ambientales por fase y cuándo avisar de stock, REPROCANN y ambiente' }}</div>
             </div>
           </div>
           <div class="pv__card-body">

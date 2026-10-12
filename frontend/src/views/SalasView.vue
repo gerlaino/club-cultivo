@@ -1,4 +1,5 @@
 <script setup>
+import { formatG } from '../lib/formatters.js'
 import { ref, computed, watch, onMounted } from "vue";
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useSalasStore } from "../stores/salas";
@@ -51,11 +52,11 @@ function kindColor(k) {
   return map[k] || '#64748b';
 }
 
-function kindEmoji(k) {
+function kindIcon(k) {
   const map = {
-    vegetativo: '🍃', floracion: '🌸', cosecha: '🌾', curado: '🫙', manicura: '✂️', madre: '🌱', clon: '🔁', mixta: '🔀',
+    vegetativo: 'bi-tree', floracion: 'bi-flower1', cosecha: 'bi-scissors', curado: 'bi-archive', manicura: 'bi-scissors', madre: 'bi-flower2', clon: 'bi-arrow-repeat', mixta: 'bi-shuffle',
   };
-  return map[k] || '🏠';
+  return map[k] || 'bi-house';
 }
 
 // ── Filtros ──────────────────────────────────────────────────
@@ -68,14 +69,14 @@ const page        = ref(1);
 const perPage     = ref(9);
 
 const KIND_TABS = [
-  { value: '',           emoji: '🏠', label: 'Todas'      },
-  { value: 'vegetativo', emoji: '🍃', label: 'Vegetativo' },
-  { value: 'floracion',  emoji: '🌸', label: 'Floración'  },
-  { value: 'cosecha',    emoji: '🌾', label: 'Cosecha'    },
-  { value: 'curado',     emoji: '🫙', label: 'Curado'     },
-  { value: 'mixta',      emoji: '🔀', label: 'Mixta'      },
-  { value: 'madre',      emoji: '🌱', label: 'Madres'     },
-  { value: 'clon',       emoji: '🔁', label: 'Clones'     },
+  { value: '',           label: 'Todas'      },
+  { value: 'vegetativo', label: 'Vegetativo' },
+  { value: 'floracion',  label: 'Floración'  },
+  { value: 'cosecha',    label: 'Cosecha'    },
+  { value: 'curado',     label: 'Curado'     },
+  { value: 'mixta',      label: 'Mixta'      },
+  { value: 'madre',      label: 'Madres'     },
+  { value: 'clon',       label: 'Clones'     },
 ];
 
 const kindTabs = computed(() =>
@@ -261,7 +262,7 @@ async function confirmDelete(s) {
                     <div class="slv__comp-bar" :style="{ width: compSorted[0].kg_producidos > 0 ? (s.kg_producidos / compSorted[0].kg_producidos * 100) + '%' : '0%' }"></div>
                   </div>
                 </td>
-                <td class="slv__comp-num">{{ s.kg_por_planta != null ? (s.kg_por_planta * 1000).toFixed(1) + ' g' : '—' }}</td>
+                <td class="slv__comp-num">{{ s.kg_por_planta != null ? formatG(s.kg_por_planta * 1000, 1) : '—' }}</td>
                 <td class="slv__comp-num">{{ s.dias_promedio != null ? s.dias_promedio + ' d' : '—' }}</td>
                 <td class="slv__comp-num">{{ s.temperatura != null ? Number(s.temperatura).toFixed(1) + '°' : '—' }}</td>
                 <td class="slv__comp-num">{{ s.humedad != null ? Number(s.humedad).toFixed(0) + '%' : '—' }}</td>
@@ -277,21 +278,21 @@ async function confirmDelete(s) {
     <!-- KPIs -->
     <div class="slv__kpis">
       <div class="slv__kpi">
-        <div class="slv__kpi-icon">🏠</div>
+        <div class="slv__kpi-icon"><i class="bi bi-house" aria-hidden="true"></i></div>
         <div class="slv__kpi-body">
           <div class="slv__kpi-val">{{ stats.total }}</div>
           <div class="slv__kpi-lbl">Total {{ salaTxt.cortas }}</div>
         </div>
       </div>
       <div class="slv__kpi slv__kpi--accent">
-        <div class="slv__kpi-icon">🟢</div>
+        <div class="slv__kpi-icon"><i class="bi bi-circle-fill" aria-hidden="true"></i></div>
         <div class="slv__kpi-body">
           <div class="slv__kpi-val" style="color:#15803d">{{ stats.activas }}</div>
           <div class="slv__kpi-lbl">Activas</div>
         </div>
       </div>
       <div class="slv__kpi">
-        <div class="slv__kpi-icon">🌿</div>
+        <div class="slv__kpi-icon"><i class="bi bi-flower3" aria-hidden="true"></i></div>
         <div class="slv__kpi-body">
           <div class="slv__kpi-val">{{ stats.plantas }}</div>
           <div class="slv__kpi-lbl">Plantas totales</div>
@@ -307,7 +308,7 @@ async function confirmDelete(s) {
         :class="{ 'slv__tab--active': filterKind === tab.value }"
         @click="filterKind = tab.value; page = 1"
       >
-        {{ tab.emoji }} {{ tab.label }}
+        {{ tab.label }}
         <span class="slv__tab-count">{{ tab.count }}</span>
       </button>
     </div>
@@ -344,7 +345,7 @@ async function confirmDelete(s) {
     </div>
     <div v-else-if="salas.error" class="slv__alert">{{ salas.error }}</div>
     <div v-else-if="!salas.items.length" class="slv__empty">
-      <div class="slv__empty-icon">🏗️</div>
+      <div class="slv__empty-icon"><i class="bi bi-bricks" aria-hidden="true"></i></div>
       <p class="slv__empty-title">No hay salas todavía</p>
       <p v-if="canCreate" class="slv__empty-sub">Creá {{ salaTxt.Corta === 'Sala' ? 'la primera sala' : 'el primer espacio' }} para organizar el cultivo.</p>
       <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
@@ -352,7 +353,7 @@ async function confirmDelete(s) {
       </button>
     </div>
     <div v-else-if="!paginated.length" class="slv__empty">
-      <div class="slv__empty-icon">🔍</div>
+      <div class="slv__empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
       <p class="slv__empty-title">Sin resultados</p>
       <p class="slv__empty-sub">Probá con otros filtros.</p>
     </div>
@@ -368,7 +369,7 @@ async function confirmDelete(s) {
         <div class="slv__card-body">
 
           <div class="slv__card-head">
-            <div class="slv__card-kind-icon">{{ kindEmoji(s.kind || s.tipo) }}</div>
+            <div class="slv__card-kind-icon"><i :class="['bi', kindIcon(s.kind || s.tipo)]" aria-hidden="true"></i></div>
             <div class="slv__card-meta">
               <div class="slv__card-nombre">{{ s.nombre }}</div>
               <div class="slv__card-tipo">{{ kindLabel(s.kind) }}</div>
@@ -433,7 +434,7 @@ async function confirmDelete(s) {
           <tr v-for="s in paginated" :key="s.id">
             <td>
               <RouterLink :to="{ name: 'sala-detail', params: { id: s.id } }" class="slv__table-link">
-                <span class="slv__table-emoji">{{ kindEmoji(s.kind) }}</span>
+                <i :class="['bi', kindIcon(s.kind), 'slv__table-emoji']" aria-hidden="true"></i>
                 <span>
                   <div class="slv__table-nombre">{{ s.nombre }}</div>
                   <div class="slv__table-kind">{{ kindLabel(s.kind) }}</div>

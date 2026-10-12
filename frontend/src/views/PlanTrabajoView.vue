@@ -210,7 +210,7 @@ onMounted(() => {
     <div class="ptv__hdr">
       <div>
         <h1 class="ptv__title">Planes</h1>
-        <p class="ptv__subtitle">Lo que se hace en cada semana del ciclo. Se arma una vez y se aplica {{ esPersonal ? 'a tus plantas' : 'a los lotes' }}.</p>
+        <p class="ptv__subtitle">Lo que se hace en cada semana del cultivo. Se arma una vez y se aplica {{ esPersonal ? 'a tus plantas' : 'a los lotes' }}.</p>
       </div>
       <button class="ptv__btn-primary" @click="abrirEditar()"><i class="bi bi-plus-lg"></i> Plan nuevo</button>
     </div>

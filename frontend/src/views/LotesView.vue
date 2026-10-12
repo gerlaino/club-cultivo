@@ -48,13 +48,13 @@ const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].i
 const ESTADOS = ["enraizado","vegetativo","floracion","cosecha","en_manicura","curado","finalizado"];
 
 const ESTADO_META = {
-  enraizado:     { label:"Enraizado",       dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2", icon:"🌱" },
-  vegetativo:  { label:"Vegetativo",  dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72", icon:"🌱" },
-  floracion:   { label:"Floración",   dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706", icon:"🌸" },
-  cosecha:     { label:"Cosecha",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452", icon:"✂️" },
-  en_manicura: { label:"En manicura", dot:"#7c3aed", bg:"#ede9fe", text:"#5b21b6", bar:"#7c3aed", icon:"✂️" },
-  curado:      { label:"Curado",      dot:"#2563eb", bg:"#dbeafe", text:"#1e40af", bar:"#2563eb", icon:"🫙" },
-  finalizado:  { label:"Finalizado",  dot:"#1A3D2E", bg:"#E8F0EB", text:"#0F2A1E", bar:"#1A3D2E", icon:"✅" },
+  enraizado:     { label:"Enraizado",       dot:"#0891b2", bg:"#e0f2fe", text:"#0369a1", bar:"#0891b2" },
+  vegetativo:  { label:"Vegetativo",  dot:"#3F6452", bg:"#E8F0EB", text:"#2D4A3E", bar:"#5A8A72" },
+  floracion:   { label:"Floración",   dot:"#D97706", bg:"#FEF3C7", text:"#92400e", bar:"#D97706" },
+  cosecha:     { label:"Cosecha",     dot:"#5A8A72", bg:"#F4F8F5", text:"#1A3D2E", bar:"#3F6452" },
+  en_manicura: { label:"En manicura", dot:"#7c3aed", bg:"#ede9fe", text:"#5b21b6", bar:"#7c3aed" },
+  curado:      { label:"Curado",      dot:"#2563eb", bg:"#dbeafe", text:"#1e40af", bar:"#2563eb" },
+  finalizado:  { label:"Finalizado",  dot:"#1A3D2E", bg:"#E8F0EB", text:"#0F2A1E", bar:"#1A3D2E" },
 };
 
 // "Cosechado" es todo lo que ya salió de floración: cortado y en secado (cosecha),
@@ -64,7 +64,7 @@ const COSECHADOS = ["cosecha","en_manicura","curado","finalizado"];
 // transformó en stock). Cosecha y en_manicura todavía cuentan como ciclo activo.
 const EN_CICLO = ["enraizado","vegetativo","floracion","cosecha","en_manicura"];
 
-function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
+function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8" }; }
 function estadoLabel(e)  { return em(e).label; }
 // ---------- Stats ----------
 const stats = computed(() => {
@@ -196,7 +196,7 @@ async function confirmarMover() {
   const cambian = fase ? elegidos.filter(l => l.estado !== fase && l.estado !== 'enraizado') : []
   const lineas = [`Vas a mover ${elegidos.length} lote(s) a "${d.nombre}".`]
   if (cambian.length) {
-    lineas.push(`⚠️ La sala está en ${fase === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos cambian de fase:`)
+    lineas.push(`Atención: la sala está en ${fase === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos cambian de fase:`)
     lineas.push(...cambian.map(l => `   · ${l.codigo}: ${estadoLabel(l.estado)} → ${estadoLabel(fase)}`))
     if (fase === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
   }
@@ -324,11 +324,11 @@ async function descargar(formato) {
     <!-- Tabs -->
     <div class="lv__tabs">
       <button class="lv__tab" :class="{ 'lv__tab--active': tab === 'activos' }" @click="setTab('activos')">
-        🌱 Lotes activos
+        Lotes activos
         <span class="lv__tab-count">{{ store.items.filter(l => l.estado !== 'finalizado').length }}</span>
       </button>
       <button class="lv__tab" :class="{ 'lv__tab--active': tab === 'finalizados' }" @click="setTab('finalizados')">
-        ✅ Finalizados
+        Finalizados
         <span class="lv__tab-count">{{ store.items.filter(l => l.estado === 'finalizado').length }}</span>
       </button>
     </div>
@@ -397,8 +397,8 @@ async function descargar(formato) {
       <DsSpinner />
     </div>
     <div v-else-if="store.error" class="lv__alert">{{ store.error }}</div>
-    <EmptyState v-else-if="!store.items.length" icon="🌱" title="No hay lotes todavía" message="Creá el primer lote para comenzar la trazabilidad" />
-    <EmptyState v-else-if="!paginated.length" icon="🔍" title="Sin resultados" message="Probá ajustando los filtros" />
+    <EmptyState v-else-if="!store.items.length" icon="bi-diagram-3" title="No hay lotes todavía" message="Creá el primer lote para comenzar la trazabilidad" />
+    <EmptyState v-else-if="!paginated.length" icon="bi-search" title="Sin resultados" message="Probá ajustando los filtros" />
 
     <!-- Tabla -->
     <div v-else class="lv__table-wrap">

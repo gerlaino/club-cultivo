@@ -158,7 +158,7 @@ class InformesController < ApplicationController
       secciones: [
         {
           titulo: 'Lotes cosechados en el período',
-          headers: ['Lote', 'Genética', 'Sede', 'Cosecha', 'Plantas', 'Flor seca (g)', 'g / planta', 'Días de ciclo'],
+          headers: ['Lote', 'Genética', 'Sede', 'Cosecha', 'Plantas', 'Flor seca (g)', 'g / planta', 'Días de cultivo'],
           rows: per[:lotes].map do |l|
             [l[:codigo], l[:genetica] || '—', l[:sede] || '—', fmt_fecha(l[:fecha]), l[:plantas],
              l[:gramos] || 'sin peso', l[:gramos_por_planta] || '—', l[:dias_ciclo] || '—']

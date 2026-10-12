@@ -56,7 +56,7 @@
                         :class="{ 'rls__radio-btn--sel': formData.estado_general === key }"
                         :style="formData.estado_general === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.estado_general = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
 
@@ -68,7 +68,7 @@
                         :class="{ 'rls__radio-btn--sel': formData.plagas_observadas === key }"
                         :style="formData.plagas_observadas === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.plagas_observadas = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
 
@@ -102,7 +102,7 @@
 
               <div v-for="accionId in seleccionadas" :key="accionId" class="rls__seccion">
                 <div class="rls__seccion-header">
-                  <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
+                  <span>{{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
                   <p v-if="accionId === 'riego' && sala?.camas?.length" class="rsm__cama-hint">

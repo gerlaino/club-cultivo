@@ -117,7 +117,7 @@ const frascosCasiVacios = computed(() => stockFlor.value.casiVacios)
 const tiendaStocks  = ref([])
 const loadingTienda = ref(false)
 
-const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', preroll: '🚬 Preroll', otro: '📦 Otro' }
+const FORMA_LABELS = { flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura', topico: 'Tópico', preroll: 'Preroll', otro: 'Otro' }
 const KIND_LABELS = { enraizado: 'Enraizado', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
 
@@ -172,11 +172,11 @@ function onSalaCreada() {
 const sedeAcciones = computed(() => {
   const items = []
   if (tieneInv.value) {
-    items.push({ emoji: '📊', label: 'Gestionar stock', onClick: () => router.push('/admin/stock') })
+    items.push({ icon: 'bi-bar-chart', label: 'Gestionar stock', onClick: () => router.push('/admin/stock') })
   }
   if (isAdmin.value) {
     items.push({ divider: true })
-    items.push({ emoji: '🗑️', label: 'Eliminar sede', danger: true, onClick: eliminarSede, disabled: deleting.value })
+    items.push({ icon: 'bi-trash', label: 'Eliminar sede', danger: true, onClick: eliminarSede, disabled: deleting.value })
   }
   return items
 })
@@ -336,15 +336,15 @@ onMounted(async () => {
                   <div class="sdv__tienda-forma">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</div>
                   <i v-if="isAdmin" class="bi bi-box-arrow-up-right sdv__tienda-link-ico"></i>
                 </div>
-                <div v-if="s.genetica" class="sdv__tienda-gen">🧬 {{ s.genetica.nombre }}</div>
-                <div v-if="s.lote_codigo" class="sdv__tienda-lote">📋 {{ s.lote_codigo }}</div>
+                <div v-if="s.genetica" class="sdv__tienda-gen"><i class="bi bi-tag" aria-hidden="true"></i> {{ s.genetica.nombre }}</div>
+                <div v-if="s.lote_codigo" class="sdv__tienda-lote"><i class="bi bi-journal-text" aria-hidden="true"></i> {{ s.lote_codigo }}</div>
                 <div class="sdv__tienda-qty">
                   <strong>{{ parseFloat(s.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}</strong>
                   <span class="sdv__tienda-unit">{{ s.unidad || 'g' }}</span>
                 </div>
                 <div v-if="s.precio_sugerido_ars" class="sdv__tienda-precio">$ {{ parseFloat(s.precio_sugerido_ars).toLocaleString('es-AR', { maximumFractionDigits: 2 }) }}/{{ s.unidad || 'g' }}</div>
                 <div class="sdv__tienda-status" :class="parseFloat(s.cantidad) > 0 ? 'sdv__tienda-status--ok' : 'sdv__tienda-status--empty'">
-                  {{ parseFloat(s.cantidad) > 0 ? '✓ Disponible' : '✗ Agotado' }}
+                  {{ parseFloat(s.cantidad) > 0 ? 'Disponible' : 'Agotado' }}
                 </div>
               </div>
             </div>
@@ -403,7 +403,7 @@ onMounted(async () => {
               <dt>Estado</dt>
               <dd><span class="sdv__state-badge" :style="sede.activa ? 'background:#dcfce7;color:#15803d' : 'background:#fffbeb;color:#b45309'">{{ sede.activa ? "Activa" : "Inactiva" }}</span></dd>
               <dt>REPROCANN</dt>
-              <dd><span class="sdv__state-badge" :style="sede.declarada_reprocann ? 'background:#dcfce7;color:#15803d' : 'background:#f1f5f9;color:#64748b'">{{ sede.declarada_reprocann ? "Declarada ✓" : "No declarada" }}</span></dd>
+              <dd><span class="sdv__state-badge" :style="sede.declarada_reprocann ? 'background:#dcfce7;color:#15803d' : 'background:#f1f5f9;color:#64748b'">{{ sede.declarada_reprocann ? "Declarada" : "No declarada" }}</span></dd>
               <template v-if="sede.direccion"><dt>Dirección</dt><dd>{{ sede.direccion }}</dd></template>
               <template v-if="sede.ciudad"><dt>Ciudad</dt><dd>{{ sede.ciudad }}</dd></template>
               <template v-if="sede.provincia"><dt>Provincia</dt><dd>{{ sede.provincia }}</dd></template>

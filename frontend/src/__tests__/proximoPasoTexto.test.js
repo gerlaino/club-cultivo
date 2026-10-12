@@ -22,9 +22,9 @@ describe('Próximo paso pasado del objetivo', () => {
     expect(t).toBe('Cosechar: tocaba hace 1 día (la genética pide 60 de floración; lleva 61)')
   })
 
-  it('una automática habla del ciclo', () => {
+  it('una automática habla de los días de cultivo', () => {
     const t = textoProximoPaso(lote({ fase: 'cosecha', faltan_dias: -3, objetivo_dias: 70, objetivo_origen: 'genetica', lleva_dias: 73, automatica: true }, { dias_ciclo_objetivo: 70 }))
-    expect(t).toContain('la genética pide un ciclo de 70; lleva 73')
+    expect(t).toContain('la genética pide 70 días de cultivo; lleva 73')
   })
 
   it('con fecha de cosecha fijada a mano lo dice así', () => {

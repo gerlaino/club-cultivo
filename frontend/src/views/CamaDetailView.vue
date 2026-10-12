@@ -14,7 +14,7 @@
           <span v-if="cama.m2">{{ fmtNum(cama.largo_m) }} × {{ fmtNum(cama.ancho_m) }} m · {{ fmtNum(cama.m2) }} m²</span>
           <span v-if="cama.litros_suelo">{{ fmtNum(cama.litros_suelo, 0) }} L de tierra</span>
           <span v-if="cama.armada_el">Armada el {{ fechaLarga(cama.armada_el) }}<template v-if="cama.edad_dias"> ({{ edadCama(cama.edad_dias).replace('armada ', '') }})</template></span>
-          <span>{{ cama.ciclos_count }} {{ cama.ciclos_count === 1 ? 'ciclo' : 'ciclos' }}</span>
+          <span>{{ cama.ciclos_count }} {{ cama.ciclos_count === 1 ? 'siembra' : 'siembras' }}</span>
         </p>
         <p v-if="paso" class="cd__paso" :class="{ 'cd__paso--alerta': paso.alerta }"><i class="bi bi-clock"></i> {{ paso.texto }}</p>
 
@@ -33,7 +33,7 @@
 
       <section v-if="cama.con_costo || cama.gramos_cosechados" class="cd__kpis">
         <div class="cd__kpi"><span class="cd__kpi-n">{{ fmtNum(cama.gramos_cosechados, 1) }} g</span><span class="cd__kpi-l">cosechados en la cama</span></div>
-        <div v-if="mejorGm2" class="cd__kpi"><span class="cd__kpi-n">{{ fmtNum(mejorGm2, 1) }} g/m²</span><span class="cd__kpi-l">el mejor ciclo</span></div>
+        <div v-if="mejorGm2" class="cd__kpi"><span class="cd__kpi-n">{{ fmtNum(mejorGm2, 1) }} g/m²</span><span class="cd__kpi-l">la mejor siembra</span></div>
         <template v-if="cama.con_costo">
           <div class="cd__kpi"><span class="cd__kpi-n">{{ formatARS(cama.invertido_ars) }}</span><span class="cd__kpi-l">puesto en la cama</span></div>
           <div class="cd__kpi"><span class="cd__kpi-n">{{ cama.costo_por_gramo != null ? formatARS(cama.costo_por_gramo) : '—' }}</span>
@@ -57,7 +57,7 @@
         <p v-if="!cama.ciclos.length" class="cd__vacio">Todavía no {{ esPersonal ? 'creció ninguna planta en' : 'pasó ningún lote por' }} esta cama.</p>
         <div v-else class="cd__tabla-wrap">
           <table class="cd__tabla">
-            <thead><tr><th>Ciclo</th><th>Fechas</th><th>{{ esPersonal ? 'Plantas' : 'Lotes' }}</th><th class="num">Gramos</th><th class="num">g/m²</th><th v-if="cama.con_costo" class="num">Suelo</th></tr></thead>
+            <thead><tr><th>Siembra</th><th>Fechas</th><th>{{ esPersonal ? 'Plantas' : 'Lotes' }}</th><th class="num">Gramos</th><th class="num">g/m²</th><th v-if="cama.con_costo" class="num">Suelo</th></tr></thead>
             <tbody>
               <tr v-for="(ci, i) in cama.ciclos" :key="ci.id">
                 <td><strong>{{ ci.numero }}</strong><span v-if="!ci.hasta" class="cd__abierto">en curso</span></td>
@@ -87,7 +87,7 @@
             <div class="cd__registro-body">
               <div class="cd__registro-top">
                 <strong>{{ r.tipo === 'top_dress' && r.recarga ? 'Recarga (top dress)' : r.tipo_label }}</strong>
-                <span class="cd__gris">{{ fechaCorta(r.registrado_en) }}<template v-if="r.ciclo_numero"> · ciclo {{ r.ciclo_numero }}</template><template v-else> · sin plantas</template></span>
+                <span class="cd__gris">{{ fechaCorta(r.registrado_en) }}<template v-if="r.ciclo_numero"> · siembra {{ r.ciclo_numero }}</template><template v-else> · sin plantas</template></span>
               </div>
               <p v-if="descripcion(r)" class="cd__registro-desc">{{ descripcion(r) }}</p>
               <p v-if="r.observaciones" class="cd__registro-obs">{{ r.observaciones }}</p>

@@ -422,7 +422,7 @@
                     <span class="stk__input-suf">g</span>
                   </div>
                   <span v-if="repartirForm.cantidad && Number(repartirForm.cantidad) < repartirTarget?.cantidad" class="stk__field-hint">
-                    Quedan {{ (repartirTarget.cantidad - Number(repartirForm.cantidad)).toFixed(1) }}g en sede actual
+                    Quedan {{ formatG((repartirTarget.cantidad - Number(repartirForm.cantidad)), 1) }} en sede actual
                   </span>
                 </div>
                 <div class="stk__field">
@@ -567,8 +567,8 @@
                 </div>
               </div>
               <div v-if="ajustarPreview !== null" class="stk__ajuste-preview" :class="ajustarPreviewClass">
-                <span>Resultado: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
-                <span class="stk__ajuste-preview-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ ajustarDelta.toFixed(2) }}g</span>
+                <span>Resultado: <strong>{{ formatG(ajustarPreview, 2) }}</strong></span>
+                <span class="stk__ajuste-preview-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ formatG(ajustarDelta, 2) }}</span>
               </div>
             </div>
             <div class="stk__modal-ft">
@@ -675,7 +675,7 @@
                   </div>
                   <div class="stk__mov-right">
                     <span class="stk__mov-g" :class="m.gramos >= 0 ? 'stk__mov-g--pos' : 'stk__mov-g--neg'">
-                      {{ m.gramos >= 0 ? '+' : '' }}{{ m.gramos.toFixed(2) }}g
+                      {{ m.gramos >= 0 ? '+' : '' }}{{ formatG(m.gramos, 2) }}
                     </span>
                   </div>
                 </div>
@@ -689,6 +689,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useConfirm } from '../../composables/useConfirm.js'

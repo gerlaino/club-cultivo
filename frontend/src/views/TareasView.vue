@@ -214,7 +214,7 @@
 
           <div class="tv__panel-body">
             <div class="tv__panel-tipo">
-              <span class="tv__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.emoji }} {{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
+              <span class="tv__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
             </div>
             <h4 class="tv__panel-nombre">{{ tareaDetalle.titulo }}</h4>
             <p v-if="tareaDetalle.descripcion" class="tv__panel-desc">{{ tareaDetalle.descripcion }}</p>

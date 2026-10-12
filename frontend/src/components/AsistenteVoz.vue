@@ -185,7 +185,7 @@
                                 class="av__tarea-chip"
                                 :class="{ 'av__tarea-chip--on': (accion.datos.tareas_realizadas||[]).includes(t.key) }"
                                 @click="toggleTarea(accion, t.key)">
-                                {{ t.emoji }} {{ t.label }}
+                                {{ t.label }}
                               </button>
                             </div>
                           </div>

@@ -187,7 +187,7 @@ onMounted(async () => {
           :style="filtroTipo === tipo ? { borderColor: DOC_META[tipo]?.color, color: DOC_META[tipo]?.color, background: DOC_META[tipo]?.color + '12' } : {}"
           @click="filtroTipo = filtroTipo === tipo ? '' : tipo"
         >
-          {{ DOC_META[tipo]?.emoji }} {{ DOC_META[tipo]?.label }}
+          {{ DOC_META[tipo]?.label }}
         </button>
       </div>
     </div>
@@ -218,7 +218,7 @@ onMounted(async () => {
         <!-- Tipo y estado -->
         <div class="dv__doc-top">
           <div class="dv__doc-tipo" :style="{ background: (DOC_META[d.tipo]?.color || '#94a3b8') + '15', color: DOC_META[d.tipo]?.color || '#94a3b8' }">
-            {{ DOC_META[d.tipo]?.emoji }} {{ DOC_META[d.tipo]?.label || d.tipo }}
+            {{ DOC_META[d.tipo]?.label || d.tipo }}
           </div>
           <span class="dv__doc-estado"
                 :style="{ background: ESTADOS_META[d.estado]?.bg, color: ESTADOS_META[d.estado]?.color }">
@@ -284,7 +284,7 @@ onMounted(async () => {
                         :class="{ 'dv__sel-btn--active': docForm.tipo === tipo }"
                         :style="docForm.tipo === tipo ? { borderColor: DOC_META[tipo]?.color, background: DOC_META[tipo]?.color + '15', color: DOC_META[tipo]?.color } : {}"
                         @click="docForm.tipo = tipo">
-                  {{ DOC_META[tipo]?.emoji }} {{ DOC_META[tipo]?.label }}
+                  {{ DOC_META[tipo]?.label }}
                 </button>
               </div>
             </div>
@@ -292,7 +292,7 @@ onMounted(async () => {
             <div class="dv__field">
               <label class="dv__label">Título <span class="dv__req">*</span></label>
               <input type="text" class="dv__input" v-model="docForm.titulo"
-                     placeholder="Ej: Plan de trabajo 2026 · Club Mitocondria" />
+                     placeholder="Ej: Plan de trabajo 2026" />
             </div>
 
             <div class="dv__field">

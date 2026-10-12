@@ -1,9 +1,11 @@
 <script setup>
+import { formatG } from '../lib/formatters.js'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
+import { useClubStore }         from "../stores/club.js"
 import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento , listRetirosCaja, saldarRetiroCaja, listCuentasCorrientes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
@@ -124,7 +126,7 @@ const FORMAS = [
   { valor: 'sueldo',      label: 'Se descuenta del sueldo', hint: 'Genera un egreso de sueldo.' },
   // La recaudación que se llevó para guardarla con el resto del fondo del club: no es deuda de
   // nadie ni gasto, sólo plata de la organización en otro lado.
-  { valor: 'organizacion', label: 'Quedó guardada en la organización', hint: 'Caja fuerte, banco: sigue siendo del club y deja de estar a su nombre.' },
+  { valor: 'organizacion', label: 'Quedó guardada en la organización', hint: 'Caja fuerte, banco: sigue siendo de la organización y deja de estar a su nombre.' },
 ]
 const FORMA_LABEL = { devuelto: 'devolvió', comprobante: 'rindió comprobante', sueldo: 'a cuenta de sueldo', organizacion: 'guardada en la organización' }
 // Las que tienen sentido para algo que se compró con la plata del cajón.
@@ -690,7 +692,8 @@ onMounted(async () => {
     listSedes().then(r => { sedes.value = r.data || [] }),
     listUnidadesNegocio().then(r => { unidades.value = r.data || [] }).catch(() => {}),
     listInsumos({ activos: 'true' }).then(r => { insumos.value = r.data?.insumos || [] }).catch(() => {}),
-    listBares().then(r => { bares.value = r.data || [] }).catch(() => {}),
+    // Sin el Buffet contratado el endpoint responde 403: no se pide.
+    useClubStore().data?.features?.bar ? listBares().then(r => { bares.value = r.data || [] }).catch(() => {}) : Promise.resolve(),
     listCategoriasContables().then(r => { categorias.value = r.data || [] }).catch(() => {}),
     listDepositos().then(r => { depositos.value = r.data?.depositos || r.data || [] }).catch(() => {}),
   ])
@@ -1257,7 +1260,7 @@ onMounted(async () => {
               </span>
               <span class="cv__pl-num" style="color:#15803d;font-family:monospace">{{ g.cpg_min ? fmt(g.cpg_min) : '—' }}</span>
               <span class="cv__pl-num" style="color:#dc2626;font-family:monospace">{{ g.cpg_max ? fmt(g.cpg_max) : '—' }}</span>
-              <span class="cv__pl-num" style="font-family:monospace">{{ g.total_gramos ? g.total_gramos.toFixed(0) + 'g' : '—' }}</span>
+              <span class="cv__pl-num" style="font-family:monospace">{{ g.total_gramos ? formatG(g.total_gramos, 0) : '—' }}</span>
             </div>
           </div>
         </div><!-- /sub-tab cepas -->

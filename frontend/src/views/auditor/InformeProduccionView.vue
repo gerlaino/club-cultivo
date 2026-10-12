@@ -60,7 +60,7 @@
           <thead>
             <tr>
               <th>Lote</th><th>Genética</th><th>Sede</th><th>Cosecha</th>
-              <th class="num">Plantas</th><th class="num">Flor seca</th><th class="num">g / planta</th><th class="num">Días de ciclo</th>
+              <th class="num">Plantas</th><th class="num">Flor seca</th><th class="num">g / planta</th><th class="num">Días de cultivo</th>
             </tr>
           </thead>
           <tbody>

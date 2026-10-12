@@ -730,7 +730,7 @@ onMounted(async () => {
                  caso aislado y nadie nota que van seis meses seguidos. -->
             <div v-if="aCuenta.veces" class="udc__acuenta">
               <div class="udc__acuenta-hdr">
-                <span class="udc__acuenta-lbl">Tiene del club</span>
+                <span class="udc__acuenta-lbl">Tiene de la organización</span>
                 <span class="udc__acuenta-val">{{ fmtARS(aCuenta.total_ars) }}</span>
               </div>
               <p class="udc__acuenta-sub">
@@ -757,7 +757,7 @@ onMounted(async () => {
                 </button>
               </div>
               <p v-if="aCuenta.total_ars > 0" class="udc__saldar-hint">
-                Entra al cajón como efectivo. No es un ingreso del club: esa plata siempre fue suya.
+                Entra al cajón como efectivo. No es un ingreso de la organización: esa plata siempre fue suya.
               </p>
             </div>
           </div>

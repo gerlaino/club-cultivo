@@ -294,30 +294,30 @@ function onCamaGuardada() { camaModal.value = null; loadHistorial(); lotes.fetch
 const autoEnVege = computed(() => !!lote.value?.automatica && lote.value?.estado === 'vegetativo')
 const loteAcciones = computed(() => {
   const items = []
-  items.push({ emoji: '📋', label: esPersonal.value ? 'Registrar' : 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
+  items.push({ icon: 'bi-journal-text', label: esPersonal.value ? 'Registrar' : 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
   // Automática en vegetativo: se cosecha desde acá; que empezó a florecer es sólo una anotación
   // opcional, no un botón principal que parezca un paso obligatorio (4-oct-2026, Germán).
   if (autoEnVege.value && lote.value?.puede_transicionar && lote.value?.proxima_fase_posible) {
-    items.push({ emoji: '🌸', label: 'Anotar que empezó a florecer', onClick: () => handleAvanzarFase() })
+    items.push({ icon: 'bi-flower1', label: 'Anotar que empezó a florecer', onClick: () => handleAvanzarFase() })
   }
   // Separar parte del lote: típicamente al prender, cuando la mitad va a una maceta y la mitad a
   // otra. Solo en cultivo y con más de una planta (desprender el lote entero lo dejaría vacío).
   if (puedeDesprender.value) {
-    items.push({ emoji: '🪴', label: esPersonal.value ? 'Separar algunas plantas' : 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
+    items.push({ icon: 'bi-flower2', label: esPersonal.value ? 'Separar algunas plantas' : 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
   }
   // Suelo vivo: el último trasplante (a una cama), y lo que se le hace a la cama del lote.
   const enCultivo = ['enraizado', 'vegetativo', 'floracion'].includes(lote.value?.estado)
   if (enCultivo && !lote.value?.en_cama) {
-    items.push({ emoji: '🧱', label: 'Plantar en una cama', onClick: () => { plantarOpen.value = true } })
+    items.push({ icon: 'bi-grid-3x3-gap', label: 'Plantar en una cama', onClick: () => { plantarOpen.value = true } })
   }
   if (enCultivo && lote.value?.en_cama) {
-    items.push({ emoji: '🧺', label: `Alimentar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('alimentar') })
-    items.push({ emoji: '💧', label: `Regar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('regar') })
+    items.push({ icon: 'bi-basket', label: `Alimentar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('alimentar') })
+    items.push({ icon: 'bi-droplet', label: `Regar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('regar') })
   }
   if (canEdit.value) {
-    items.push({ emoji: '✏️', label: esPersonal.value ? 'Editar' : 'Editar lote', onClick: () => editarOpen.value = true })
+    items.push({ icon: 'bi-pencil', label: esPersonal.value ? 'Editar' : 'Editar lote', onClick: () => editarOpen.value = true })
     items.push({ divider: true })
-    items.push({ emoji: '🗑️', label: esPersonal.value ? 'Eliminar' : 'Eliminar lote', danger: true, onClick: eliminarLote })
+    items.push({ icon: 'bi-trash', label: esPersonal.value ? 'Eliminar' : 'Eliminar lote', danger: true, onClick: eliminarLote })
   }
   return items
 })
@@ -435,7 +435,7 @@ onUnmounted(() => {
       <div class="ld__hero">
         <div class="ld__hero-left">
           <div class="ld__hero-title-row">
-            <span class="ld__hero-emoji">{{ em(lote.estado).emoji }}</span>
+            <i :class="['bi', em(lote.estado).icon, 'ld__hero-emoji']" aria-hidden="true"></i>
             <!-- En autocultivo el lote no se nombra: son las plantas de su genética. -->
             <h1 class="ld__title">{{ esPersonal ? (lote.genetica?.nombre || lote.strain || 'Plantas') : lote.codigo }}</h1>
             <span class="ld__estado-pill" :style="{ background: em(lote.estado).bg, color: em(lote.estado).color }">
@@ -446,22 +446,22 @@ onUnmounted(() => {
           </div>
           <p class="ld__subtitle">
             <span v-if="lote.genetica && esPersonal"><span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span> {{ lote.plants_count }} {{ lote.plants_count === 1 ? 'planta' : 'plantas' }}</span>
-            <span v-else-if="lote.genetica">🌿 {{ lote.genetica.nombre }}<span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span></span>
-            <span v-else-if="lote.strain" class="ld__strain-fallback">🌿 {{ lote.strain }}</span>
+            <span v-else-if="lote.genetica"><i class="bi bi-flower3" aria-hidden="true"></i> {{ lote.genetica.nombre }}<span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span></span>
+            <span v-else-if="lote.strain" class="ld__strain-fallback"><i class="bi bi-flower3" aria-hidden="true"></i> {{ lote.strain }}</span>
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
-            <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
+            <span v-if="lote.sala"><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ lote.sala.nombre }}</span>
             <template v-if="lote.cama">
               <span class="ld__subtitle-sep">·</span>
-              <RouterLink :to="`/camas/${lote.cama.id}`" class="ld__origen">🧱 {{ lote.cama.nombre }}<template v-if="lote.cama.ciclo_numero"> · ciclo {{ lote.cama.ciclo_numero }}</template></RouterLink>
+              <RouterLink :to="`/camas/${lote.cama.id}`" class="ld__origen"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> {{ lote.cama.nombre }}<template v-if="lote.cama.ciclo_numero"> · siembra {{ lote.cama.ciclo_numero }}</template></RouterLink>
             </template>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
-            <span v-if="lote.start_date">📅 inicio {{ formatDate(lote.start_date) }}</span>
+            <span v-if="lote.start_date"><i class="bi bi-calendar3" aria-hidden="true"></i> inicio {{ formatDate(lote.start_date) }}</span>
             <!-- De dónde salió, si nació desprendiéndose de otro lote. Sin esto el sufijo del
                  código (-B) no dice nada. -->
             <template v-if="lote.lote_origen">
               <span class="ld__subtitle-sep">·</span>
               <RouterLink :to="{ name: 'lote-detail', params: { id: lote.lote_origen.id } }" class="ld__origen">
-                🪴 desprendido de {{ lote.lote_origen.codigo }}
+                <i class="bi bi-flower2" aria-hidden="true"></i> desprendido de {{ lote.lote_origen.codigo }}
               </RouterLink>
             </template>
             <template v-if="lote.desprendidos_count > 0">
@@ -474,7 +474,7 @@ onUnmounted(() => {
             <!-- El ciclo arranca en vegetativo; el enraizado se muestra al lado para no perder el
                  panorama ("día 28 de ciclo + 12 enraizando"). -->
             <span v-if="lote.dias_ciclo != null || lote.dias_enraizado != null" class="ld__subtitle-sep">·</span>
-            <span v-if="lote.dias_ciclo != null" class="ld__dias-badge">Día {{ lote.dias_ciclo }} de ciclo</span>
+            <span v-if="lote.dias_ciclo != null" class="ld__dias-badge">Día {{ lote.dias_ciclo }} de cultivo</span>
             <span v-else-if="lote.dias_enraizado != null" class="ld__dias-badge">{{ verboArranque(lote).replace(/^./, c => c.toUpperCase()) }} · día {{ lote.dias_enraizado }}</span>
             <span v-if="lote.dias_ciclo != null && lote.dias_enraizado" class="ld__dias-extra">
               + {{ lote.dias_enraizado }}d {{ verboArranque(lote) }}
@@ -537,7 +537,7 @@ onUnmounted(() => {
         <div class="ld__ciclo-track">
           <div v-for="(etapa, i) in cicloPasos" :key="etapa" class="ld__ciclo-step"
                :class="{ 'ld__ciclo-step--done': i < cicloIndex, 'ld__ciclo-step--current': i === cicloIndex, 'ld__ciclo-step--pending': i > cicloIndex }">
-            <div class="ld__ciclo-dot"><span class="ld__ciclo-emoji">{{ em(etapa).emoji }}</span></div>
+            <div class="ld__ciclo-dot"><i :class="['bi', em(etapa).icon, 'ld__ciclo-emoji']" aria-hidden="true"></i></div>
             <div class="ld__ciclo-label">{{ etapa === 'enraizado' && lote.etiqueta_arranque ? lote.etiqueta_arranque : em(etapa).label }}</div>
             <div v-if="i < cicloPasos.length - 1" class="ld__ciclo-connector" :class="{ 'ld__ciclo-connector--done': i < cicloIndex }"></div>
           </div>
@@ -559,7 +559,7 @@ onUnmounted(() => {
           <div class="ld__section">
             <button class="ld__section-toggle" @click="tareasExpanded = !tareasExpanded">
               <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">📋</span>
+                <span class="ld__section-emoji"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
                 <span class="ld__section-title">{{ esPersonal ? 'Tareas de estas plantas' : 'Tareas del lote' }}</span>
               </div>
               <i class="bi ld__chevron" :class="tareasExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -582,7 +582,7 @@ onUnmounted(() => {
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="historialExpanded = !historialExpanded">
               <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">📜</span>
+                <span class="ld__section-emoji"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
                 <span class="ld__section-title">{{ esPersonal ? 'Historial' : 'Historial del lote' }}</span>
               </div>
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -598,7 +598,7 @@ onUnmounted(() => {
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="nutricionExpanded = !nutricionExpanded">
               <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">🧪</span>
+                <span class="ld__section-emoji"><i class="bi bi-eyedropper" aria-hidden="true"></i></span>
                 <span class="ld__section-title">Riego y nutrición</span>
               </div>
               <i class="bi ld__chevron" :class="nutricionExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -612,7 +612,7 @@ onUnmounted(() => {
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="graficosExpanded = !graficosExpanded">
               <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">📊</span>
+                <span class="ld__section-emoji"><i class="bi bi-bar-chart" aria-hidden="true"></i></span>
                 <span class="ld__section-title">Evolución ambiental</span>
               </div>
               <i class="bi ld__chevron" :class="graficosExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -626,7 +626,7 @@ onUnmounted(() => {
           <div v-if="!esPersonal" class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="labExpanded = !labExpanded">
               <div class="ld__section-toggle-left">
-                <span class="ld__section-emoji">🧪</span>
+                <span class="ld__section-emoji"><i class="bi bi-eyedropper" aria-hidden="true"></i></span>
                 <span class="ld__section-title">Análisis de laboratorio</span>
                 <span v-if="analisisLab.length" class="ld__section-badge">{{ analisisLab.length }}</span>
               </div>
@@ -718,11 +718,11 @@ onUnmounted(() => {
 
           <!-- Datos técnicos -->
           <div class="ld__card">
-            <div class="ld__card-header"><span class="ld__card-title">⚙️ Datos técnicos</span></div>
+            <div class="ld__card-header"><span class="ld__card-title"><i class="bi bi-gear" aria-hidden="true"></i> Datos técnicos</span></div>
             <dl class="ld__dl">
               <dt>Plantas</dt><dd><strong>{{ lote.plants_count ?? 0 }}</strong></dd>
               <template v-if="lote.en_cama">
-                <dt>Cultivo</dt><dd>Suelo vivo · <RouterLink :to="`/camas/${lote.cama.id}`">{{ lote.cama.nombre }}</RouterLink><template v-if="lote.cama.ciclo_numero"> (ciclo {{ lote.cama.ciclo_numero }})</template></dd>
+                <dt>Cultivo</dt><dd>Suelo vivo · <RouterLink :to="`/camas/${lote.cama.id}`">{{ lote.cama.nombre }}</RouterLink><template v-if="lote.cama.ciclo_numero"> (siembra {{ lote.cama.ciclo_numero }})</template></dd>
               </template>
               <template v-else>
                 <dt>Maceta</dt><dd>{{ macetaLabel(lote.tamanio_maceta) }}</dd>
@@ -742,7 +742,7 @@ onUnmounted(() => {
                 <template v-else>sin m² cargados</template>
               </dd>
               <template v-if="lote.automatica">
-                <dt>Ciclo objetivo</dt><dd>{{ lote.dias_ciclo_objetivo ? lote.dias_ciclo_objetivo + ' días' : '—' }}</dd>
+                <dt>Duración objetivo</dt><dd>{{ lote.dias_ciclo_objetivo ? lote.dias_ciclo_objetivo + ' días' : '—' }}</dd>
               </template>
               <template v-else>
                 <dt>Vegetativo objetivo</dt><dd>{{ lote.dias_vegetativo_objetivo ? lote.dias_vegetativo_objetivo + ' días' : '—' }}</dd>
@@ -750,7 +750,7 @@ onUnmounted(() => {
               </template>
               <dt>Cosecha objetivo</dt><dd>{{ lote.dias_cosecha_objetivo ? lote.dias_cosecha_objetivo + ' días' : '—' }}</dd>
               <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
-              <dt>Día del ciclo</dt>
+              <dt>Día de cultivo</dt>
               <dd>
                 {{ lote.dias_ciclo != null ? 'día ' + lote.dias_ciclo : 'todavía ' + verboArranque(lote) }}
                 <small v-if="lote.dias_enraizado" class="ld__dd-nota">+ {{ lote.dias_enraizado }}d {{ verboArranque(lote) }}</small>
@@ -761,14 +761,14 @@ onUnmounted(() => {
           </div>
 
           <div v-if="lote.notes" class="ld__card ld__card--mt">
-            <div class="ld__card-header"><span class="ld__card-title">📋 Notas</span></div>
+            <div class="ld__card-header"><span class="ld__card-title"><i class="bi bi-journal-text" aria-hidden="true"></i> Notas</span></div>
             <div class="ld__card-notes">{{ lote.notes }}</div>
           </div>
 
           <!-- Plan vs Real -->
           <div v-if="canAdmin && !esPersonal" class="ld__card ld__card--mt">
             <div class="ld__card-header">
-              <span class="ld__card-title">🎯 Plan vs Real</span>
+              <span class="ld__card-title"><i class="bi bi-bullseye" aria-hidden="true"></i> Plan vs Real</span>
             </div>
             <LotePlanVsReal :lote="lote" :lote-id="id" :can-admin="canAdmin" @saved="lotes.fetchOne(id)" />
           </div>
@@ -826,11 +826,11 @@ onUnmounted(() => {
         <div class="ld__modal" style="max-width:440px">
           <div class="ld__modal-header">
             <div>
-              <h3 class="ld__modal-title">🔄 Avanzar fase</h3>
+              <h3 class="ld__modal-title"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Avanzar fase</h3>
               <p class="ld__modal-sub">
-                {{ lote?.codigo }} · {{ em(lote?.estado).emoji }} {{ estadoLoteLabel(lote) }}
+                {{ lote?.codigo }} · {{ estadoLoteLabel(lote) }}
                 <span style="color:#94a3b8"> → </span>
-                {{ em(lote?.proxima_fase_posible).emoji }} {{ em(lote?.proxima_fase_posible).label }}
+                {{ em(lote?.proxima_fase_posible).label }}
               </p>
             </div>
             <button class="ld__modal-close" @click="showTransicionModal = false"><i class="bi bi-x-lg"></i></button>
@@ -914,7 +914,7 @@ onUnmounted(() => {
         <div class="ld__modal" style="max-width:420px">
           <div class="ld__modal-header">
             <div>
-              <h3 class="ld__modal-title">🌿 Registrar cosecha</h3>
+              <h3 class="ld__modal-title"><i class="bi bi-flower3" aria-hidden="true"></i> Registrar cosecha</h3>
               <p class="ld__modal-sub">{{ lote?.codigo }} · floración → cosecha</p>
             </div>
             <button class="ld__modal-close" @click="showCosechaModal = false"><i class="bi bi-x-lg"></i></button>
@@ -978,7 +978,7 @@ onUnmounted(() => {
           <div class="ld__modal-header">
             <div>
               <h3 class="ld__modal-title">
-                {{ em(lote?.estado).emoji }} → {{ em(lote?.proxima_fase_posible).emoji }} Avanzar fase
+                Avanzar fase
               </h3>
               <p class="ld__modal-sub">
                 {{ lote?.codigo }} · {{ estadoLoteLabel(lote) }} → {{ em(lote?.proxima_fase_posible).label }}

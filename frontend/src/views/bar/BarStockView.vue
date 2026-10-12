@@ -136,7 +136,7 @@ async function borrarCat(c) {
       <div v-if="esGestion" class="bs__actions">
         <span class="bs__val">Valorizado <b>{{ fmt(valorizado) }}</b></span>
         <button class="btn" @click="abrirCategorias">Categorías</button>
-        <RouterLink :to="{ name: 'contabilidad' }" class="btn btn--brand">＋ Comprar producto</RouterLink>
+        <RouterLink :to="{ name: 'contabilidad' }" class="btn btn--brand"><i class="bi bi-plus-lg" aria-hidden="true"></i> Comprar producto</RouterLink>
       </div>
     </div>
 

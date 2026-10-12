@@ -148,7 +148,7 @@ async function transmitirPendientes() {
       <div v-if="infoAbierto" class="ar__info-panel">
         <div class="ar__info-title"><i class="bi bi-shield-check"></i> ¿Qué es ARICCAME?</div>
         <p class="ar__info-desc">
-          ARICCAME es el sistema regulatorio nacional al que los clubes deben reportar automáticamente cada ingreso de producto al stock y cada dispensación realizada a socios. Este módulo muestra el estado de cada registro enviado al sistema.
+          ARICCAME es el sistema regulatorio nacional al que las organizaciones deben reportar automáticamente cada ingreso de producto al stock y cada dispensación realizada a pacientes. Este módulo muestra el estado de cada registro enviado al sistema.
         </p>
         <div class="ar__info-steps">
           <div class="ar__info-step">

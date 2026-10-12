@@ -17,7 +17,7 @@
         <button v-for="e in ESPECTROS" :key="e.value" type="button"
                 class="lf__radio-btn" :class="{ 'lf__radio-btn--sel': f.espectro === e.value }"
                 @click="f.espectro = e.value">
-          {{ e.emoji }} {{ e.label }}
+          {{ e.label }}
         </button>
       </div>
     </div>

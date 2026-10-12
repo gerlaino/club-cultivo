@@ -14,7 +14,7 @@
         <div class="lhs__dot" :style="{ background: dotColor(it) }"></div>
         <div class="lhs__row-body">
           <div class="lhs__row-head">
-            <span class="lhs__row-titulo">{{ it.emoji }} {{ it.titulo }}<span v-if="metaDetalle(it)" class="lhs__row-detalle"> · {{ metaDetalle(it) }}</span></span>
+            <span class="lhs__row-titulo">{{ it.titulo }}<span v-if="metaDetalle(it)" class="lhs__row-detalle"> · {{ metaDetalle(it) }}</span></span>
             <span class="lhs__row-fecha">{{ formatDateTime(it.fecha) }}</span>
           </div>
           <div v-if="it.detalle" class="lhs__row-desc">{{ it.detalle }}</div>

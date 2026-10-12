@@ -3,7 +3,7 @@
     <!-- Cabecera: cuántas, sacar/subir, comparar -->
     <div class="lg__head">
       <div class="lg__head-left">
-        <span class="lg__emoji">📷</span>
+        <span class="lg__emoji"><i class="bi bi-camera" aria-hidden="true"></i></span>
         <span class="lg__title">Fotos</span>
         <span v-if="fotos.length" class="lg__pill">{{ fotos.length }}</span>
         <span v-if="diaActual" class="lg__dia">día {{ diaActual }}{{ esPersonal ? '' : ' del lote' }}</span>
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Vacío -->
-    <EmptyState v-if="cargado && !fotos.length" icon="📷" title="Sin fotos todavía" compact>
+    <EmptyState v-if="cargado && !fotos.length" icon="bi-camera" title="Sin fotos todavía" compact>
       <template #actions>
         <button v-if="canEdit" class="lg__btn-outline" @click="abrirCamara"><i class="bi bi-camera-fill"></i> Sacar la primera</button>
       </template>
@@ -63,7 +63,7 @@
             <span class="lg__foto-dia">{{ f.dia ? `Día ${f.dia}` : fechaCorta(f.tomada_el) }}</span>
             <span v-if="f.plant" class="lg__foto-plant">{{ f.plant.nombre || f.plant.codigo }}</span>
           </div>
-          <span v-if="f.es_portada" class="lg__badge" title="Portada en el plano de la sala">⭐</span>
+          <span v-if="f.es_portada" class="lg__badge" title="Portada en el plano de la sala"><i class="bi bi-star-fill" aria-hidden="true"></i></span>
           <span v-if="f.etiquetas?.some(e => e === 'problema')" class="lg__badge lg__badge--warn" title="Problema">!</span>
           <span v-if="comparando" class="lg__check"><i v-if="seleccion.includes(f.id)" class="bi bi-check-lg"></i></span>
         </div>

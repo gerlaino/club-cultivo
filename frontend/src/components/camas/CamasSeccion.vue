@@ -21,7 +21,7 @@
         </div>
         <p class="cs__meta">
           <span v-if="c.m2">{{ fmtNum(c.m2) }} m²</span>
-          <span v-if="c.ciclo_actual">Ciclo {{ c.ciclo_actual.numero }} · día {{ c.ciclo_actual.dias }}</span>
+          <span v-if="c.ciclo_actual">Siembra {{ c.ciclo_actual.numero }} · día {{ c.ciclo_actual.dias }}</span>
           <span v-else-if="c.ciclos_count">{{ c.ciclos_count }} {{ c.ciclos_count === 1 ? 'cosecha' : 'cosechas' }}</span>
           <span v-if="c.edad_dias != null">{{ edad(c.edad_dias) }}</span>
         </p>

@@ -1,7 +1,7 @@
 <template>
   <div class="act__wrap" ref="wrapRef">
     <button class="act__trigger" @click="open = !open" :class="{ 'act__trigger--open': open }">
-      ⚡ {{ label }}
+      {{ label }} <i class="bi bi-chevron-down act__caret" aria-hidden="true"></i>
       <svg class="act__chevron" viewBox="0 0 10 6" fill="none">
         <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
@@ -19,7 +19,8 @@
             :disabled="item.disabled"
             @click="handleClick(item)"
           >
-            <span class="act__item-emoji">{{ item.emoji }}</span>
+            <i v-if="item.icon" :class="['bi', item.icon, 'act__item-emoji']" aria-hidden="true"></i>
+            <span v-else-if="item.emoji" class="act__item-emoji">{{ item.emoji }}</span>
             <span class="act__item-label">{{ item.label }}</span>
           </button>
         </template>
@@ -115,7 +116,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .act__item--danger { color: var(--c-rust-600, #DC2626); }
 .act__item--danger:hover { background: #FEF2F2; }
 .act__item--disabled { opacity: .45; cursor: not-allowed; }
-.act__item-emoji { font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; }
+.act__caret { font-size: .7em; margin-left: 2px; }
+.act__item-emoji { font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; color: var(--c-ink-500); }
+.act__item--danger .act__item-emoji { color: inherit; }
 .act__item-label { font-weight: 500; }
 
 .act__divider { height: 1px; background: var(--c-ink-100, #F3F4F6); margin: var(--sp-2) 0; }

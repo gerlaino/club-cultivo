@@ -471,7 +471,7 @@ onMounted(async () => {
         >
           <ul class="navbar-nav align-items-lg-center mb-2 mb-lg-0 ms-3 gap-lg-1">
             <li class="nav-item">
-              <RouterLink class="nav-link px-2" to="/" @click="closeNav">Dashboard</RouterLink>
+              <RouterLink class="nav-link px-2" to="/" @click="closeNav">Inicio</RouterLink>
             </li>
             <li class="nav-item" v-if="can('sedes', 'index')">
               <RouterLink class="nav-link px-2" to="/sedes" @click="closeNav">Sedes</RouterLink>

@@ -20,7 +20,7 @@
 
     <div v-else-if="!reservas.length" class="rsv__empty">
       <i class="bi bi-bookmark-star"></i>
-      <p>No hay reservas {{ estado ? ESTADO_LABEL[estado]?.toLowerCase() : '' }}.</p>
+      <p>No hay reservas{{ estado ? ' ' + (VACIO_PLURAL[estado] || ESTADO_LABEL[estado]?.toLowerCase()) : '' }}.</p>
     </div>
 
     <table v-else class="rsv__table">
@@ -121,6 +121,8 @@ const canGestionarReservas = computed(() => ['admin', 'supervisor', 'super_admin
 const ESTADO_LABEL = {
   pendiente: 'Pendiente', entregada: 'Entregada', cancelada: 'Cancelada', vencida: 'Vencida',
 }
+// «No hay reservas pendientes», en plural: el estado en singular no concuerda con «reservas».
+const VACIO_PLURAL = { pendiente: 'pendientes', entregada: 'entregadas', cancelada: 'canceladas', vencida: 'vencidas' }
 
 const reservas = ref([])
 
@@ -133,7 +135,7 @@ const gruposPorSede = computed(() => {
   for (const r of reservas.value) {
     const id = r.stock?.sede?.id ?? null
     if (!mapa.has(id)) {
-      mapa.set(id, { id, nombre: r.stock?.sede?.nombre || 'Sin sede (club)', reservas: [] })
+      mapa.set(id, { id, nombre: r.stock?.sede?.nombre || 'Sin sede (toda la organización)', reservas: [] })
     }
     mapa.get(id).reservas.push(r)
   }

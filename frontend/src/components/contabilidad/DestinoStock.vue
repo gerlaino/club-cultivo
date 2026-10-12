@@ -159,7 +159,7 @@ const nombreSede = (id) => props.sedes.find(s => String(s.id) === String(id))?.n
             </select>
           </label>
           <p class="dst__hint">
-            Para que el gasto aparezca en el resultado de esa sede. Si es de todo el club —el
+            Para que el gasto aparezca en el resultado de esa sede. Si es de toda la organización —el
             contador, un seguro— dejalo en «toda la organización».
           </p>
         </template>
@@ -242,7 +242,7 @@ const nombreSede = (id) => props.sedes.find(s => String(s.id) === String(id))?.n
                 <span class="dst__lbl">Qué entró</span>
                 <select class="dst__inp" :class="{ 'dst__inp--err': errores.destino_item }"
                         :value="d.insumo_id" @change="set({ insumo_id: $event.target.value, nombre: '' })">
-                  <option value="">＋ Es nuevo{{ nombrePropuesto ? `: «${nombrePropuesto}»` : '' }}</option>
+                  <option value="">+ Es nuevo{{ nombrePropuesto ? `: «${nombrePropuesto}»` : '' }}</option>
                   <option v-for="i in insumosDelDeposito" :key="i.id" :value="i.id">
                     {{ i.nombre }} — hay {{ i.stock_actual }} {{ i.unidad_medida }}
                   </option>
@@ -323,7 +323,7 @@ const nombreSede = (id) => props.sedes.find(s => String(s.id) === String(id))?.n
                 <span class="dst__lbl">Qué producto es</span>
                 <select class="dst__inp" :value="d.bar_producto_id"
                         @change="set({ bar_producto_id: $event.target.value, nombre: '' })">
-                  <option value="">＋ Es nuevo{{ nombrePropuesto ? `: «${nombrePropuesto}»` : '' }}</option>
+                  <option value="">+ Es nuevo{{ nombrePropuesto ? `: «${nombrePropuesto}»` : '' }}</option>
                   <option v-for="p in barProductos" :key="p.id" :value="p.id">
                     {{ p.nombre }} — hay {{ p.stock_actual }}
                   </option>

@@ -240,7 +240,7 @@
         <h3 class="mst__modal-title">{{ plata.tipo === 'ingreso' ? 'Poner plata en el cajón' : 'Sacar plata del cajón' }}</h3>
         <p class="mst__modal-sub">
           {{ plata.tipo === 'ingreso'
-             ? 'Cambio, reponer el fondo, o lo que se cobró por fuera. No cuenta como ingreso del club: esa plata ya era suya.'
+             ? 'Cambio, reponer el fondo, o lo que se cobró por fuera. No cuenta como ingreso de la organización: esa plata ya era suya.'
              : 'Un gasto pagado con la caja baja el resultado. Un retiro no: o queda a nombre de alguien, o va a guardarse con el resto de la plata de la organización.' }}
         </p>
         <input v-model.number="plata.monto" type="number" min="0" step="100" class="mst__input"
@@ -250,7 +250,7 @@
         <select v-if="plata.tipo === 'salida'" v-model="plata.clase" class="mst__select">
           <option value="guardado">Va a guardarse en la organización — no queda a nombre de nadie</option>
           <option value="retiro">Retiro a mi nombre — lo rindo después</option>
-          <option value="gasto">Gasto — el club gastó esa plata</option>
+          <option value="gasto">Gasto — la organización gastó esa plata</option>
         </select>
         <div class="mst__modal-acc">
           <button class="mst__btn mst__btn--ghost" @click="plata = null">Cancelar</button>

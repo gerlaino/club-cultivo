@@ -22,15 +22,15 @@ const router = useRouter()
 const salas  = useSalasStore()
 
 const ESTADO_META = {
-  enraizado:   { label: 'Enraizado',   bg: '#e0f2fe', text: '#0369a1', bar: '#0891b2', icon: '🌱' },
-  vegetativo:  { label: 'Vegetativo',  bg: '#E8F0EB', text: '#2D4A3E', bar: '#5A8A72', icon: '🍃' },
-  floracion:   { label: 'Floración',   bg: '#FEF3C7', text: '#92400e', bar: '#D97706', icon: '🌸' },
-  cosecha:     { label: 'Cosecha',     bg: '#F4F8F5', text: '#1A3D2E', bar: '#3F6452', icon: '✂️' },
-  en_manicura: { label: 'En manicura', bg: '#ede9fe', text: '#5b21b6', bar: '#7c3aed', icon: '✂️' },
-  curado:      { label: 'Curado',      bg: '#dbeafe', text: '#1e40af', bar: '#2563eb', icon: '🫙' },
-  finalizado:  { label: 'Finalizado',  bg: '#E8F0EB', text: '#0F2A1E', bar: '#1A3D2E', icon: '✅' },
+  enraizado:   { label: 'Enraizado',   bg: '#e0f2fe', text: '#0369a1', bar: '#0891b2' },
+  vegetativo:  { label: 'Vegetativo',  bg: '#E8F0EB', text: '#2D4A3E', bar: '#5A8A72' },
+  floracion:   { label: 'Floración',   bg: '#FEF3C7', text: '#92400e', bar: '#D97706' },
+  cosecha:     { label: 'Cosecha',     bg: '#F4F8F5', text: '#1A3D2E', bar: '#3F6452' },
+  en_manicura: { label: 'En manicura', bg: '#ede9fe', text: '#5b21b6', bar: '#7c3aed' },
+  curado:      { label: 'Curado',      bg: '#dbeafe', text: '#1e40af', bar: '#2563eb' },
+  finalizado:  { label: 'Finalizado',  bg: '#E8F0EB', text: '#0F2A1E', bar: '#1A3D2E' },
 }
-function em(e) { return ESTADO_META[e] || { label: e || '—', bg: '#f1f5f9', text: '#64748b', bar: '#94a3b8', icon: '•' } }
+function em(e) { return ESTADO_META[e] || { label: e || '—', bg: '#f1f5f9', text: '#64748b', bar: '#94a3b8' } }
 function tipoLabel(t) { return { sativa: 'Sativa', indica: 'Índica', hibrida: 'Híbrida' }[t] || t }
 
 // Semáforo de los días EN FASE contra el objetivo de la genética para esa fase.
@@ -102,14 +102,14 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
         <th :class="{ 'lt-th--sort': ordena }" @click="ordena && ordenar('codigo_asc')">
           Código <span v-if="ordena" class="lt-sort">{{ sortBy === 'codigo_asc' ? '↑' : '↕' }}</span>
         </th>
-        <th>🌿 Genética</th>
-        <th v-if="mostrarSala">📍 Sala</th>
+        <th>Genética</th>
+        <th v-if="mostrarSala">Sala</th>
         <th :class="{ 'lt-th--sort': ordena }" @click="ordena && ordenar('plantas_desc')">
-          🪴 Plantas <span v-if="ordena" class="lt-sort">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
+          Plantas <span v-if="ordena" class="lt-sort">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
         </th>
-        <th>🪣 Maceta</th>
-        <th title="Días en la fase actual">⏱️ En fase</th>
-        <th title="Fecha en que entró a la fase actual">📅 Desde</th>
+        <th>Maceta</th>
+        <th title="Días en la fase actual">En fase</th>
+        <th title="Fecha en que entró a la fase actual">Desde</th>
         <th :class="{ 'lt-th--sort': ordena }" title="Días totales desde el inicio del lote"
             @click="ordena && ordenar(sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc', 'fecha_asc')">
           Total <span v-if="ordena" class="lt-sort">{{ sortBy?.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
@@ -141,14 +141,14 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
           <td data-label="Estado">
             <span class="lt-estado">
               <span class="lt-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
-                {{ em(l.estado).icon }} {{ estadoLoteLabel(l) }}
+                {{ estadoLoteLabel(l) }}
               </span>
               <!-- Al pasar el mouse: los días de las fases que ya pasaron. -->
               <span class="lt-pop" role="tooltip">
                 <template v-if="fasesPasadas(l).length">
                   <span class="lt-pop__tit">Fases anteriores</span>
                   <span v-for="(f, i) in fasesPasadas(l)" :key="i" class="lt-pop__fila">
-                    <span>{{ em(f.estado).icon }} {{ em(f.estado).label }}</span>
+                    <span>{{ em(f.estado).label }}</span>
                     <strong>{{ f.dias }} d</strong>
                   </span>
                 </template>
@@ -171,7 +171,7 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
           <td data-label="Plantas">
             <span class="lt-num">{{ l.plants_count ?? 0 }}</span>
             <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0" class="lt-sub">
-              ✅ {{ l.plantas_cosechadas_count }} cosechadas
+              {{ l.plantas_cosechadas_count }} cosechadas
             </span>
           </td>
           <td data-label="Maceta">
@@ -208,7 +208,7 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
             <div v-if="(l.fases || []).length" class="lt-fases">
               <div v-for="(f, i) in l.fases" :key="i" class="lt-fase" :class="{ 'lt-fase--actual': f.actual }"
                    :style="{ '--fase': em(f.estado).bar, flexGrow: Math.max(f.dias, 1) }">
-                <span class="lt-fase__nom">{{ em(f.estado).icon }} {{ em(f.estado).label }}</span>
+                <span class="lt-fase__nom">{{ em(f.estado).label }}</span>
                 <span class="lt-fase__dias">{{ f.dias }} d<template v-if="f.actual"> · ahora</template></span>
                 <span class="lt-fase__fechas">{{ fechaCorta(f.desde) }} → {{ f.actual ? 'hoy' : fechaCorta(f.hasta) }}</span>
               </div>

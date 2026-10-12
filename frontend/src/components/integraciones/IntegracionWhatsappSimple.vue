@@ -47,7 +47,7 @@ async function probar() {
       <div class="iws__ico"><i class="bi bi-whatsapp"></i></div>
       <div class="iws__head-txt">
         <div class="iws__title">WhatsApp</div>
-        <div class="iws__sub">Avisos automáticos a los socios (despachos, recordatorios)</div>
+        <div class="iws__sub">Avisos automáticos a los pacientes (despachos, recordatorios)</div>
       </div>
       <span class="iws__badge" :class="`iws__badge--${estado}`">
         <i :class="estado === 'conectado' ? 'bi bi-check-circle-fill' : estado === 'pendiente' ? 'bi bi-clock-fill' : 'bi bi-dash-circle'"></i>

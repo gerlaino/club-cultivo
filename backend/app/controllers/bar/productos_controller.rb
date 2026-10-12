@@ -150,7 +150,7 @@ module Bar
     def require_feature_bar!
       return if current_user.club.feature?(:bar)
 
-      render json: { error: 'El bar no está habilitado para este club.' }, status: :forbidden
+      render json: { error: 'El Buffet no está habilitado para esta organización.' }, status: :forbidden
     end
 
     ROLES_OPERADOR = %w[admin supervisor dispensador].freeze

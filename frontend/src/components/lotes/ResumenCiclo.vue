@@ -6,7 +6,7 @@
     <div class="rc__head">
       <div>
         <div class="rc__title">Cómo salió</div>
-        <div class="rc__sub">{{ r.estado === 'finalizado' ? 'Ciclo cerrado' : 'Curando · el ciclo terminó' }}<template v-if="r.anterior"> · vs. {{ r.anterior.lotes === 1 ? 'tu ciclo anterior' : `tus ${r.anterior.lotes} ciclos anteriores` }}{{ r.anterior.misma_genetica ? ' con esta genética' : ' (otras genéticas)' }}</template></div>
+        <div class="rc__sub">{{ r.estado === 'finalizado' ? 'Cultivo cerrado' : 'Curando · el cultivo terminó' }}<template v-if="r.anterior"> · vs. {{ r.anterior.lotes === 1 ? 'tu cultivo anterior' : `tus ${r.anterior.lotes} cultivos anteriores` }}{{ r.anterior.misma_genetica ? ' con esta genética' : ' (otras genéticas)' }}</template></div>
       </div>
       <!-- Bootstrap Icons, no emoji: el emoji depende de la fuente del teléfono. -->
       <span class="rc__ico"><i class="bi bi-flag-fill"></i></span>
@@ -24,7 +24,7 @@
       </div>
       <div class="rc__num">
         <span class="rc__num-v">{{ r.dias?.total != null ? Math.round(r.dias.total) : '—' }}<small>días</small></span>
-        <span class="rc__num-l">de ciclo</span>
+        <span class="rc__num-l">de cultivo</span>
         <span v-if="delta(r.dias?.total, r.anterior?.dias_total)" class="rc__delta" :class="deltaClase(r.dias?.total, r.anterior?.dias_total, false)">{{ delta(r.dias?.total, r.anterior?.dias_total) }}</span>
       </div>
       <!-- El número que el cultivador compara con la ficha del banco. Sin los metros del
@@ -55,9 +55,9 @@
       <i class="bi bi-bricks"></i>
       <span>
         {{ r.cama.nombre }} · ciclo {{ r.cama.ciclo }}<template v-if="r.cama.g_m2 != null">: <strong>{{ fmt(r.cama.g_m2) }} g/m²</strong></template>
-        <template v-if="r.cama.anterior?.g_m2 != null"> (ciclo {{ r.cama.anterior.ciclo }}: {{ fmt(r.cama.anterior.g_m2) }})</template>
+        <template v-if="r.cama.anterior?.g_m2 != null"> (siembra {{ r.cama.anterior.ciclo }}: {{ fmt(r.cama.anterior.g_m2) }})</template>
         <span v-if="r.cama.g_m2 != null && delta(r.cama.g_m2, r.cama.anterior?.g_m2)" class="rc__delta" :class="deltaClase(r.cama.g_m2, r.cama.anterior?.g_m2, true)">{{ delta(r.cama.g_m2, r.cama.anterior?.g_m2) }}</span>
-        <template v-if="r.cama.aplicaciones_suelo"> · {{ r.cama.aplicaciones_suelo }} {{ r.cama.aplicaciones_suelo === 1 ? 'cosa' : 'cosas' }} al suelo en el ciclo</template>
+        <template v-if="r.cama.aplicaciones_suelo"> · {{ r.cama.aplicaciones_suelo }} {{ r.cama.aplicaciones_suelo === 1 ? 'cosa' : 'cosas' }} al suelo en esta siembra</template>
       </span>
     </div>
 
@@ -118,7 +118,7 @@ const fases = computed(() => {
   const enPie = lista.filter(f => ['vegetativo', 'floracion'].includes(f.clave))
   const resto = lista.filter(f => !['enraizado', 'vegetativo', 'floracion'].includes(f.clave))
   const enraiz = lista.filter(f => f.clave === 'enraizado')
-  const ciclo = enPie.length ? [{ clave: 'ciclo', label: 'Ciclo', color: '#16a34a', dias: enPie.reduce((t, f) => t + f.dias, 0) }] : []
+  const ciclo = enPie.length ? [{ clave: 'ciclo', label: 'Cultivo', color: '#16a34a', dias: enPie.reduce((t, f) => t + f.dias, 0) }] : []
   return [...enraiz, ...ciclo, ...resto]
 })
 

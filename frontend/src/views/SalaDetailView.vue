@@ -227,25 +227,25 @@ const salaAcciones = computed(() => {
   const items = []
   const nombre = salaTxt.value.corta
   if (canEdit.value || isCultivador.value) {
-    items.push({ emoji: '🌿', label: `Registrar ${nombre}`, onClick: () => { lecturaOpen.value = true } })
+    items.push({ icon: 'bi-flower3', label: `Registrar ${nombre}`, onClick: () => { lecturaOpen.value = true } })
     // Los lotes que enraízan viven en un propagador con otro clima —la sala marca 60% de humedad y
     // adentro hay 90%—, así que su registro va aparte y solo aparece si hay alguno.
     if (hayEnraizando.value) {
-      items.push({ emoji: '🌱', label: 'Registrar enraizado', onClick: () => { enraizadoOpen.value = true } })
+      items.push({ icon: 'bi-flower2', label: 'Registrar enraizado', onClick: () => { enraizadoOpen.value = true } })
     }
   }
   if (puedeCargarLote.value) {
     const lbl = 'Cargar lote de cosecha'
-    items.push({ emoji: '📦', label: lbl, onClick: () => { showCargarLote.value = true } })
+    items.push({ icon: 'bi-box-seam', label: lbl, onClick: () => { showCargarLote.value = true } })
   }
   if (canCambiarFase.value) {
     const hacia = sala.value?.kind === 'vegetativo' ? 'Floración' : 'Vegetativo'
-    items.push({ emoji: '🔄', label: `Pasar ${nombre} a ${hacia}`, onClick: () => ejecutarCambioFase(), disabled: cambiarFaseLoading.value })
+    items.push({ icon: 'bi-arrow-repeat', label: `Pasar ${nombre} a ${hacia}`, onClick: () => ejecutarCambioFase(), disabled: cambiarFaseLoading.value })
   }
   if (canEdit.value) {
-    items.push({ emoji: '✏️', label: `Editar ${nombre}`, onClick: openEditSala })
+    items.push({ icon: 'bi-pencil', label: `Editar ${nombre}`, onClick: openEditSala })
     items.push({ divider: true })
-    items.push({ emoji: '🗑️', label: `Eliminar ${nombre}`, danger: true, onClick: eliminarSala, disabled: deleting.value })
+    items.push({ icon: 'bi-trash', label: `Eliminar ${nombre}`, danger: true, onClick: eliminarSala, disabled: deleting.value })
   }
   return items
 })
@@ -395,9 +395,9 @@ async function confirmarMover() {
 
   const ef = efectosMover.value
   const lineas = [`Vas a mover ${lotesAMover.value.length} lote(s) a "${d.nombre}".`]
-  if (ef.cambiaSede) lineas.push(`⚠️ Es de OTRA SEDE: los lotes pasan a ${d.sede?.nombre || 'esa sede'} y sus costos se imputan ahí.`)
+  if (ef.cambiaSede) lineas.push(`Atención: es de OTRA SEDE: los lotes pasan a ${d.sede?.nombre || 'esa sede'} y sus costos se imputan ahí.`)
   if (ef.cambian.length) {
-    lineas.push(`⚠️ La sala está en ${ef.faseDestino === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos lotes cambian de fase:`)
+    lineas.push(`Atención: la sala está en ${ef.faseDestino === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos lotes cambian de fase:`)
     lineas.push(...ef.cambian.map(l => `   · ${l.codigo}: ${estadoMeta(l.estado).label} → ${estadoMeta(ef.faseDestino).label}`))
     if (ef.faseDestino === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
   }
@@ -468,16 +468,16 @@ const amb = computed(() => lectura(sala.value?.ambiente_actual))
 const ambIncubadora = computed(() => lectura(sala.value?.ambiente_incubadora))
 
 const ESTADO_META = {
-  semilla:    { label:"Semilla",  color:"#64748b", emoji:"🌱" },
-  esqueje:    { label:"Enraizado",color:"#0891b2", emoji:"🌱" },
-  vegetativo: { label:"Vegetativo",      color:"#16a34a", emoji:"🌱" },
-  floracion:  { label:"Floración",       color:"#d97706", emoji:"🌸" },
-  cosecha:     { label:"Cosecha",     color:"#92400e", emoji:"✂️" },
-  en_manicura: { label:"En manicura", color:"#7c3aed", emoji:"✂️" },
-  curado:      { label:"Curado",      color:"#2563eb", emoji:"🍂" },
-  finalizado:  { label:"Finalizado",  color:"#1b5e20", emoji:"✅" },
+  semilla:    { label:"Semilla",  color:"#64748b" },
+  esqueje:    { label:"Enraizado",color:"#0891b2" },
+  vegetativo: { label:"Vegetativo",      color:"#16a34a" },
+  floracion:  { label:"Floración",       color:"#d97706" },
+  cosecha:     { label:"Cosecha",     color:"#92400e" },
+  en_manicura: { label:"En manicura", color:"#7c3aed" },
+  curado:      { label:"Curado",      color:"#2563eb" },
+  finalizado:  { label:"Finalizado",  color:"#1b5e20" },
 }
-function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
+function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b" } }
 function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", manicura:"Manicura" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
@@ -914,7 +914,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
         <!-- Superficie: cuánto mide y cuánto está ocupado por los lotes de adentro. Si no se
              cargó, se dice, porque sin eso no hay g/m² (22-sep-2026). -->
         <div class="sd__kpi">
-          <div class="sd__kpi-icon">📐</div>
+          <div class="sd__kpi-icon"><i class="bi bi-rulers" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ sala.m2 ? `${sala.m2} m²` : '—' }}</div>
             <div class="sd__kpi-label">Superficie</div>
@@ -925,7 +925,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
         </div>
         <div v-if="!esPersonal" class="sd__kpi">
-          <div class="sd__kpi-icon">🌿</div>
+          <div class="sd__kpi-icon"><i class="bi bi-flower3" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value" style="color:#16a34a">{{ kpis.enCiclo }}</div>
             <div class="sd__kpi-label">Lotes activos</div>
@@ -933,14 +933,14 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
         </div>
         <div class="sd__kpi">
-          <div class="sd__kpi-icon">🪴</div>
+          <div class="sd__kpi-icon"><i class="bi bi-flower2" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.totalPlantas }}</div>
             <div class="sd__kpi-label">Plantas activas</div>
           </div>
         </div>
         <div v-if="esPersonal" class="sd__kpi">
-          <div class="sd__kpi-icon">🫙</div>
+          <div class="sd__kpi-icon"><i class="bi bi-archive" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.cosechados }}</div>
             <div class="sd__kpi-label">{{ kpis.cosechados === 1 ? 'Cosecha' : 'Cosechas' }}</div>
@@ -948,7 +948,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
         </div>
         <div v-else class="sd__kpi">
-          <div class="sd__kpi-icon">📦</div>
+          <div class="sd__kpi-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.totalLotes }}</div>
             <div class="sd__kpi-label">Total lotes</div>
@@ -960,7 +960,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
              ANTIGÜEDAD va siempre: un dato de hace una semana mostrado como si fuera de ahora es
              peor que no tener dato. -->
         <div v-if="amb" class="sd__kpi sd__kpi--amb" :class="{ 'sd__kpi--viejo': amb.viejo }">
-          <div class="sd__kpi-icon">🌡️</div>
+          <div class="sd__kpi-icon"><i class="bi bi-thermometer-half" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">
               <span v-if="amb.temperatura != null">{{ amb.temperatura }}°</span>
@@ -978,7 +978,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
         <!-- Incubadora / bandeja: su propio KPI. Es otro aire, no una segunda medición del mismo. -->
         <div v-if="ambIncubadora" class="sd__kpi sd__kpi--amb sd__kpi--incubadora"
              :class="{ 'sd__kpi--viejo': ambIncubadora.viejo }">
-          <div class="sd__kpi-icon">🫙</div>
+          <div class="sd__kpi-icon"><i class="bi bi-archive" aria-hidden="true"></i></div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">
               <span v-if="ambIncubadora.temperatura != null">{{ ambIncubadora.temperatura }}°</span>
@@ -999,8 +999,8 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
       <!-- Tabs -->
       <div class="sd__tabs">
-        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 {{ esPersonal ? 'Plantas' : 'Lotes' }}</button>
-        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'">📋 Historial</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'"><i class="bi bi-flower3" aria-hidden="true"></i> {{ esPersonal ? 'Plantas' : 'Lotes' }}</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'"><i class="bi bi-journal-text" aria-hidden="true"></i> Historial</button>
       </div>
 
       <div class="sd__layout">
@@ -1011,14 +1011,14 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           <div v-if="esPersonal" v-show="tabActiva === 'lotes'" class="sd__section">
             <div class="sd__section-toggle sd__section-toggle--fijo">
               <div class="sd__section-toggle-left">
-                <span class="sd__section-emoji">🪴</span>
+                <span class="sd__section-emoji"><i class="bi bi-flower2" aria-hidden="true"></i></span>
                 <span class="sd__section-title">Plantas</span>
                 <span class="sd__pill">{{ plantasDelEspacio.length }}</span>
               </div>
             </div>
             <div class="sd__section-body">
               <PlantasGrilla v-if="plantasDelEspacio.length" :plantas="plantasDelEspacio" :lotes="items" />
-              <EmptyState v-else icon="🪴" title="Sin plantas todavía" message="Este espacio no tiene plantas creciendo." compact>
+              <EmptyState v-else icon="bi-flower2" title="Sin plantas todavía" message="Este espacio no tiene plantas creciendo." compact>
                 <template #actions>
                   <button class="sd__btn-outline" @click="openCreate">Agregar la primera</button>
                 </template>
@@ -1030,7 +1030,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           <div v-else v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
               <div class="sd__section-toggle-left">
-                <span class="sd__section-emoji">🌿</span>
+                <span class="sd__section-emoji"><i class="bi bi-flower3" aria-hidden="true"></i></span>
                 <span class="sd__section-title">Lotes</span>
                 <span class="sd__pill">{{ items.length }}</span>
               </div>
@@ -1038,7 +1038,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </button>
             <div v-show="lotesExpanded" class="sd__section-body sd__section-body--flush">
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
-              <EmptyState v-else-if="!items.length" icon="📦" :title="'Sin lotes todavía'" :message="esPersonal ? 'Este espacio no tiene lotes todavía.' : 'Esta sala no tiene lotes asignados.'" compact>
+              <EmptyState v-else-if="!items.length" icon="bi-box-seam" :title="'Sin lotes todavía'" :message="esPersonal ? 'Este espacio no tiene lotes todavía.' : 'Esta sala no tiene lotes asignados.'" compact>
                 <template #actions>
                   <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">
@@ -1119,7 +1119,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           <div v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="fotosExpanded = !fotosExpanded">
               <div class="sd__section-toggle-left">
-                <span class="sd__section-emoji">📷</span>
+                <span class="sd__section-emoji"><i class="bi bi-camera" aria-hidden="true"></i></span>
                 <span class="sd__section-title">Fotos</span>
                 <span v-if="fotosSala.length" class="sd__pill">{{ fotosSala.length }}</span>
               </div>
@@ -1198,7 +1198,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     <td>
                       <template v-if="l.duracion_dias != null">{{ l.duracion_dias }}</template>
                       <template v-else-if="l.dias_transcurridos != null">
-                        {{ l.dias_transcurridos }}<span class="sd__hist-encurso" title="Ciclo en curso: el número sigue corriendo">·</span>
+                        {{ l.dias_transcurridos }}<span class="sd__hist-encurso" title="En curso: el número sigue corriendo">·</span>
                       </template>
                       <template v-else>—</template>
                     </td>
@@ -1224,7 +1224,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           <!-- Widget Ambiente -->
           <div v-if="canSeeAmbiente && (ambienteMini.length > 0)" class="sd__card sd__card--ambiente">
             <div class="sd__card-header" style="display:flex;align-items:center;justify-content:space-between">
-              <span class="sd__card-title">🌿 Ambiente</span>
+              <span class="sd__card-title"><i class="bi bi-flower3" aria-hidden="true"></i> Ambiente</span>
               <RouterLink :to="{ name: 'sala-ambiente', params: { id: salaId } }" class="sd__link-small">
                 Ver detalle <i class="bi bi-arrow-right"></i>
               </RouterLink>
@@ -1235,7 +1235,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
           <div v-else-if="canSeeAmbiente" class="sd__card sd__card--ambiente">
             <div class="sd__card-header" style="display:flex;align-items:center;justify-content:space-between">
-              <span class="sd__card-title">🌿 Ambiente</span>
+              <span class="sd__card-title"><i class="bi bi-flower3" aria-hidden="true"></i> Ambiente</span>
               <RouterLink :to="{ name: 'sala-ambiente', params: { id: salaId } }" class="sd__link-small">
                 Ver detalle <i class="bi bi-arrow-right"></i>
               </RouterLink>
@@ -1266,14 +1266,14 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
           <!-- Notas -->
           <div v-if="sala.notes" class="sd__card sd__card--mt">
-            <div class="sd__card-header"><span class="sd__card-title">📋 Notas</span></div>
+            <div class="sd__card-header"><span class="sd__card-title"><i class="bi bi-journal-text" aria-hidden="true"></i> Notas</span></div>
             <div class="sd__card-notes">{{ sala.notes }}</div>
           </div>
 
           <!-- Cámara -->
           <div class="sd__card sd__card--mt">
             <div class="sd__card-header">
-              <span class="sd__card-title">📷 Cámara</span>
+              <span class="sd__card-title"><i class="bi bi-camera" aria-hidden="true"></i> Cámara</span>
               <button v-if="canEdit && !showCameraForm" class="sd__link-small" @click="abrirFormCamera">
                 <i :class="sala.camera_stream_url ? 'bi bi-pencil' : 'bi bi-plus-lg'"></i>
                 {{ sala.camera_stream_url ? 'Editar' : 'Conectar cámara' }}
@@ -1351,7 +1351,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   @error="cameraError = true"
                 />
                 <div v-if="cameraError" class="sd__cam-error">
-                  <span>📷 Sin señal — verificá que la cámara esté encendida</span>
+                  <span><i class="bi bi-camera" aria-hidden="true"></i> Sin señal — verificá que la cámara esté encendida</span>
                 </div>
                 <div class="sd__cam-controls">
                   <button class="sd__cam-btn" @click="refreshSnapshot" title="Actualizar imagen">
@@ -1475,7 +1475,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
     <Teleport to="body">
       <div v-modal="() => showUpgrade = false" v-if="showUpgrade" class="sd__overlay">
         <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
-          <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
+          <div style="font-size:3rem;margin-bottom:.75rem"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></div>
           <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
           <p style="color:#64748b;font-size:.875rem;margin-bottom:1.5rem">Alcanzaste el máximo de lotes o plantas de tu plan. Contactá al equipo para actualizar.</p>
           <button class="sd__btn-primary" @click="showUpgrade=false">Entendido</button>

@@ -237,7 +237,7 @@ class MovimientosContablesController < ApplicationController
       monto_cambia    = nuevo_monto.present?    && nuevo_monto.to_d != @movimiento.monto_ars.to_d
       paciente_cambia = nuevo_paciente.present? && nuevo_paciente.to_i != @movimiento.paciente_id
       if monto_cambia || paciente_cambia
-        return render json: { error: 'Este aporte ya acreditó la cuenta corriente del socio. Eliminalo (se revierte el crédito) y cargalo de nuevo con los datos correctos.' }, status: :unprocessable_entity
+        return render json: { error: 'Este aporte ya acreditó la cuenta corriente del paciente. Eliminalo (se revierte el crédito) y cargalo de nuevo con los datos correctos.' }, status: :unprocessable_entity
       end
     end
 

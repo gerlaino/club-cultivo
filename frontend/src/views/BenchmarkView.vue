@@ -164,7 +164,7 @@ const metricas = computed(() => {
 
       <div v-if="plat" class="bv__plat-info">
         <i class="bi bi-building-check"></i>
-        <span><strong>{{ plat.clubes_participantes }}</strong> club{{ plat.clubes_participantes !== 1 ? 'es' : '' }} compartiendo datos actualmente</span>
+        <span><strong>{{ plat.clubes_participantes }}</strong> {{ plat.clubes_participantes !== 1 ? 'organizaciones' : 'organización' }} compartiendo datos actualmente</span>
       </div>
       <div v-else class="bv__plat-info bv__plat-info--empty">
         <i class="bi bi-hourglass-split"></i>

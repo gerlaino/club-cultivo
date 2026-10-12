@@ -122,7 +122,7 @@
 
       <!-- Empty total -->
       <div v-if="tareas.length === 0" class="tl__empty">
-        <span>📅</span>
+        <span><i class="bi bi-calendar3" aria-hidden="true"></i></span>
         <p>{{ esPersonal ? 'Sin tareas para estas plantas' : 'Sin tareas para este lote' }}</p>
       </div>
     </div>
@@ -169,7 +169,7 @@
         <div class="tl__modal tl__modal--wide">
           <div class="tl__modal-header">
             <div>
-              <h3 class="tl__modal-title">📋 {{ esPersonal ? 'Registro' : 'Registro del lote' }}</h3>
+              <h3 class="tl__modal-title"><i class="bi bi-journal-text" aria-hidden="true"></i> {{ esPersonal ? 'Registro' : 'Registro del lote' }}</h3>
               <p class="tl__modal-sub">{{ lote.codigo }} · {{ new Date().toLocaleDateString('es-AR') }}</p>
             </div>
             <button class="tl__modal-close" @click="tareaCompletando = null"><i class="bi bi-x-lg"></i></button>
@@ -186,7 +186,7 @@
                           :class="{ 'tl__sel-btn--active': registroForm.estado_general === key }"
                           :style="registroForm.estado_general===key ? {borderColor:meta.color,background:meta.color+'15',color:meta.color} : {}"
                           @click="registroForm.estado_general = key">
-                    {{ meta.emoji }} {{ key }}
+                    {{ key }}
                   </button>
                 </div>
               </div>
@@ -198,7 +198,7 @@
                           :class="{ 'tl__sel-btn--active': registroForm.plagas_observadas === key }"
                           :style="registroForm.plagas_observadas===key ? {borderColor:meta.color,background:meta.color+'15',color:meta.color} : {}"
                           @click="registroForm.plagas_observadas = key">
-                    {{ meta.emoji }} {{ key }}
+                    {{ key }}
                   </button>
                 </div>
               </div>
@@ -229,7 +229,7 @@
               <label class="tl__label">¿Avanzar a la siguiente etapa?</label>
               <div class="tl__selector">
                 <button type="button" class="tl__sel-btn" :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === '' }" :style="registroForm.nuevo_estado==='' ? {borderColor:'#64748b',background:'#f1f5f9',color:'#64748b'} : {}" @click="registroForm.nuevo_estado = ''">Sin cambio</button>
-                <button v-for="etapa in estadosSiguientes" :key="etapa" type="button" class="tl__sel-btn" :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === etapa }" :style="registroForm.nuevo_estado===etapa ? {borderColor:em(etapa).color,background:em(etapa).bg,color:em(etapa).color} : {}" @click="registroForm.nuevo_estado = etapa">{{ em(etapa).emoji }} {{ em(etapa).label }}</button>
+                <button v-for="etapa in estadosSiguientes" :key="etapa" type="button" class="tl__sel-btn" :class="{ 'tl__sel-btn--active': registroForm.nuevo_estado === etapa }" :style="registroForm.nuevo_estado===etapa ? {borderColor:em(etapa).color,background:em(etapa).bg,color:em(etapa).color} : {}" @click="registroForm.nuevo_estado = etapa">{{ em(etapa).label }}</button>
               </div>
             </div>
             <div class="tl__field tl__field--full" style="margin-top:.75rem">
@@ -586,10 +586,10 @@ function esRegistroLote(t) {
 
 // ── Constantes dominio ────────────────────────────────────
 const TIPO_LABELS = {
-  riego:'💧 Riego', poda:'✂️ Poda', medicion:'📏 Medición',
-  limpieza:'🧹 Limpieza', cosecha:'🌿 Cosecha', trasplante:'🪴 Trasplante',
-  inspeccion:'🔍 Inspección', registrar_lote:'📋 Registrar lote',
-  registrar_planta:'🌱 Registrar planta', otro:'📋 Otro'
+  riego:'Riego', poda:'Poda', medicion:'📏 Medición',
+  limpieza:'Limpieza', cosecha:'Cosecha', trasplante:'Trasplante',
+  inspeccion:'Inspección', registrar_lote:'Registrar lote',
+  registrar_planta:'Registrar planta', otro:'Otro'
 }
 const ESTADO_SALUD_META = {
   excelente:{color:"#16a34a",emoji:"🟢"}, bueno:{color:"#65a30d",emoji:"🟡"},

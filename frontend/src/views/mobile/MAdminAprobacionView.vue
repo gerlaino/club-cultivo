@@ -35,7 +35,7 @@
 
         <div class="maa__pesada">
           <i class="bi bi-bar-chart-fill"></i>
-          <strong>{{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</strong>
+          <strong>{{ formatG((p.peso_total_g || p.peso_calculado_g || 0), 1) }}</strong>
           <span v-if="p.manicurador_nombre">· ✂️ {{ p.manicurador_nombre }}</span>
         </div>
 
@@ -98,7 +98,7 @@
                         :class="{ 'maa__cont--sel': stockDestino === s.id }" @click="stockDestino = s.id">
                   <span class="maa__cont-radio"><span v-if="stockDestino === s.id" class="maa__cont-dot"></span></span>
                   <span class="maa__cont-body">
-                    <span class="maa__cont-title">{{ s.numero_lote_producto || `Frasco #${s.id}` }} <b>{{ Number(s.cantidad || 0).toFixed(0) }} g</b></span>
+                    <span class="maa__cont-title">{{ s.numero_lote_producto || `Frasco #${s.id}` }} <b>{{ formatG(Number(s.cantidad || 0), 0) }}</b></span>
                     <span class="maa__cont-meta">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}<span v-if="s.fecha_elaboracion"> · del {{ fecha(s.fecha_elaboracion) }}</span><span v-if="s.estado === 'agotado'" class="maa__cont-vacio"> · vacío, se vuelve a usar</span></span>
                   </span>
                 </button>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura, listStocks } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'

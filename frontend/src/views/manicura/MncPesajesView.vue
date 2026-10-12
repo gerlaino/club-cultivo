@@ -114,14 +114,14 @@
               <div class="mpv__hist-date">{{ fmtDate(p.fecha_pesaje) }}</div>
               <div class="mpv__hist-info">
                 <span>{{ p.plantas_count || p.plantas_registradas || 0 }} plantas</span>
-                <span>{{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
+                <span>{{ formatG((p.peso_total_g || p.peso_calculado_g || 0), 1) }}</span>
               </div>
               <span class="mpv__badge" :class="badgeClass(p.estado)">
                 {{ estadoLabel(p.estado) }}
               </span>
               <div v-if="p.estado === 'confirmado'" class="mpv__hist-confirmado">
                 <CheckCircle :size="12" :stroke-width="2" />
-                {{ (p.peso_confirmado_g || 0).toFixed(1) }}g confirmados
+                {{ formatG((p.peso_confirmado_g || 0), 1) }} confirmados
               </div>
               <button
                 v-if="p.estado === 'enviado'"
@@ -159,6 +159,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus, Trash2, Undo2 } from 'lucide-vue-next'

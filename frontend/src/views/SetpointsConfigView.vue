@@ -201,7 +201,7 @@
         <!-- Lo que VIENE: los hitos del ciclo, avisados con anticipación. En uso personal viene
              prendido; una organización lo prende si quiere. -->
         <fieldset class="spc__fieldset">
-          <legend class="spc__legend">Próximos pasos del ciclo</legend>
+          <legend class="spc__legend">Próximos pasos del cultivo</legend>
           <p class="spc__field-desc">
             La app calcula sola cuándo cada lote llega a sus días de vegetativo (¿pasa a floración?), a la
             cosecha estimada (mirar los tricomas), al fin del secado y a las tres semanas de curado, y lo
@@ -210,7 +210,7 @@
           </p>
           <label class="spc__check spc__check--hitos">
             <input v-model="configForm.hitos_cultivo" type="checkbox" />
-            <span>Avisar los próximos pasos del ciclo</span>
+            <span>Avisar los próximos pasos del cultivo</span>
           </label>
           <div v-if="configForm.hitos_cultivo" class="spc__field">
             <label class="spc__label">Con cuánta anticipación</label>

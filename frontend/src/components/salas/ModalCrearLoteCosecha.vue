@@ -235,7 +235,7 @@ async function crear() {
           <!-- ── Paso 1: Datos básicos ── -->
           <template v-if="paso === 1">
             <div class="clc__paso-title">
-              <i class="bi bi-seedling"></i> Datos del lote
+              <i class="bi bi-flower1"></i> Datos del lote
             </div>
 
             <!-- Código -->

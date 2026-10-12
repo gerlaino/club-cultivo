@@ -1,5 +1,25 @@
 # Changelog
 
+## Octubre 2026 (fc) — Limpieza de la revisión del admin: íconos, vocabulario y números (12-oct)
+
+- **Íconos**: tres íconos que no existen en Bootstrap Icons 1.13 (`bi-seedling`, `bi-calendar-year`,
+  `bi-bluetooth-fill`) y el «＋» de ancho completo (se veía como un cuadrado vacío en «Comprar»)
+  reemplazados. Emojis usados como íconos fuera de Lotes, Salas, Sedes, Depósito, Stock, ficha de
+  genética y ficha del lote (menú de acciones con `icon`, línea de fases con
+  `ESTADO_META[*].icon`); el «⚡ Acciones» es «Acciones ▾». En toda la app se dejó de dibujar el
+  emoji pegado a un texto que ya lo nombra (`{{ x.emoji }} {{ x.label }}`). `EmptyState` usa
+  `bi-inbox` por defecto. Quedan emojis en pantallas de rol (registro de planta y de sala, tareas,
+  asistente de voz, portal): ~780 líneas en 123 archivos.
+- **Vocabulario**: «ciclo» fuera del texto visible (lote → «cultivo», cama de suelo vivo →
+  «siembra», duraciones → «Duración»; también la notificación «Próximos pasos del cultivo», el
+  Excel de producción y la guía de nutrientes); «club»/«socios» → «organización»/«pacientes» en
+  pantallas, mensajes de error del backend y del Buffet; «onboarding» → «puesta en marcha»;
+  «Setpoints» → «Umbrales ambientales»; placeholders `miclub.org` → `organizacion.org`;
+  «No hay reservas pendientes» (concordancia).
+- **Números**: `formatG(g, decimales)` en lugar de `toFixed(1) + 'g'` («1.234,5 g», no «1234.0g»)
+  en stock, pesajes, manicura, dispensas y ganancia por lote.
+- Contabilidad ya no pide `/bares` sin el Buffet contratado (respondía 403 en cada carga).
+
 ## Octubre 2026 (fb) — Contabilidad, Stock y Equipo según los lienzos aprobados (12-oct)
 
 Germán aprobó los lienzos de la revisión «como admin del club»: «3 me falta una sección con

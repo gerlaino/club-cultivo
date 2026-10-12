@@ -6,7 +6,7 @@
         <button v-for="t in TIPOS" :key="t.value" type="button"
                 class="clf__radio-btn" :class="{ 'clf__radio-btn--sel': f.tipo === t.value }"
                 @click="f.tipo = t.value">
-          {{ t.emoji }} {{ t.label }}
+          {{ t.label }}
         </button>
       </div>
     </div>

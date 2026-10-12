@@ -190,7 +190,7 @@
         <div class="mlot__destino" v-if="faseSiguiente">
           <span class="mlot__destino-de">{{ estadoEmoji(lote.estado) }} {{ estadoLoteLabel(lote) }}</span>
           <i class="bi bi-arrow-right"></i>
-          <span class="mlot__destino-a">{{ faseSiguiente.emoji }} {{ faseSiguiente.label }}</span>
+          <span class="mlot__destino-a">{{ faseSiguiente.label }}</span>
         </div>
         <!-- Cuántas prendieron: sin este número el % de prendimiento da 100% siempre. -->
         <div v-if="lote.estado === 'enraizado'" class="mlot__field">

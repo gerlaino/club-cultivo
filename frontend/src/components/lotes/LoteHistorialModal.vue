@@ -42,7 +42,7 @@
             <div class="lhm__row-body">
               <!-- Edición inline (campos según la categoría de la actividad) -->
               <div v-if="editandoId === rowKey(it)" class="lhm__edit">
-                <div class="lhm__edit-titulo">{{ it.emoji }} {{ it.titulo }}</div>
+                <div class="lhm__edit-titulo">{{ it.titulo }}</div>
 
                 <div v-if="it.categoria === 'fertilizacion'" class="lhm__edit-row">
                   <input v-model="editForm.producto" type="text" class="lhm__edit-input" maxlength="120" placeholder="Producto / fórmula" />
@@ -65,7 +65,7 @@
               <!-- Lectura -->
               <template v-else>
                 <div class="lhm__row-head">
-                  <span class="lhm__row-titulo">{{ it.emoji }} {{ it.titulo }}<span v-if="metaDetalle(it)" class="lhm__row-detalle"> · {{ metaDetalle(it) }}</span></span>
+                  <span class="lhm__row-titulo">{{ it.titulo }}<span v-if="metaDetalle(it)" class="lhm__row-detalle"> · {{ metaDetalle(it) }}</span></span>
                   <div class="lhm__row-right">
                     <span class="lhm__row-fecha">{{ formatDateTime(it.fecha) }}</span>
                     <template v-if="canAdmin">

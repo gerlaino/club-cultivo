@@ -367,7 +367,7 @@ class Dispensacion < ApplicationRecord
 
   def paciente_activo_como_socio
     return unless paciente
-    errors.add(:base, 'El socio no está activo en la organización') unless paciente.es_paciente?
+    errors.add(:base, 'El paciente no está activo en la organización') unless paciente.es_paciente?
 
     # Un paciente cargado en el mostrador todavía no está admitido. Se valida acá y no sólo en
     # la pantalla porque es el punto por el que pasa TODA entrega —el modal, la conversión de
@@ -444,7 +444,7 @@ class Dispensacion < ApplicationRecord
         next
       end
       unless st.club_id == paciente&.club_id || st.sede&.club_id == paciente&.club_id
-        errors.add(:base, 'Una línea usa stock de otro club.')
+        errors.add(:base, 'Una línea usa stock de otra organización.')
         next
       end
       unless st.apto_dispensa?

@@ -275,7 +275,7 @@
         </div>
         <div class="cvd__panel-body">
           <div class="cvd__panel-tipo">
-            <span class="cvd__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.emoji }} {{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
+            <span class="cvd__tipo-pill">{{ TIPO_META[tareaDetalle.tipo]?.label }}</span>
           </div>
           <h4 class="cvd__panel-nombre">{{ tareaDetalle.titulo }}</h4>
           <p v-if="tareaDetalle.descripcion" class="cvd__panel-desc">{{ tareaDetalle.descripcion }}</p>

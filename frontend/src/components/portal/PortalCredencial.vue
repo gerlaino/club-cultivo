@@ -44,7 +44,7 @@
           <p class="pcr__full-club">{{ club?.name }}</p>
 
           <p class="pcr__full-nombre">{{ c.nombre }} {{ c.apellido }}</p>
-          <p class="pcr__full-dni">DNI {{ c.dni }} · Socio N.º {{ c.numero_socio }}</p>
+          <p class="pcr__full-dni">DNI {{ c.dni }} · Paciente N.º {{ c.numero_socio }}</p>
 
           <div class="pcr__full-qr">
             <img v-if="qr" :src="qr" alt="Código del carnet" />

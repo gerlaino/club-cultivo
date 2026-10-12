@@ -46,9 +46,10 @@ export function formatPrecio(n, moneda = 'USD') {
   return moneda === 'USD' ? `US$ ${num}` : new Intl.NumberFormat('es-AR', { style: 'currency', currency: moneda, maximumFractionDigits: 0 }).format(n)
 }
 
-export function formatG(g) {
+// «1.234,5 g»: separador de miles y sin «.0» de más. Nunca `toFixed(1) + 'g'` («1234.0g»).
+export function formatG(g, decimales = 1) {
   if (g == null) return '—'
-  return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
+  return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: decimales })} g`
 }
 
 // conAño=true incluye el año, false solo día y mes

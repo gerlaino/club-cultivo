@@ -35,7 +35,7 @@
             <span v-else class="cp__crest-emoji">🌿</span>
           </div>
           <div class="cp__band-txt">
-            <div class="cp__band-club">{{ data.club?.nombre || 'Club de Cultivo' }}</div>
+            <div class="cp__band-club">{{ data.club?.nombre || 'Organización' }}</div>
             <div class="cp__band-kicker">Carnet de Paciente</div>
           </div>
           <span class="cp__state" :class="`cp__state--${estadoKey}`">

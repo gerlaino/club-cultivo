@@ -1,6 +1,6 @@
 <script setup>
 defineProps({
-  icon:    { type: String, default: '🌿' },
+  icon:    { type: String, default: 'bi-inbox' },
   title:   { type: String, required: true },
   message: { type: String, default: '' },
   compact: { type: Boolean, default: false },

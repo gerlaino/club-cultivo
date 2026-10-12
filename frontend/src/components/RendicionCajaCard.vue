@@ -45,7 +45,7 @@
            anotaron $20.000 tenía que preguntar, y así es como una diferencia chica se convierte
            en una discusión. No es una deuda ni una pérdida: es plata suya que quedó con él. -->
       <p v-if="miSaldo > 0" class="rnd__saldo">
-        Tenés <b>${{ fmt(miSaldo) }}</b> del club de rendiciones anteriores. Se descuenta cuando
+        Tenés <b>${{ fmt(miSaldo) }}</b> de la organización de rendiciones anteriores. Se descuenta cuando
         los entregás.
       </p>
       <div v-if="miPendiente" class="rnd__box rnd__box--espera">

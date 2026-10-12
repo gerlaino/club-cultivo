@@ -33,7 +33,7 @@ module Nutricion
         titulo: 'Vegetativo',
         predomina: 'Nitrógeno (N)',
         detalle: 'El nitrógeno arma hojas y tallos; el fósforo y el potasio acompañan en menor ' \
-                 'medida. Calcio y magnesio hacen falta todo el ciclo (en coco o con agua de ósmosis ' \
+                 'medida. Calcio y magnesio hacen falta en todas las fases (en coco o con agua de ósmosis ' \
                  'suele haber que sumarlos). En los estudios, lo que mejor funcionó en vegetativo ' \
                  'rondó 160–200 mg/L de N, 30 de fósforo y 60 de potasio.',
       },

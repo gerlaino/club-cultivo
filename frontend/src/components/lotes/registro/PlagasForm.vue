@@ -7,7 +7,7 @@
                 class="plf__radio-btn" :class="{ 'plf__radio-btn--sel': f.resultado === r.value }"
                 :style="f.resultado === r.value ? { borderColor: r.color, background: r.color + '18', color: r.color } : {}"
                 @click="f.resultado = r.value">
-          {{ r.emoji }} {{ r.label }}
+          {{ r.label }}
         </button>
       </div>
     </div>

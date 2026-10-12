@@ -194,7 +194,7 @@
         <div class="qr__progreso">
           <div class="qr__progreso-top">
             <span class="qr__progreso-cnt"><strong>{{ progreso.pesadas }}</strong> / {{ progreso.total }} plantas</span>
-            <span class="qr__progreso-total">{{ Number(progreso.peso_total_g || 0).toFixed(1) }}g total</span>
+            <span class="qr__progreso-total">{{ formatG(Number(progreso.peso_total_g || 0), 1) }} total</span>
           </div>
           <div class="qr__progreso-bar">
             <div class="qr__progreso-fill"
@@ -277,6 +277,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../lib/formatters.js'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '../stores/auth'

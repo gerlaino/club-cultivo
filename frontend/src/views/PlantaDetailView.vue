@@ -575,11 +575,11 @@ const enCultivo = computed(() => ['enraizado', 'vegetativo', 'floracion'].includ
 
 const plantaAcciones = computed(() => {
   const items = []
-  if (enCultivo.value) items.push({ emoji: '📋', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
-  items.push({ emoji: '✏️', label: 'Editar planta', onClick: abrirEditarPlanta })
+  if (enCultivo.value) items.push({ icon: 'bi-journal-text', label: 'Registrar planta', onClick: () => { showRegistroPlanta.value = true } })
+  items.push({ icon: 'bi-pencil', label: 'Editar planta', onClick: abrirEditarPlanta })
   items.push({ divider: true })
   if (planta.value?.state !== 'descartada') items.push({ emoji: '🥀', label: 'Descartar (se perdió/murió)', danger: true, onClick: abrirDescartar })
-  items.push({ emoji: '🗑️', label: 'Eliminar (error de carga)', danger: true, onClick: eliminarPlanta })
+  items.push({ icon: 'bi-trash', label: 'Eliminar (error de carga)', danger: true, onClick: eliminarPlanta })
   return items
 })
 
@@ -637,7 +637,7 @@ onMounted(async () => {
               {{ estadoPlantaLabel(planta) }}
             </span>
             <span v-if="planta.estado_salud" class="pd__salud-pill" :style="{ color: sm(planta.estado_salud).color }">
-              {{ sm(planta.estado_salud).emoji }} {{ sm(planta.estado_salud).label }}
+              {{ sm(planta.estado_salud).label }}
             </span>
           </div>
           <div class="pd__hero-meta">
@@ -720,14 +720,14 @@ onMounted(async () => {
           <div class="pd__section">
             <button class="pd__section-toggle" @click="historialExpanded = !historialExpanded">
               <div class="pd__stl">
-                <span class="pd__s-emoji">📜</span>
+                <span class="pd__s-emoji"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
                 <span class="pd__s-title">Historial de la planta</span>
               </div>
               <i class="bi pd__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
             <div v-show="historialExpanded" class="pd__section-body pd__section-body--flush">
               <div v-if="loadingActs" class="pd__placeholder">Cargando historial…</div>
-              <EmptyState v-else-if="activities.length === 0" icon="📋" title="Sin registros todavía" compact>
+              <EmptyState v-else-if="activities.length === 0" icon="bi-journal-text" title="Sin registros todavía" compact>
                 <template v-if="auth.user?.role !== 'manicura'" #actions>
                   <button class="pd__btn-outline" @click="abrirModal">Hacer primer registro</button>
                 </template>
@@ -750,18 +750,18 @@ onMounted(async () => {
                     <div class="pd__act-head">
                       <template v-if="a.activity_type === 'registro_planta'">
                         <div class="pd__act-titulo">
-                          🌱 Registro de planta
+                          <i class="bi bi-flower2" aria-hidden="true"></i> Registro de planta
                           <span v-if="a.metadata?.estado_salud" :style="{ color: sm(a.metadata.estado_salud).color }">
-                            · {{ sm(a.metadata.estado_salud).emoji }} {{ sm(a.metadata.estado_salud).label }}
+                            · {{ sm(a.metadata.estado_salud).label }}
                           </span>
                           <span v-if="a.metadata?.plagas && a.metadata.plagas !== 'ninguna'"
                                 :style="{ color: pgm(a.metadata.plagas).color }">
-                            · {{ pgm(a.metadata.plagas).emoji }} {{ pgm(a.metadata.plagas).label }}
+                            · {{ pgm(a.metadata.plagas).label }}
                           </span>
                         </div>
                         <div class="pd__act-metricas">
                           <div v-if="a.metadata?.altura_cm"   class="pd__metrica"><span>📏</span><span>{{ a.metadata.altura_cm }} cm</span></div>
-                          <div v-if="a.metadata?.num_colas"   class="pd__metrica"><span>🌿</span><span>{{ a.metadata.num_colas }} copas</span></div>
+                          <div v-if="a.metadata?.num_colas"   class="pd__metrica"><span><i class="bi bi-flower3" aria-hidden="true"></i></span><span>{{ a.metadata.num_colas }} copas</span></div>
                           <div v-if="a.metadata?.color_hojas" class="pd__metrica">
                             <span>{{ chm(a.metadata.color_hojas).emoji }}</span>
                             <span>{{ chm(a.metadata.color_hojas).label }}</span>
@@ -779,13 +779,13 @@ onMounted(async () => {
                         </div>
                         <div class="pd__act-metricas">
                           <div v-if="a.metadata?.ec"                   class="pd__metrica pd__metrica--sensor"><span>⚡</span><span>EC {{ a.metadata.ec }} mS/cm</span></div>
-                          <div v-if="a.metadata?.ph"                   class="pd__metrica pd__metrica--sensor"><span>🧪</span><span>pH {{ a.metadata.ph }}</span></div>
-                          <div v-if="a.metadata?.temperatura_sustrato" class="pd__metrica pd__metrica--sensor"><span>🌡️</span><span>{{ a.metadata.temperatura_sustrato }}°C sustrato</span></div>
+                          <div v-if="a.metadata?.ph"                   class="pd__metrica pd__metrica--sensor"><span><i class="bi bi-eyedropper" aria-hidden="true"></i></span><span>pH {{ a.metadata.ph }}</span></div>
+                          <div v-if="a.metadata?.temperatura_sustrato" class="pd__metrica pd__metrica--sensor"><span><i class="bi bi-thermometer-half" aria-hidden="true"></i></span><span>{{ a.metadata.temperatura_sustrato }}°C sustrato</span></div>
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
                       <template v-else-if="a.activity_type === 'transplant'">
-                        <div class="pd__act-titulo">🪴 Trasplante de maceta</div>
+                        <div class="pd__act-titulo"><i class="bi bi-flower2" aria-hidden="true"></i> Trasplante de maceta</div>
                         <div class="pd__act-metricas">
                           <div v-if="a.metadata?.maceta_origen_l" class="pd__metrica pd__metrica--trasplante">
                             <span>{{ a.metadata.maceta_origen_l }}L</span>
@@ -800,37 +800,37 @@ onMounted(async () => {
                       </template>
                       <template v-else-if="a.activity_type === 'registro_ambiental_lote'">
                         <div class="pd__act-titulo">
-                          🌿 {{ esPersonal ? 'Registro del espacio' : 'Registro del lote' }}
+                          <i class="bi bi-flower3" aria-hidden="true"></i> {{ esPersonal ? 'Registro del espacio' : 'Registro del lote' }}
                           <span class="pd__heredado-badge">{{ esPersonal ? 'para todas' : 'heredado' }}</span>
                         </div>
                         <div v-if="a.metadata?.tareas_realizadas?.length" class="pd__act-tareas">
                           <span v-for="t in a.metadata.tareas_realizadas" :key="t" class="pd__tarea-chip">
-                            {{ tm(t).emoji }} {{ tm(t).label }}
+                            {{ tm(t).label }}
                           </span>
                         </div>
                         <div class="pd__act-metricas">
-                          <div v-if="a.metadata?.temperatura" class="pd__metrica"><span>🌡️</span><span>{{ a.metadata.temperatura }}°C</span></div>
-                          <div v-if="a.metadata?.humedad"     class="pd__metrica"><span>💧</span><span>{{ a.metadata.humedad }}%</span></div>
-                          <div v-if="a.metadata?.ph"          class="pd__metrica"><span>🧪</span><span>pH {{ a.metadata.ph }}</span></div>
+                          <div v-if="a.metadata?.temperatura" class="pd__metrica"><span><i class="bi bi-thermometer-half" aria-hidden="true"></i></span><span>{{ a.metadata.temperatura }}°C</span></div>
+                          <div v-if="a.metadata?.humedad"     class="pd__metrica"><span><i class="bi bi-droplet" aria-hidden="true"></i></span><span>{{ a.metadata.humedad }}%</span></div>
+                          <div v-if="a.metadata?.ph"          class="pd__metrica"><span><i class="bi bi-eyedropper" aria-hidden="true"></i></span><span>pH {{ a.metadata.ph }}</span></div>
                           <div v-if="a.metadata?.ec"          class="pd__metrica"><span>⚡</span><span>EC {{ a.metadata.ec }}</span></div>
                           <div v-if="a.metadata?.co2"         class="pd__metrica"><span>💨</span><span>{{ a.metadata.co2 }} ppm</span></div>
                           <!-- Riego por planta: lo que recibió ESTA planta. -->
-                          <div v-if="a.metadata?.riego_planta" class="pd__metrica"><span>💧</span><span>{{ a.metadata.riego_planta.texto }}</span></div>
+                          <div v-if="a.metadata?.riego_planta" class="pd__metrica"><span><i class="bi bi-droplet" aria-hidden="true"></i></span><span>{{ a.metadata.riego_planta.texto }}</span></div>
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
 
                       <template v-else-if="a.activity_type === 'lote_fase'">
-                        <div class="pd__act-titulo">🔄 {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'cambio de fase' : 'fase del lote' }}</span></div>
+                        <div class="pd__act-titulo"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'cambio de fase' : 'fase del lote' }}</span></div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_actividad'">
                         <div class="pd__act-titulo">{{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'para todas' : 'heredado' }}</span></div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_alerta'">
-                        <div class="pd__act-titulo">⚠️ {{ a.description }}</div>
+                        <div class="pd__act-titulo"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> {{ a.description }}</div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_nota'">
-                        <div class="pd__act-titulo">📝 {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'nota' : 'nota del lote' }}</span></div>
+                        <div class="pd__act-titulo"><i class="bi bi-pencil-square" aria-hidden="true"></i> {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'nota' : 'nota del lote' }}</span></div>
                       </template>
 
                       <template v-else>
@@ -851,7 +851,7 @@ onMounted(async () => {
           <div class="pd__section pd__section--mt">
             <button class="pd__section-toggle" @click="toggleFotos">
               <div class="pd__stl">
-                <span class="pd__s-emoji">📷</span>
+                <span class="pd__s-emoji"><i class="bi bi-camera" aria-hidden="true"></i></span>
                 <span class="pd__s-title">Fotos de la planta</span>
                 <span v-if="fotos.length > 0" class="pd__pill">{{ fotos.length }}</span>
               </div>
@@ -865,7 +865,7 @@ onMounted(async () => {
             </button>
             <input ref="fotoInput" type="file" accept="image/*" style="display:none" @change="handleFotoUpload" />
             <div v-show="fotosExpanded" class="pd__section-body">
-              <EmptyState v-if="fotos.length === 0" icon="📷" title="Sin fotos todavía" compact>
+              <EmptyState v-if="fotos.length === 0" icon="bi-camera" title="Sin fotos todavía" compact>
                 <template v-if="auth.user?.role !== 'manicura'" #actions>
                   <button class="pd__btn-outline" @click="fotoInput?.click()"><i class="bi bi-camera-fill"></i> Subir primera foto</button>
                 </template>
@@ -893,7 +893,7 @@ onMounted(async () => {
 
           <!-- Datos técnicos -->
           <div class="pd__card">
-            <div class="pd__card-header"><span class="pd__card-title">⚙️ Datos técnicos</span></div>
+            <div class="pd__card-header"><span class="pd__card-title"><i class="bi bi-gear" aria-hidden="true"></i> Datos técnicos</span></div>
             <dl class="pd__dl">
               <dt>Fecha creación</dt><dd>{{ formatDate(planta.created_at) }}</dd>
               <dt>Genética</dt><dd>{{ planta.genetica?.nombre || '—' }}</dd>
@@ -906,7 +906,7 @@ onMounted(async () => {
 
           <!-- Estado actual -->
           <div class="pd__card pd__card--mt" v-if="ultimoRegistro">
-            <div class="pd__card-header"><span class="pd__card-title">📊 Último estado</span></div>
+            <div class="pd__card-header"><span class="pd__card-title"><i class="bi bi-bar-chart" aria-hidden="true"></i> Último estado</span></div>
             <div class="pd__estado-card">
               <div class="pd__estado-row">
                 <span class="pd__estado-label">Salud</span>
@@ -917,12 +917,12 @@ onMounted(async () => {
               </div>
               <div class="pd__estado-row">
                 <span class="pd__estado-label">Hojas</span>
-                <span>{{ chm(ultimoRegistro.metadata?.color_hojas).emoji }} {{ chm(ultimoRegistro.metadata?.color_hojas).label }}</span>
+                <span>{{ chm(ultimoRegistro.metadata?.color_hojas).label }}</span>
               </div>
               <div class="pd__estado-row">
                 <span class="pd__estado-label">Plagas</span>
                 <span :style="{ color: pgm(ultimoRegistro.metadata?.plagas).color }">
-                  {{ pgm(ultimoRegistro.metadata?.plagas).emoji }} {{ pgm(ultimoRegistro.metadata?.plagas).label }}
+                  {{ pgm(ultimoRegistro.metadata?.plagas).label }}
                 </span>
               </div>
               <div v-if="ultimoRegistro.metadata?.deficiencias" class="pd__estado-row">
@@ -982,7 +982,7 @@ onMounted(async () => {
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
-              <h3 class="pd__modal-title">🌱 Registrar planta</h3>
+              <h3 class="pd__modal-title"><i class="bi bi-flower2" aria-hidden="true"></i> Registrar planta</h3>
               <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }} · hoy {{ new Date().toLocaleDateString('es-AR') }}</p>
             </div>
             <button class="pd__modal-close" @click="showModal = false"><i class="bi bi-x-lg"></i></button>
@@ -999,7 +999,7 @@ onMounted(async () => {
                         :class="{ 'pd__sel-btn--active': form.estado_salud === key }"
                         :style="form.estado_salud===key ? { borderColor:meta.color, background:meta.color+'15', color:meta.color } : {}"
                         @click="form.estado_salud = key">
-                  {{ meta.emoji }} {{ meta.label }}
+                  {{ meta.label }}
                 </button>
               </div>
             </div>
@@ -1029,7 +1029,7 @@ onMounted(async () => {
                         :class="{ 'pd__sel-btn--active': form.color_hojas === key }"
                         :style="form.color_hojas===key ? { borderColor:'#1b5e20', background:'#e8f5e9', color:'#1b5e20' } : {}"
                         @click="form.color_hojas = key">
-                  {{ meta.emoji }} {{ meta.label }}
+                  {{ meta.label }}
                   <span class="pd__sel-hint">{{ meta.hint }}</span>
                 </button>
               </div>
@@ -1044,7 +1044,7 @@ onMounted(async () => {
                         :class="{ 'pd__sel-btn--active': form.plagas === key }"
                         :style="form.plagas===key ? { borderColor:meta.color, background:meta.color+'15', color:meta.color } : {}"
                         @click="form.plagas = key">
-                  {{ meta.emoji }} {{ meta.label }}
+                  {{ meta.label }}
                 </button>
               </div>
             </div>
@@ -1115,7 +1115,7 @@ onMounted(async () => {
                     {{ ble.conectando.value ? 'Buscando…' : 'Conectar' }}
                   </button>
                   <button v-else class="pd__ble-btn pd__ble-btn--off" @click="ble.desconectar()">
-                    <i class="bi bi-bluetooth-fill"></i> Desconectar
+                    <i class="bi bi-bluetooth"></i> Desconectar
                   </button>
                 </div>
               </div>
@@ -1194,7 +1194,7 @@ onMounted(async () => {
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
-              <h3 class="pd__modal-title">🪴 Registrar trasplante</h3>
+              <h3 class="pd__modal-title"><i class="bi bi-flower2" aria-hidden="true"></i> Registrar trasplante</h3>
               <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
             </div>
             <button class="pd__modal-close" @click="showTrasplanteModal = false"><i class="bi bi-x-lg"></i></button>
@@ -1254,7 +1254,7 @@ onMounted(async () => {
         <div class="pd__modal pd__modal--foto">
           <div class="pd__modal-header">
             <div>
-              <h3 class="pd__modal-title">📷 Subir foto</h3>
+              <h3 class="pd__modal-title"><i class="bi bi-camera" aria-hidden="true"></i> Subir foto</h3>
               <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
             </div>
             <button class="pd__modal-close" @click="cancelarSubidaFoto"><i class="bi bi-x-lg"></i></button>
@@ -1317,7 +1317,7 @@ onMounted(async () => {
         <div class="pd__modal" style="max-width:440px">
           <div class="pd__modal-header">
             <div>
-              <h3 class="pd__modal-title">✏️ Editar planta</h3>
+              <h3 class="pd__modal-title"><i class="bi bi-pencil" aria-hidden="true"></i> Editar planta</h3>
               <p class="pd__modal-sub">{{ planta?.nombre || planta?.codigo_qr }}</p>
             </div>
             <button class="pd__modal-close" @click="showEditarPlanta = false"><i class="bi bi-x-lg"></i></button>

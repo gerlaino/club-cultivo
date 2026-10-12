@@ -55,7 +55,7 @@ export const FLOWS = {
     key: 'compra',
     icono: 'bi-cart3',
     titulo: 'Compré algo',
-    resumen: 'Insumos, mercadería, algo que entra al club',
+    resumen: 'Insumos, mercadería, algo que entra a la organización',
     tipo: 'egreso',
     // Con qué se clasifica el movimiento si no se elige categoría del catálogo (la columna
     // legacy `categoria` es NOT NULL y sólo acepta `MovimientoContable::CATEGORIAS`).

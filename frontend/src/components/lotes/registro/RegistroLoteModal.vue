@@ -23,7 +23,7 @@
         <!-- Barra "ya registraste hoy" -->
         <div v-if="registrosHoy.length" class="rls__today-bar">
           Hoy ya registraste:
-          <span v-for="r in registrosHoy" :key="r" class="rls__today-chip">{{ getAccion(r)?.emoji }} {{ getAccion(r)?.label }}</span>
+          <span v-for="r in registrosHoy" :key="r" class="rls__today-chip">{{ getAccion(r)?.label }}</span>
         </div>
 
         <!-- Body -->
@@ -63,7 +63,7 @@
                         :class="{ 'rls__radio-btn--sel': formData.estado_general === key }"
                         :style="formData.estado_general === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.estado_general = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
 
@@ -75,7 +75,7 @@
                         :class="{ 'rls__radio-btn--sel': formData.plagas_observadas === key }"
                         :style="formData.plagas_observadas === key ? { borderColor: meta.color, background: meta.color + '18', color: meta.color } : {}"
                         @click="formData.plagas_observadas = key">
-                  {{ meta.emoji }} {{ key }}
+                  {{ key }}
                 </button>
               </div>
             </div>
@@ -88,7 +88,7 @@
 
               <div v-for="accionId in seleccionadas" :key="accionId" class="rls__seccion">
                 <div class="rls__seccion-header">
-                  <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
+                  <span>{{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
                   <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" :lote-id="lote?.id"

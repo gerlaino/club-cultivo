@@ -22,7 +22,7 @@ export function textoCambioDeFase (data) {
   if (deshace) {
     const t = Number(data.tareas_a_cancelar) || 0
     cola = [
-      'Se borra su paso a floración (esos días no cuentan en el ciclo)' +
+      'Se borra su paso a floración (esos días no cuentan como floración)' +
         (t ? ` y se cancela${t === 1 ? '' : 'n'} ${t} tarea${t === 1 ? '' : 's'} de floración pendiente${t === 1 ? '' : 's'}.` : '.'),
       'Las fotos, notas y riegos de esos días quedan.',
     ]

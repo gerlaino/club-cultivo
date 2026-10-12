@@ -1,4 +1,5 @@
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
@@ -182,7 +183,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
         <div class="dv__header-title"><i class="bi bi-capsule"></i> Dispensaciones</div>
         <div class="dv__header-sub">
           Entregas regulatorias al paciente
-          <span v-if="meta.total"> · <strong>{{ (meta.gramos_totales ?? 0).toFixed(1) }}g</strong> en {{ meta.total }} dispensa{{ meta.total === 1 ? '' : 's' }}</span>
+          <span v-if="meta.total"> · <strong>{{ formatG((meta.gramos_totales ?? 0), 1) }}</strong> en {{ meta.total }} dispensa{{ meta.total === 1 ? '' : 's' }}</span>
         </div>
       </div>
       <div class="dv__header-actions">

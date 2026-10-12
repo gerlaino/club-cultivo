@@ -266,12 +266,12 @@ it('no se muestra si no hay nada que hacer', async () => {
 // Cuando rinde $100.000 y sobre la mesa aparecen $80.000, los $20.000 quedan a su nombre — y el
 // repartidor no lo veía en ningún lado: si le anotaron una diferencia, tenía que preguntar. Así
 // es como algo chico se convierte en una discusión.
-describe('Lo que el repartidor tiene del club', () => {
+describe('Lo que el repartidor tiene de la organización', () => {
   it('se lo dice, sin que tenga que preguntar', async () => {
     miSaldo = 20000
     const w = await montar('delivery')
 
-    expect(w.text()).toContain('Tenés $20.000 del club')
+    expect(w.text()).toContain('Tenés $20.000 de la organización')
     // No es una deuda ni una pérdida: es plata suya que quedó con él.
     expect(w.text()).not.toMatch(/debé|deuda|debe/i)
   })

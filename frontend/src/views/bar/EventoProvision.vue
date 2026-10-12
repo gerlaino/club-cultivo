@@ -418,7 +418,7 @@ async function confirmarCierre(finalizar) {
         </p>
         <p class="pv__rec-nota">
           El sobrante vuelve a su depósito. Lo consumido sin vender es <b>costo del evento</b>; lo dispensado a
-          socios ya tiene su costo y su ingreso en la dispensación, con su trazabilidad.
+          pacientes ya tiene su costo y su ingreso en la dispensación, con su trazabilidad.
         </p>
         <div class="modal__actions">
           <button class="btn" @click="cierreForm = null">Cancelar</button>

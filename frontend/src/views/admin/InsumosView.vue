@@ -378,7 +378,7 @@ async function eliminarInsumo(i) {
 // ── Transferir a otro depósito (reclasificación de stock, sin egreso) ─────────
 // Destinos válidos: cualquier otro depósito de insumos (no flor/salón, familia 'mercaderia').
 const depositosDestino = computed(() => depositos.value.filter(d => d.id !== depositoActivo.value?.id && d.familia !== 'mercaderia' && d.activo))
-const depLabel = (d) => d.sede_nombre ? `${d.nombre} · 📍 ${d.sede_nombre}` : d.nombre
+const depLabel = (d) => d.sede_nombre ? `${d.nombre} · ${d.sede_nombre}` : d.nombre
 const transferForm = ref(null)
 function abrirTransfer(i) { cerrarMenu(); transferForm.value = { insumo: i, deposito_destino_id: depositosDestino.value[0]?.id ?? null, cantidad: null } }
 async function confirmarTransfer() {
@@ -431,13 +431,13 @@ async function revertirCompra(compra) {
       </div>
       <div class="dp__head-right">
         <select v-if="multiSede" v-model="sedeFiltro" class="dp__sede-filtro">
-          <option :value="null">🏢 Toda la organización</option>
+          <option :value="null"><i class="bi bi-building" aria-hidden="true"></i> Toda la organización</option>
           <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
              Acá solo se gestiona lo que ya existe (reponer/editar/merma/eliminar). -->
-        <RouterLink to="/recetas" class="btn" title="Recetas de nutrientes: se arman con lo del depósito y se aplican al regar">📋 Recetas</RouterLink>
-        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 'compra', deposito: depositoActivo?.id } }" class="btn btn--primary" title="Registrar la compra: el gasto y la entrada al depósito en un paso">＋ Comprar</RouterLink>
+        <RouterLink to="/recetas" class="btn" title="Recetas de nutrientes: se arman con lo del depósito y se aplican al regar"><i class="bi bi-journal-text" aria-hidden="true"></i> Recetas</RouterLink>
+        <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 'compra', deposito: depositoActivo?.id } }" class="btn btn--primary" title="Registrar la compra: el gasto y la entrada al depósito en un paso"><i class="bi bi-plus-lg" aria-hidden="true"></i> Comprar</RouterLink>
       </div>
     </header>
 
@@ -445,13 +445,13 @@ async function revertirCompra(compra) {
       <button v-for="d in TABS" :key="d.id" class="dp__tab" :class="{ 'is-on': depositoActivo?.id === d.id }" @click="depositoActivoId = d.id">
         {{ tabLabel(d) }}
       </button>
-      <button v-if="depositoActivo && !esSoloLectura && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito">⚙</button>
-      <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
+      <button v-if="depositoActivo && !esSoloLectura && !depositoActivo.es_sistema" class="dp__tab dp__tab--add" title="Gestionar este depósito" @click="abrirEditarDeposito" aria-label="Gestionar este depósito"><i class="bi bi-gear" aria-hidden="true"></i></button>
+      <button class="dp__tab dp__tab--add" title="Crear un depósito" aria-label="Crear un depósito" @click="abrirNuevoDeposito"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
     </div>
 
     <!-- Sector a la que pertenece este depósito (a dónde va su plata en el P&L) -->
     <p v-if="depositoActivo && !esSoloLectura" class="dp__area-line">
-      <span class="dp__area-chip">🏷️ Sector: {{ depositoActivo.area_nombre || 'sin sector' }}</span>
+      <span class="dp__area-chip"><i class="bi bi-tag" aria-hidden="true"></i> Sector: {{ depositoActivo.area_nombre || 'sin sector' }}</span>
     </p>
 
     <!-- Resumen en vivo del depósito activo -->
@@ -602,7 +602,7 @@ async function revertirCompra(compra) {
         </div>
         <label v-if="multiSede" class="fld">Sede
           <select v-model="entradaForm.sede_id" class="inp">
-            <option :value="null">🏢 Pool de la organización</option>
+            <option :value="null"><i class="bi bi-building" aria-hidden="true"></i> Pool de la organización</option>
             <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
           </select>
         </label>
@@ -734,7 +734,7 @@ async function revertirCompra(compra) {
               </label>
               <span v-if="!lotes.length" class="mut" style="font-size:.8rem">Sin lotes activos.</span>
             </div>
-            <p v-if="porLote" class="dp__reparto">{{ porLote.toFixed(2) }} {{ consumoForm.insumo.unidad_medida }} a cada uno de los {{ consumoForm.lote_ids.length }} lotes.</p>
+            <p v-if="porLote" class="dp__reparto">{{ porLote.toLocaleString('es-AR', { maximumFractionDigits: 2 }) }} {{ consumoForm.insumo.unidad_medida }} a cada uno de los {{ consumoForm.lote_ids.length }} lotes.</p>
           </div>
 
           <label class="fld">Sala (opcional)
@@ -752,7 +752,7 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
-        <label class="fld">Sector <small class="mut">(a qué parte del club se le carga el costo)</small>
+        <label class="fld">Sector <small class="mut">(a qué parte de la organización se le carga el costo)</small>
           <select v-model="depoForm.unidad_negocio_id" class="inp">
             <option :value="null">— Sin sector —</option>
             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>

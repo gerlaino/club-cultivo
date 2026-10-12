@@ -1,4 +1,5 @@
 <script setup>
+import { formatG } from '../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listSedes, createSede, updateSede, deleteSede,
@@ -479,28 +480,28 @@ function tieneActividad(sede) {
       <template v-if="!loading">
       <div class="kpi-grid">
         <div class="kpi-card">
-          <div class="kpi-card__icon" style="background:rgba(15,23,42,.06)">🏢</div>
+          <div class="kpi-card__icon" style="background:rgba(15,23,42,.06)"><i class="bi bi-building" aria-hidden="true"></i></div>
           <div class="kpi-card__body">
             <div class="kpi-card__value">{{ kpis.total }}</div>
             <div class="kpi-card__label">Total sedes</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card__icon" style="background:rgba(22,163,74,.1)">🌱</div>
+          <div class="kpi-card__icon" style="background:rgba(22,163,74,.1)"><i class="bi bi-flower2" aria-hidden="true"></i></div>
           <div class="kpi-card__body">
             <div class="kpi-card__value" style="color:#16a34a">{{ kpis.produccion }}</div>
             <div class="kpi-card__label">Con producción</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card__icon" style="background:rgba(37,99,235,.1)">🏪</div>
+          <div class="kpi-card__icon" style="background:rgba(37,99,235,.1)"><i class="bi bi-shop" aria-hidden="true"></i></div>
           <div class="kpi-card__body">
             <div class="kpi-card__value" style="color:#2563eb">{{ kpis.social }}</div>
             <div class="kpi-card__label">Dispensarios</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card__icon" style="background:rgba(234,179,8,.1)">✅</div>
+          <div class="kpi-card__icon" style="background:rgba(234,179,8,.1)"><i class="bi bi-check2-circle" aria-hidden="true"></i></div>
           <div class="kpi-card__body">
             <div class="kpi-card__value" style="color:#ca8a04">{{ kpis.reprocann }}</div>
             <div class="kpi-card__label">REPROCANN</div>
@@ -516,7 +517,7 @@ function tieneActividad(sede) {
 
       <!-- Empty -->
       <div v-else-if="!sedes.length" class="empty-state">
-        <div class="empty-state__icon">🏢</div>
+        <div class="empty-state__icon"><i class="bi bi-building" aria-hidden="true"></i></div>
         <h3 class="empty-state__title">Sin sedes registradas</h3>
         <p class="empty-state__desc">Registrá la primera sede de la organización para comenzar a organizar la producción.</p>
         <button v-if="canEdit" class="btn-primary-action" @click="openCreate">
@@ -560,7 +561,7 @@ function tieneActividad(sede) {
                 <div class="sede-card__stat-sep"></div>
                 <div class="sede-card__stat sede-card__stat--stock">
                   <span class="sede-card__stat-value" style="color:#15803d">
-                    {{ stockResumen(sede.id).totalG.toFixed(1) }}g
+                    {{ formatG(stockResumen(sede.id).totalG, 1) }}
                   </span>
                   <span class="sede-card__stat-label">en stock</span>
                 </div>
@@ -678,7 +679,7 @@ function tieneActividad(sede) {
           <div class="modal-panel__body">
             <div v-if="loadingInv" class="loading-state"><DsSpinner :size="40" /></div>
             <div v-else-if="!inventarioData.length" class="empty-state empty-state--sm">
-              <div class="empty-state__icon">📦</div>
+              <div class="empty-state__icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
               <p class="empty-state__desc">Sin stock en esta sede</p>
             </div>
             <div v-else class="inv-grid">
@@ -715,7 +716,7 @@ function tieneActividad(sede) {
         <div class="modal-panel modal-panel--sm modal-panel--center">
           <button class="modal-panel__close modal-panel__close--abs" @click="showUpgrade=false"><i class="bi bi-x-lg"></i></button>
           <div class="upgrade-body">
-            <div class="upgrade-icon">🚀</div>
+            <div class="upgrade-icon"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></div>
             <h3 class="upgrade-title">Límite del plan alcanzado</h3>
             <p class="upgrade-desc">Tu plan <strong>{{ planLabel }}</strong> permite <strong>{{ limites?.sedes }} sede{{ limites?.sedes !== 1 ? 's' : '' }}</strong>. Contactá al equipo para actualizar.</p>
             <a href="mailto:hola@cultivoespacial.com" class="btn-primary-action"><i class="bi bi-envelope me-1"></i>Contactar</a>

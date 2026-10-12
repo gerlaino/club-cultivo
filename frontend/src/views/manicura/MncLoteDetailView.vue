@@ -163,7 +163,7 @@
         <div v-if="pesajeBorrador" class="mnl__jornada">
           <div class="mnl__jornada-info">
             <span class="mnl__jornada-lbl">Jornada en curso</span>
-            <span class="mnl__jornada-kpi">{{ pesajeBorrador.plantas_registradas || 0 }} {{ pesajeBorrador.plantas_registradas === 1 ? 'planta' : 'plantas' }} · {{ (pesajeBorrador.peso_calculado_g || 0).toFixed(1) }}g</span>
+            <span class="mnl__jornada-kpi">{{ pesajeBorrador.plantas_registradas || 0 }} {{ pesajeBorrador.plantas_registradas === 1 ? 'planta' : 'plantas' }} · {{ formatG((pesajeBorrador.peso_calculado_g || 0), 1) }}</span>
           </div>
           <div class="mnl__jornada-acts">
             <button class="mnl__pj-del" :disabled="borrando === pesajeBorrador.id" title="Descartar jornada" @click="borrarPesaje(pesajeBorrador)">
@@ -186,7 +186,7 @@
         <div v-if="pesajesHistorial.length" class="mnl__hist">
           <div v-for="p in pesajesHistorial" :key="p.id" class="mnl__hist-row">
             <span class="mnl__hist-date">{{ fmtDate(p.fecha_pesaje) }}</span>
-            <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} {{ (p.plantas_count || p.plantas_registradas) === 1 ? 'planta' : 'plantas' }} · {{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
+            <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} {{ (p.plantas_count || p.plantas_registradas) === 1 ? 'planta' : 'plantas' }} · {{ formatG((p.peso_total_g || p.peso_calculado_g || 0), 1) }}</span>
             <span class="mnl__badge" :class="badgeClass(p.estado)">{{ pesajeEstadoLabel(p.estado) }}</span>
             <button v-if="p.estado === 'enviado'" class="mnl__hist-act" :disabled="reabriendo === p.id" title="Reabrir para corregir" @click="reabrirPesaje(p)">
               <Undo2 :size="13" />
@@ -251,7 +251,7 @@
                   <button v-for="s in contenedores" :key="s.id" type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === s.id }" @click="adminForm.stock_id = s.id">
                     <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === s.id" class="mnl-cont__dot" /></span>
                     <Package :size="15" :stroke-width="2" />
-                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ (s.cantidad || 0).toFixed(0) }}g · {{ s.sede?.nombre || 'Sin asignar' }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
+                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ formatG((s.cantidad || 0), 0) }} · {{ s.sede?.nombre || 'Sin asignar' }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
                   </button>
                 </div>
                 <button v-if="!repartirDirecto && !loadingDirecto" type="button" class="mnl-link" @click="empezarRepartoDirecto">Repartir en varios frascos (copones, bajos…)</button>
@@ -369,6 +369,7 @@
 </template>
 
 <script setup>
+import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'

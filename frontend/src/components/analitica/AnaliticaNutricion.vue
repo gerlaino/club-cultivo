@@ -9,11 +9,11 @@
           <button type="button" class="anu__quitar" :aria-label="`Quitar ${l.codigo}`" @click="quitar(l.id)"><i class="bi bi-x"></i></button>
         </span>
         <select v-if="ids.length < MAXIMO" class="anu__agregar" value="" aria-label="Agregar un lote" @change="agregar($event.target.value); $event.target.value = ''">
-          <option value="" disabled>{{ disponibles.length ? '＋ Agregar un lote…' : 'No hay más lotes con riegos o fertilizaciones' }}</option>
+          <option value="" disabled>{{ disponibles.length ? '+ Agregar un lote…' : 'No hay más lotes con riegos o fertilizaciones' }}</option>
           <option v-for="l in disponibles" :key="l.id" :value="l.id">{{ l.codigo }} · {{ l.genetica || 'sin genética' }} · {{ l.estado_label }}</option>
         </select>
         <button v-if="mismaGenetica.length" type="button" class="anu__link" @click="sumarMismaGenetica">
-          ＋ los de la misma genética ({{ mismaGenetica.length }})
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> Los de la misma genética ({{ mismaGenetica.length }})
         </button>
       </div>
       <p class="anu__hint">De 2 a {{ MAXIMO }} lotes con riegos o fertilizaciones registrados. Uno en curso entra igual, sin rendimiento.</p>

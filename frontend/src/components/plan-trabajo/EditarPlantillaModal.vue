@@ -212,7 +212,7 @@ async function guardar() {
               <button v-if="!tareasVisibles.length" type="button" class="ep__tareas-empty" @click="abrirNuevaTarea">
                 <i class="bi bi-list-task ep__empty-ico"></i>
                 <span><span class="ep__empty-msg">Todavía no tiene tareas</span><br>
-                <span class="ep__empty-sub">Agregá la primera: qué, qué día del ciclo, y si se repite.</span></span>
+                <span class="ep__empty-sub">Agregá la primera: qué, qué día del cultivo, y si se repite.</span></span>
               </button>
 
               <div v-for="g in porSemana" :key="g.semana" class="ep__semana">

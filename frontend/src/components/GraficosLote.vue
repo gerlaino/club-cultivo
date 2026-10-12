@@ -22,7 +22,7 @@
     </div>
 
     <div v-else-if="!datos.length" class="gl__empty">
-      <span>📊</span>
+      <i class="bi bi-bar-chart" aria-hidden="true"></i>
       <p>Sin registros ambientales aún</p>
     </div>
 

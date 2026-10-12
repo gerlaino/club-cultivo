@@ -6,7 +6,7 @@
 // cuenta el informe de Pérdidas y deja la trazabilidad con gramos que desaparecieron sin
 // explicación, que para un auditor es peor que una pérdida declarada.
 export const MOTIVOS_FINALIZACION = [
-  { value: 'entregado',   label: 'Entregado a otra organización', ayuda: 'Salió entero: lo tiene otro club o dispensario.' },
+  { value: 'entregado',   label: 'Entregado a otra organización', ayuda: 'Salió entero: lo tiene otra organización o dispensario.' },
   { value: 'vendido',     label: 'Vendido',                       ayuda: 'Salida por venta a un tercero.' },
   { value: 'regalado',    label: 'Regalado',                      ayuda: 'Salió sin cobrar y sin paciente identificado.' },
   { value: 'uso_interno', label: 'Uso interno',                   ayuda: 'Consumido por la organización (muestras, pruebas).' },

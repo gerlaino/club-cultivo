@@ -27,14 +27,14 @@ describe('Volver a vegetativo', () => {
 
   it('dice qué se borra y qué queda', () => {
     const m = textoCambioDeFase(VUELTA).message
-    expect(m).toContain('Se borra su paso a floración (esos días no cuentan en el ciclo) y se cancelan 4 tareas de floración pendientes.')
+    expect(m).toContain('Se borra su paso a floración (esos días no cuentan como floración) y se cancelan 4 tareas de floración pendientes.')
     expect(m).toContain('Las fotos, notas y riegos de esos días quedan.')
     expect(m).not.toMatch(/toda la información/i)
   })
 
   it('sin tareas pendientes no las menciona', () => {
     const m = textoCambioDeFase({ ...VUELTA, tareas_a_cancelar: 0 }).message
-    expect(m).toContain('Se borra su paso a floración (esos días no cuentan en el ciclo).')
+    expect(m).toContain('Se borra su paso a floración (esos días no cuentan como floración).')
     expect(m).not.toContain('tarea')
   })
 
