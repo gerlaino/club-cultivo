@@ -625,6 +625,9 @@ export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}
 export const getEvolucionMostrador = (sedeId, params = {}) =>
   api.get(`/sedes/${sedeId}/mostrador/evolucion`, { params })
 export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
+// El panel de conducción: el inicio del administrador (`Panel::Conduccion`, 12-oct-2026).
+export const getPanelConduccion = (params = {}) => api.get('/panel_conduccion', { params })
+export const getDetalleCierrePanel = (id) => api.get(`/panel_conduccion/cierres/${id}`)
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 // LA LLAVE DEL CANDADO: marcar visto congela la corrección del cierre, así que se tiene que
 // poder reabrir para revisión — con rastro de quién y cuándo.

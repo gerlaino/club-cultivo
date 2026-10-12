@@ -1,5 +1,37 @@
 # Changelog
 
+## Octubre 2026 (ez) — El inicio del administrador es un panel de conducción (12-oct)
+
+Germán: «el dashboard del admin tiene mil cosas; como presidente esperás controlar y monitorear
+todo». Lienzo aprobado (https://claude.ai/artifact/JcxEoQ2m4WGuCh5Wo1sryA), con el pedido de un
+registro profesional de gestión en todos los textos. Sin cambios de esquema.
+
+- **Backend**: `Panel::Conduccion` + `GET /panel_conduccion?sede_id=&periodo=hoy|semana|mes` (sólo
+  admin, 404 en autocultivo). Veredicto, «Requiere atención» por impacto en pesos (faltante o
+  sobrante de caja y diferencias de inventario de cierres sin revisar de los últimos 30 días, caja
+  abierta más de 24 h, efectivo de delivery sin rendir y rendiciones sin recibir —sin contar dos
+  veces el mismo efectivo—), seguimiento (REPROCANN a 15 días, pesajes, altas, tareas vencidas),
+  «Dentro de parámetros» (los controles que se cumplen), finanzas (resultado contra el mismo
+  tramo del período anterior, efectivo en cajas, cuentas por cobrar como Contabilidad), inventario
+  (`Stock.flor_seca_disponible` y cobertura en días al ritmo de 28 días), pacientes, cultivo (cupo
+  de floración de `PlanEnforcer`, próxima cosecha), trazabilidad de la flor por etapa, estado de
+  las sedes, actividad del equipo y la serie diaria del mes. Las dispensas se acotan por paciente
+  (no tienen `club_id`).
+- `GET /panel_conduccion/cierres/:id` (`Panel::DetalleCierre`): la conciliación del arqueo renglón
+  por renglón (las partes de `CajaTurno#efectivo_esperado_ars`), diferencias de inventario con
+  costo, la observación de quien cerró, posibles causas (una dispensa por el mismo importe que la
+  diferencia, con iniciales del paciente; mostrador movido; historial del responsable) y el
+  registro de la jornada.
+- **Frontend**: `PanelConduccion.vue` (compu y, con `compacto`, teléfono con enlaces a las
+  pantallas `/m`) y `DetalleCierrePanel.vue` (marcar como revisado con el endpoint de siempre, ir
+  al cierre completo, ir a la dispensa). `AdminDashboard` quedó en asistente + «Puesta en marcha» +
+  panel; `MAdminHomeView` en la caja del mostrador + panel. Salieron del inicio: cajas del día
+  (está en Estado de las sedes), reservas, lotes, ambiente, actividad genérica, resumen anual.
+  El menú dice «Inicio» (no «Dashboard»). `/mostrador?solapa=cierres|merma` abre esa solapa.
+- Specs: `panel_conduccion_spec.rb` (quién lo ve, cada asunto, orden por impacto, revisado deja de
+  pedir atención, sin doble conteo, flor seca = Stock, por cobrar = Contabilidad, la conciliación
+  cierra, aislamiento) y `panelConduccionPantalla.test.js`.
+
 ## Octubre 2026 (ey) — «Flor seca disponible» es un solo número; mostrador plegado; turnos no al pasado (12-oct)
 
 Germán, en Mitocondria ONG: Stock decía 2.865,4 g de flor seca disponible y el informe de stock

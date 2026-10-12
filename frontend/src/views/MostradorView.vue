@@ -282,6 +282,7 @@
 // muestran. Acá queda la presentación y el estado de los modales, que cada pantalla abre a su
 // manera.
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
@@ -357,7 +358,10 @@ const conteo    = ref(null)      // 'apertura' | 'cierre'
 // Contar UN producto sin cerrar la caja: la fila de la mesa que se está pesando.
 const itemAContar = ref(null)
 const plata     = ref(null)
-const tab       = ref('hoy')
+// La solapa se puede pedir por enlace (`?solapa=cierres|merma`): el panel de conducción lleva al
+// cierre completo y el informe de pérdidas a la merma.
+const SOLAPAS   = { cierres: 'turnos', merma: 'merma' }
+const tab       = ref(SOLAPAS[useRoute().query.solapa] || 'hoy')
 const revisando = ref(false)
 
 // LO QUE ABRE Y CIERRA ES LA CAJA, NO EL MOSTRADOR. Desde que la mesa dejó de ser del turno, un

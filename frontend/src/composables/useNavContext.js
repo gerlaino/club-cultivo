@@ -9,7 +9,7 @@ import { listPesajesManicuraAdmin, getTareasDashboard } from '../lib/api.js'
 
 // ── Grupos primarios + sub-pestañas ────────────────────────────────────────────
 export const NAV_GROUPS = [
-  { key: 'dashboard', label: 'Dashboard', labelPersonal: 'Inicio', to: '/', tabs: [] },
+  { key: 'dashboard', label: 'Inicio', to: '/', tabs: [] },
   {
     // Sedes — SIN bandera, a propósito. Todo club tiene al menos una (el onboarding la exige) y
     // todo lo demás cuelga de ella: salas, depósitos, stock, dispensaciones. Estuvo colgada de

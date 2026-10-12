@@ -722,6 +722,9 @@ Rails.application.routes.draw do
 
     resources :setpoints_fase,    only: [:index, :show, :create, :update, :destroy]
     # Autocultivo: la guía de nutrientes (referencia; aplicar = copiar los rangos a sus alertas).
+    # El panel de conducción: el inicio del administrador (`Panel::Conduccion`, 12-oct-2026).
+    get  'panel_conduccion',             to: 'panel_conduccion#show'
+    get  'panel_conduccion/cierres/:id', to: 'panel_conduccion#cierre'
     get  'guia_nutricion',         to: 'guia_nutricion#show'
     # Autocultivo: exportar todos mis datos (ZIP armado en segundo plano, se baja con sesión).
     get  'mis_datos/exportar',           to: 'mis_datos#estado'

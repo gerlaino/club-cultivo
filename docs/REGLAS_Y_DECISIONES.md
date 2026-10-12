@@ -1731,6 +1731,13 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 - **REPROCANN declara la población REGISTRADA**: sin los que no iniciaron trámite (se informan
   aparte) y **sin corte por sede — un paciente es del club**, no de una sede.
 - **Producción** separa "del período" de "hoy en el cultivo".
+- **El inicio del administrador es un panel de conducción** (12-oct-2026, Germán): responde qué
+  requiere atención, cuánto hay en juego y quién se encarga; no es un catálogo de módulos. Todo
+  sale de `Panel::Conduccion`; lo que se cumple va en «Dentro de parámetros» como constancia. Un
+  asunto nuevo se agrega ahí con su `impacto_ars` (el orden es por impacto) y su spec. Lo operativo
+  (lotes, reservas, la caja) vive en su pantalla. **Textos de organizaciones en registro
+  profesional de gestión** («Requiere atención», «Saldo esperado/declarado», «Responsable:»,
+  «Marcar como revisado»); nunca «ciclo».
 - **Un número con el mismo nombre es el mismo número en todas las pantallas** (12-oct-2026,
   Mitocondria: Stock 2.865 g, informe 3.843 g). «Flor seca disponible» sale SÓLO de
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
