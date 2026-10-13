@@ -589,6 +589,7 @@ Rails.application.routes.draw do
       member do
         post :recibir
         post :conformar
+        post :reasignar
       end
     end
 

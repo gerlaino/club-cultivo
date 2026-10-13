@@ -1756,6 +1756,10 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
   agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
   repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
+- **Una rendición que nadie recibe se REASIGNA, no se recibe en nombre de otro** (13-oct-2026,
+  Germán): sólo administración, sólo a quien puede recibir (`Rendir::RECIBEN`), y la cuenta el
+  nuevo receptor. Toda alerta del panel con «Ver …» lleva a una pantalla donde eso se VE y se
+  puede resolver.
 - **Si el servidor se conecta a un destino que escribió un usuario, pasa por
   `Seguridad::DestinoPublico`** (13-oct-2026, barrido de seguridad): webhooks, SMTP propio y
   todo lo que venga. Sólo direcciones públicas, conectándose a la IP validada; nunca se guarda ni

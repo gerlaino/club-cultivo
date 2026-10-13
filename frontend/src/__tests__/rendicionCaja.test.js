@@ -12,12 +12,14 @@ let rendiciones = []
 let miSaldo = 0
 let cajasAbiertas = []
 const listRendiciones     = vi.fn(() => Promise.resolve({
-  data: { rendiciones, sin_conformar: 0, mi_saldo_ars: miSaldo, cajas_abiertas: cajasAbiertas },
+  data: { rendiciones, sin_conformar: 0, mi_saldo_ars: miSaldo, cajas_abiertas: cajasAbiertas, receptores: receptoresHist },
 }))
 const receptoresRendicion = vi.fn(() => Promise.resolve({ data: [{ id: 5, nombre: 'Germán', rol: 'admin' }] }))
 const crearRendicion      = vi.fn(() => Promise.resolve({ data: {} }))
 const recibirRendicion    = vi.fn(() => Promise.resolve({ data: {} }))
 const conformarRendicion  = vi.fn(() => Promise.resolve({ data: {} }))
+const reasignarRendicion  = vi.fn(() => Promise.resolve({ data: {} }))
+let receptoresHist = []
 
 vi.mock('../lib/api.js', () => ({
   listRendiciones:     (...a) => listRendiciones(...a),
@@ -25,6 +27,7 @@ vi.mock('../lib/api.js', () => ({
   crearRendicion:      (...a) => crearRendicion(...a),
   recibirRendicion:    (...a) => recibirRendicion(...a),
   conformarRendicion:  (...a) => conformarRendicion(...a),
+  reasignarRendicion:  (...a) => reasignarRendicion(...a),
 }))
 
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
@@ -39,7 +42,7 @@ async function montar (rol, id = 1) {
   return w
 }
 
-beforeEach(() => { vi.clearAllMocks(); rendiciones = []; miSaldo = 0; cajasAbiertas = [] })
+beforeEach(() => { vi.clearAllMocks(); rendiciones = []; miSaldo = 0; cajasAbiertas = []; receptoresHist = [] })
 
 describe('El repartidor rinde', () => {
   it('elige a quién le da la plata; el monto no lo escribe él', async () => {
@@ -198,59 +201,96 @@ describe('La conformidad del repartidor', () => {
   })
 })
 
-// El historial: lo mismo, pero como tabla y sin acciones. Es la solapa del Mostrador.
+// El historial: Comercial → Rendiciones. El mes entero con las pendientes arriba, y quién, cuándo
+// y cuánto en cada fila (Germán, 13-oct-2026: el panel avisaba una pendiente que acá no estaba).
 describe('El historial de rendiciones', () => {
   beforeEach(() => {
     rendiciones = [
-      { id: 9, estado: 'recibida', delivery: 'Juan', receptor: 'Germán', declarado_ars: 100000,
-        recibido_ars: 80000, diferencia_ars: -20000, conforme: false,
-        recibida_at: '2026-08-31T20:00:00Z', puedo_recibir: false, puedo_conformar: false },
-      { id: 8, estado: 'recibida', delivery: 'Juan', receptor: 'Germán', declarado_ars: 50000,
-        recibido_ars: 50000, diferencia_ars: 0, conforme: null,
-        recibida_at: '2026-08-30T20:00:00Z', puedo_recibir: false, puedo_conformar: false },
+      { id: 10, estado: 'pendiente', delivery: 'Delivery Test', delivery_id: 3, receptor: 'Pablo Ezquer',
+        receptor_id: 7, declarado_ars: 100000, recibido_ars: null, diferencia_ars: null, conforme: null,
+        rendida_at: '2026-09-17T15:00:00Z', recibida_at: null, puedo_recibir: false, puedo_reasignar: true },
+      { id: 9, estado: 'recibida', delivery: 'Juan', delivery_id: 4, receptor: 'Germán', receptor_id: 5,
+        declarado_ars: 100000, recibido_ars: 80000, diferencia_ars: -20000, conforme: false,
+        motivo: 'faltaron billetes', rendida_at: '2026-08-31T19:00:00Z', recibida_at: '2026-08-31T20:00:00Z',
+        puedo_recibir: false, puedo_reasignar: false },
+      { id: 8, estado: 'recibida', delivery: 'Juan', delivery_id: 4, receptor: 'Germán', receptor_id: 5,
+        declarado_ars: 50000, recibido_ars: 50000, diferencia_ars: 0, conforme: null,
+        rendida_at: '2026-08-30T19:00:00Z', recibida_at: '2026-08-30T20:00:00Z',
+        puedo_recibir: false, puedo_reasignar: false },
     ]
+    receptoresHist = [{ id: 5, nombre: 'Germán' }, { id: 7, nombre: 'Pablo Ezquer' }, { id: 3, nombre: 'Delivery Test' }]
   })
 
-  async function historial (rol = 'admin') {
+  async function historial (rol = 'admin', mes = '2026-09') {
     setActivePinia(createPinia())
     useAuthStore().user = { id: 5, role: rol }
-    const w = mount(RendicionCajaCard, { props: { historial: true } })
+    const w = mount(RendicionCajaCard, { props: { historial: true, mes, nombreMes: 'septiembre 2026' } })
     await flushPromises(); await flushPromises()
     return w
   }
 
-  it('muestra qué cobró y qué entregó cada uno', async () => {
+  it('pide el mes que se mira', async () => {
+    await historial()
+    expect(listRendiciones).toHaveBeenCalledWith({ mes: '2026-09' })
+  })
+
+  it('muestra la PENDIENTE, con a quién se la rindió y desde cuándo espera', async () => {
+    const w = await historial()
+    const pend = w.findAll('tbody tr')[0]
+
+    expect(pend.text()).toContain('Sin recibir')
+    expect(pend.text()).toContain('Delivery Test')
+    expect(pend.text()).toContain('Pablo Ezquer')
+    expect(pend.text()).toMatch(/Esperando hace \d+ días/)
+    expect(pend.text()).toContain('$100.000')
+  })
+
+  it('cada fila dice quién rindió y quién recibió, con fecha y hora', async () => {
+    const w = await historial()
+    const fila = w.findAll('tbody tr')[1]
+
+    expect(fila.text()).toContain('Juan')
+    expect(fila.text()).toMatch(/Rindió el 31\/08.*\d{2}:\d{2}/)
+    expect(fila.text()).toContain('Germán')
+    expect(fila.text()).toMatch(/Recibió el 31\/08.*\d{2}:\d{2}/)
+    expect(fila.find('.rnd__dif').text()).toBe('−$20.000')
+  })
+
+  it('la conformidad se ve con su motivo, y sólo donde hubo diferencia', async () => {
     const w = await historial()
     const filas = w.findAll('tbody tr')
 
-    expect(filas).toHaveLength(2)
-    expect(filas[0].text()).toContain('Juan')
-    expect(filas[0].text()).toContain('$100.000')
-    expect(filas[0].text()).toContain('$80.000')
-    expect(filas[0].find('.rnd__dif').text()).toBe('−$20.000')
+    expect(filas[1].text()).toContain('Sin conformar')
+    expect(filas[1].text()).toContain('faltaron billetes')
+    expect(filas[2].text()).not.toContain('Sin conformar') // esa cuadró
   })
 
-  it('marca la que el repartidor todavía no conformó', async () => {
+  it('una pendiente se reasigna a otra persona (ni a quien ya la tiene ni al repartidor)', async () => {
     const w = await historial()
-    const filas = w.findAll('tbody tr')
+    const select = w.findAll('tbody tr')[0].find('.rnd__reasignar select')
+    const opciones = select.findAll('option').map(o => o.text())
 
-    expect(filas[0].text()).toContain('Sin conformar')
-    expect(filas[1].text()).not.toContain('Sin conformar') // esa cuadró
+    expect(opciones).toContain('Germán')
+    expect(opciones).not.toContain('Pablo Ezquer')
+    expect(opciones).not.toContain('Delivery Test')
+
+    await select.setValue('5')
+    await w.findAll('tbody tr')[0].find('.rnd__reasignar button').trigger('click')
+    await flushPromises()
+    expect(reasignarRendicion).toHaveBeenCalledWith(10, { receptor_id: 5 })
+    expect(w.emitted('reasignada')).toBeTruthy()
   })
 
-  // Es historial: acá no se recibe ni se cuenta nada.
-  it('no tiene acciones', async () => {
+  it('en el historial no se cuenta ni se recibe plata', async () => {
     const w = await historial()
-
     expect(w.find('.rnd__input').exists()).toBe(false)
-    expect(w.find('.rnd__btn').exists()).toBe(false)
+    expect(w.find('.rnd__btn--primary').exists()).toBe(false)
   })
 
-  it('sin rendiciones lo dice, en vez de una tabla vacía', async () => {
+  it('sin rendiciones en el mes lo dice, en vez de una tabla vacía', async () => {
     rendiciones = []
     const w = await historial()
-
-    expect(w.text()).toContain('Todavía no se rindió ninguna caja')
+    expect(w.text()).toContain('No hay rendiciones en septiembre 2026')
   })
 })
 

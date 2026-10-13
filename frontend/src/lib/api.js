@@ -427,13 +427,14 @@ export const recibirCajaDelivery = (id, payload) => api.post(`/usuarios/${id}/re
 // Él la inicia y elige a quién; el receptor CUENTA y recibe. La plata nunca queda en el aire: el
 // que cuenta es el que la tiene, y ese número entra al cajón. Si ajustó, queda pendiente la
 // conformidad del repartidor — constancia, no candado.
-export const listRendiciones      = ()            => api.get('/rendiciones')
+export const listRendiciones      = (params = {}) => api.get('/rendiciones', { params })
 export const receptoresRendicion  = ()            => api.get('/rendiciones/receptores')
 export const crearRendicion       = (payload)     => api.post('/rendiciones', payload)
 export const recibirRendicion     = (id, payload) => api.post(`/rendiciones/${id}/recibir`, payload)
 // Lo que el repartidor lleva encima ahora: sale de la misma consulta que declara al rendir.
 export const getMiCajaDelivery    = () => api.get('/rendiciones/mi_caja')
 export const conformarRendicion   = (id, payload) => api.post(`/rendiciones/${id}/conformar`, payload)
+export const reasignarRendicion   = (id, payload) => api.post(`/rendiciones/${id}/reasignar`, payload)
 // Lo que el repartidor se había quedado y devuelve después. "Rendir en partes" es esto.
 export const saldarACuenta        = (payload)     => api.post('/rendiciones/saldar', payload)
 

@@ -2,36 +2,64 @@
   <section v-if="visible" class="rnd">
     <!-- ══ HISTORIAL: lo que ya pasó ═════════════════════════════════════════ -->
     <template v-if="historial">
-      <p v-if="!cerradas.length" class="rnd__vacio">Todavía no se rindió ninguna caja.</p>
+      <p v-if="!rendiciones.length" class="rnd__vacio">No hay rendiciones en {{ nombreMes || 'este mes' }}.</p>
       <div v-else class="rnd__tabla-wrap">
         <table class="rnd__tabla tabla-cards">
           <thead>
             <tr>
+              <th>Estado</th>
               <th>Repartidor</th>
-              <th>Recibió</th>
+              <th>Recibe</th>
               <th class="rnd__th-num">Cobró</th>
               <th class="rnd__th-num">Entregó</th>
               <th class="rnd__th-num">Diferencia</th>
-              <th></th>
+              <th>Conformidad</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in cerradas" :key="r.id">
+            <tr v-for="r in rendiciones" :key="r.id" :class="{ 'rnd__fila--pend': r.estado === 'pendiente' }">
+              <td data-col="Estado">
+                <span class="rnd__chip" :class="estadoDe(r).clase">{{ estadoDe(r).texto }}</span>
+              </td>
               <td data-col="Repartidor">
                 <div class="rnd__td-fuerte">{{ r.delivery }}</div>
-                <div class="rnd__td-mut">{{ fecha(r.recibida_at) }}</div>
+                <div class="rnd__td-mut">Rindió el {{ fechaHora(r.rendida_at) }}</div>
               </td>
-              <td data-col="Recibió">{{ r.receptor }}</td>
+              <td data-col="Recibe">
+                <div class="rnd__td-fuerte">{{ r.receptor || '—' }}</div>
+                <div v-if="r.estado === 'recibida'" class="rnd__td-mut">Recibió el {{ fechaHora(r.recibida_at) }}</div>
+                <div v-else-if="r.estado === 'pendiente'" class="rnd__td-mut rnd__td-espera">
+                  Esperando {{ esperando(r.rendida_at) }}
+                </div>
+                <!-- Si nadie la recibe, administración la dirige a otra persona, que la cuenta.
+                     No se recibe en nombre de otro (`Rendiciones::Reasignar`). -->
+                <div v-if="r.puedo_reasignar" class="rnd__reasignar">
+                  <select v-model="reasignarA[r.id]" class="rnd__select rnd__select--sm" :aria-label="`Reasignar la rendición de ${r.delivery}`">
+                    <option value="">Reasignar a…</option>
+                    <option v-for="p in receptoresPara(r)" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+                  </select>
+                  <button type="button" class="rnd__btn rnd__btn--sm" :disabled="!reasignarA[r.id] || guardando"
+                          @click="reasignar(r)">Reasignar</button>
+                </div>
+              </td>
               <td class="rnd__td-num rnd__td-mut" data-col="Cobró">${{ fmt(r.declarado_ars) }}</td>
-              <td class="rnd__td-num rnd__td-fuerte" data-col="Entregó">${{ fmt(r.recibido_ars) }}</td>
-              <td class="rnd__td-num" data-col="Diferencia">
-                <span v-if="r.diferencia_ars" class="rnd__dif">−${{ fmt(Math.abs(r.diferencia_ars)) }}</span>
+              <td class="rnd__td-num rnd__td-fuerte" data-col="Entregó">
+                <template v-if="r.recibido_ars != null">${{ fmt(r.recibido_ars) }}</template>
                 <span v-else class="rnd__td-mut">—</span>
               </td>
-              <td data-col="">
-                <!-- La conformidad es constancia, no candado: la plata entró igual. -->
-                <span v-if="r.conforme === false" class="rnd__chip rnd__chip--espera">Sin conformar</span>
-                <span v-else-if="r.conforme === true" class="rnd__chip rnd__chip--ok">Conformada</span>
+              <td class="rnd__td-num" data-col="Diferencia">
+                <span v-if="r.diferencia_ars" class="rnd__dif">{{ r.diferencia_ars < 0 ? '−' : '+' }}${{ fmt(Math.abs(r.diferencia_ars)) }}</span>
+                <span v-else class="rnd__td-mut">—</span>
+              </td>
+              <td data-col="Conformidad">
+                <!-- La conformidad es constancia, no candado: la plata entró igual. Sólo se pide
+                     cuando hubo ajuste; si cuadró, no hay nada que conformar. -->
+                <template v-if="r.estado === 'recibida' && r.diferencia_ars">
+                  <span v-if="r.conforme === false" class="rnd__chip rnd__chip--espera">Sin conformar</span>
+                  <span v-else-if="r.conforme === true" class="rnd__chip rnd__chip--ok">Conformada</span>
+                  <div v-if="r.motivo" class="rnd__td-mut rnd__motivo">{{ r.motivo }}</div>
+                </template>
+                <span v-else class="rnd__td-mut">—</span>
               </td>
             </tr>
           </tbody>
@@ -199,19 +227,24 @@
 // La plata NUNCA queda en el aire: es efectivo, el que cuenta es el que la tiene en la mano y ese
 // número entra al cajón. No hay estado "en disputa". Si el receptor ajusta, lo que queda es la
 // CONFORMIDAD del repartidor — constancia, no candado.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { listRendiciones, receptoresRendicion, crearRendicion, recibirRendicion,
-         conformarRendicion } from '../lib/api.js'
+         conformarRendicion, reasignarRendicion } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
 
-const props = defineProps({ historial: { type: Boolean, default: false } })
+const props = defineProps({
+  historial: { type: Boolean, default: false },
+  // Sólo en el historial: el mes que se mira ('2026-09'). Las pendientes vienen siempre, arriba.
+  mes:       { type: String, default: '' },
+  nombreMes: { type: String, default: '' },
+})
 // Recibir una rendición cambia la MESA: entra la plata al cajón y sube el producto que volvió.
 // La tarjeta se recarga sola, pero la pantalla que la contiene no se enteraba — el paquete
 // aparecía en el sistema y no en la pantalla del que lo acababa de recibir en la mano.
 // `rendida` la escucha la pantalla de Caja del repartidor: al rendir, lo que lleva encima pasa a
 // cero y el punto de la solapa tiene que apagarse solo.
-const emit = defineEmits(['recibida', 'rendida'])
+const emit = defineEmits(['recibida', 'rendida', 'reasignada'])
 
 const auth  = useAuthStore()
 const toast = useToast()
@@ -234,7 +267,6 @@ const soyRepartidor = computed(() => auth.user?.role === 'delivery')
 const miPendiente   = computed(() => rendiciones.value.find(r => r.estado === 'pendiente'))
 const miAjustada    = computed(() => rendiciones.value.find(r => r.puedo_conformar))
 const porRecibir    = computed(() => rendiciones.value.filter(r => r.puedo_recibir))
-const cerradas      = computed(() => rendiciones.value.filter(r => r.estado === 'recibida'))
 const visible       = computed(() => {
   if (props.historial) return true
   return soyRepartidor.value
@@ -245,6 +277,49 @@ const visible       = computed(() => {
 const fmt     = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })
 const fmtCant = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 const fecha   = (iso) => (iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
+// «31/08 19:00», armado a mano: `toLocaleString` con hora sale «31/8, 07:00 p. m.» según el
+// navegador, y en una tabla de plata la hora tiene que leerse igual en todas las filas.
+const dos = (n) => String(n).padStart(2, '0')
+function fechaHora (iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return `${dos(d.getDate())}/${dos(d.getMonth() + 1)} ${dos(d.getHours())}:${dos(d.getMinutes())}`
+}
+
+// Cuánto lleva esperando una pendiente: es lo que hace saltar que está trabada.
+function esperando (iso) {
+  if (!iso) return ''
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (dias < 1) return 'desde hoy'
+  return `hace ${dias} día${dias === 1 ? '' : 's'}`
+}
+
+function estadoDe (r) {
+  if (r.estado === 'pendiente') return { texto: 'Sin recibir', clase: 'rnd__chip--espera' }
+  if (r.estado === 'anulada')   return { texto: 'Anulada', clase: 'rnd__chip--neutro' }
+  if (r.diferencia_ars)         return { texto: 'Con diferencia', clase: 'rnd__chip--espera' }
+  return { texto: 'Recibida', clase: 'rnd__chip--ok' }
+}
+
+// A quién se le puede reasignar: los que pueden recibir (lo manda el backend), menos el que ya
+// la tiene y el repartidor.
+const receptoresHist = ref([])
+const reasignarA     = ref({})
+const receptoresPara = (r) => receptoresHist.value.filter(p => p.id !== r.receptor_id && p.id !== r.delivery_id)
+
+async function reasignar (r) {
+  guardando.value = true
+  try {
+    await reasignarRendicion(r.id, { receptor_id: reasignarA.value[r.id] })
+    const nombre = receptoresHist.value.find(p => p.id === reasignarA.value[r.id])?.nombre
+    reasignarA.value[r.id] = ''
+    toast.success(`Ahora la recibe ${nombre || 'otra persona'}`)
+    await cargar()
+    emit('reasignada')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo reasignar.')
+  } finally { guardando.value = false }
+}
 
 // Cuánto falta respecto de lo declarado. nil mientras no haya contado.
 function falta (r) {
@@ -255,8 +330,9 @@ function falta (r) {
 
 async function cargar () {
   try {
-    const { data } = await listRendiciones()
+    const { data } = await listRendiciones(props.historial && props.mes ? { mes: props.mes } : {})
     rendiciones.value  = data.rendiciones || []
+    receptoresHist.value = data.receptores || []
     miSaldo.value      = data.mi_saldo_ars || 0
     cajasAbiertas.value = data.cajas_abiertas || []
     // En '' y no sin clave: un `v-model` apuntando a `undefined` no matchea NINGUNA opción, y el
@@ -316,6 +392,9 @@ async function conformar (r, ok, notas) {
 }
 
 
+// En el historial, cambiar de mes es volver a pedir.
+watch(() => props.mes, () => { if (props.historial) cargar() })
+
 onMounted(async () => {
   await cargar()
   if (soyRepartidor.value) {
@@ -358,6 +437,14 @@ onMounted(async () => {
 }
 .rnd__chip--espera { background: var(--c-amber-100); color: var(--c-amber-500); }
 .rnd__chip--ok     { background: var(--c-leaf-100);  color: var(--c-leaf-700); }
+.rnd__chip--neutro { background: var(--c-slate-100); color: var(--c-ink-500); }
+/* Una pendiente es lo que hay que mirar: va arriba y se distingue sin leer. */
+.rnd__fila--pend td { background: color-mix(in srgb, var(--c-amber-100) 45%, transparent); }
+.rnd__td-espera { color: var(--c-amber-500); font-weight: 600; }
+.rnd__motivo { margin-top: 4px; max-width: 28ch; }
+.rnd__reasignar { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.rnd__select--sm { min-width: 150px; padding: 5px 8px; font-size: var(--fs-13); }
+.rnd__btn--sm { padding: 5px 10px; font-size: var(--fs-13); }
 .rnd__box {
   background: #fff; border: 1px solid var(--c-slate-200); border-left: 3px solid var(--c-leaf-600);
   border-radius: 12px; padding: 14px 16px;

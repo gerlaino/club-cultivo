@@ -1,5 +1,20 @@
 # Changelog
 
+## Octubre 2026 (ff) — Rendiciones: la pendiente se ve y se reasigna (13-oct)
+
+Germán: el panel avisaba «Rendición entregada sin recibir» (Delivery Test → Pablo Ezquer, 17/09) y
+«Ver rendiciones» llevaba a una pantalla vacía y corrida a la izquierda.
+
+- La pantalla mostraba sólo las RECIBIDAS. Ahora es el **mes entero** (‹ mes ›) con **todas las
+  pendientes arriba** aunque sean de otro mes (`GET /rendiciones?mes=2026-09`, sólo administración).
+  Tabla completa: estado, repartidor y cuándo rindió, quién recibe y cuándo recibió (o «Esperando
+  hace N días»), cobró / entregó / diferencia, conformidad con su motivo. Centrada.
+- **Reasignar** (`POST /rendiciones/:id/reasignar`, `Rendiciones::Reasignar`): si nadie recibe una
+  pendiente, administración la dirige a otra persona de las que pueden recibir, que la cuenta. No
+  se recibe en nombre de otro. Queda en el rastro (`receptor_id` se audita). Si se la reasigna a sí
+  mismo, la tarjeta para contar y recibir aparece arriba en la misma pantalla.
+- Spec que cruza el panel con la pantalla: toda pendiente que avisa el panel está en la lista.
+
 ## Octubre 2026 (fe) — Barrido de seguridad (13-oct)
 
 Brakeman, `npm audit` y lectura a mano de lo nuevo, lo público y el aislamiento entre organizaciones.

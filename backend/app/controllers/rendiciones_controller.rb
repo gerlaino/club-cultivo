@@ -5,7 +5,7 @@
 class RendicionesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:delivery) }, only: [:create, :receptores]
-  before_action :set_rendicion, only: [:recibir, :conformar]
+  before_action :set_rendicion, only: [:recibir, :conformar, :reasignar]
 
   # GET /rendiciones — las mías (si soy repartidor) o las que me toca recibir.
   #
@@ -23,8 +23,21 @@ class RendicionesController < ApplicationController
       # le está entregando a uno solo, cada uno con su botón de recibir.
       base.where(receptor_id: current_user.id)
     end
+    lista = if params[:mes].present? && gestiona?
+      # LA PANTALLA DE RENDICIONES (Comercial → Rendiciones): el mes pedido entero y, ARRIBA,
+      # todas las pendientes aunque sean de otro mes. Mostraba sólo las recibidas: el panel avisaba
+      # «rendición entregada sin recibir» y la pantalla a la que mandaba decía que no había
+      # ninguna (13-oct-2026).
+      rango = mes_pedido.all_month
+      rango = rango.begin.beginning_of_day..rango.end.end_of_day
+      mias.pendientes.to_a + mias.where.not(estado: 'pendiente').where(rendida_at: rango).to_a
+    else
+      mias.limit(30).to_a
+    end
     render json: {
-      rendiciones: mias.limit(30).map { |r| serialize(r) },
+      rendiciones: lista.map { |r| serialize(r) },
+      # A quién se le puede reasignar una pendiente. Sólo para administración.
+      receptores: gestiona? ? Rendiciones::Rendir.receptores_de(current_user.club).map { |u| { id: u.id, nombre: u.nombre_completo } } : [],
       # Dónde puede entrar el efectivo que recibe ESTA persona. Administración elige (puede haber
       # varios mostradores abiertos, y puede no querer ninguno); el dispensador no elige, así que
       # ni se le manda la lista: su caja es la de su mostrador.
@@ -137,7 +150,24 @@ class RendicionesController < ApplicationController
     render json: serialize(res.rendicion)
   end
 
+  # POST /rendiciones/:id/reasignar { receptor_id } — administración cambia a quién va dirigida
+  # una rendición que nadie recibe. No se recibe en nombre de otro: el nuevo receptor la cuenta.
+  def reasignar
+    receptor = current_user.club.users.find_by(id: params[:receptor_id])
+    res = Rendiciones::Reasignar.call(rendicion: @rendicion, receptor: receptor, por: current_user)
+    return render json: { error: res.error }, status: (gestiona? ? :unprocessable_entity : :forbidden) unless res.ok?
+
+    render json: serialize(res.rendicion.reload)
+  end
+
   private
+
+  # `?mes=2026-09`. Uno roto o vacío es el mes en curso: la pantalla nunca queda en blanco.
+  def mes_pedido
+    Date.strptime(params[:mes].to_s, '%Y-%m')
+  rescue ArgumentError
+    Time.zone.today.beginning_of_month
+  end
 
   def gestiona? = %w[admin supervisor super_admin].include?(current_user.role)
 
@@ -176,7 +206,9 @@ class RendicionesController < ApplicationController
       id:        r.id,
       estado:    r.estado,
       delivery:  r.delivery&.nombre_completo,
+      delivery_id: r.delivery_id,
       receptor:  r.receptor&.nombre_completo,
+      receptor_id: r.receptor_id,
       declarado_ars: r.monto_declarado_ars.to_f,
       recibido_ars:  r.monto_recibido_ars&.to_f,
       diferencia_ars: r.diferencia_ars&.to_f,
@@ -196,6 +228,8 @@ class RendicionesController < ApplicationController
       # vez de preguntárselo.
       elijo_destino:  r.pendiente? && current_user.id == r.receptor_id && !current_user.atiende_mostrador?,
       puedo_conformar: r.recibida? && r.conforme == false && current_user.id == r.delivery_id,
+      # Si nadie la recibe, administración la dirige a otra persona (`Rendiciones::Reasignar`).
+      puedo_reasignar: r.pendiente? && gestiona?,
     }
   end
 end
