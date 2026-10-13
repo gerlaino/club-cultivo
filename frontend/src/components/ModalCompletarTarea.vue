@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mct-fade">
-      <div v-modal="cerrar" v-if="show" class="mct__overlay">
+      <div v-modal="cerrar" v-if="show && !registrando" class="mct__overlay">
         <div class="mct__modal" role="dialog" aria-modal="true">
 
           <div class="mct__header">
@@ -44,6 +44,17 @@
               Se registrarán <strong>{{ horas }}h</strong> para el lote <strong>{{ tarea.lote.codigo }}</strong>.
             </div>
 
+            <!-- Tarea de riego que dice cómo regar: lo que se pidió, y registrar el riego con eso
+                 precargado. Al guardar el registro, la tarea queda completada. -->
+            <div v-if="esRiego" class="mct__riego" data-testid="completar-riego">
+              <div class="mct__riego-titulo"><i class="bi bi-droplet me-1"></i>Cómo regar</div>
+              <p v-if="resumenRiego" class="mct__riego-plan">{{ resumenRiego }}</p>
+              <p class="mct__hint">
+                «Registrar el riego» lo deja en {{ tarea.lote ? 'el lote' : 'la sala' }} con esto ya cargado
+                (y descuenta la receta del depósito); al guardarlo, la tarea queda hecha.
+              </p>
+            </div>
+
             <div v-if="esTrasplante" class="mct__trasplante">
               <div class="mct__trasplante-titulo">
                 <i class="bi bi-flower1 me-1"></i>¿De qué maceta a qué maceta?
@@ -79,7 +90,15 @@
 
           <div class="mct__footer">
             <button class="mct__btn-ghost" @click="cerrar" :disabled="guardando">Cancelar</button>
-            <button class="mct__btn-primary" @click="confirmar" :disabled="guardando">
+            <button v-if="esRiego" class="mct__btn-ghost" @click="confirmar" :disabled="guardando || abriendo">
+              Sólo marcarla hecha
+            </button>
+            <button v-if="esRiego" class="mct__btn-primary" @click="registrarRiego" :disabled="guardando || abriendo">
+              <DsSpinner v-if="guardando || abriendo" :size="14" />
+              <i v-else class="bi bi-droplet me-1"></i>
+              Registrar el riego
+            </button>
+            <button v-else class="mct__btn-primary" @click="confirmar" :disabled="guardando">
               <DsSpinner v-if="guardando" :size="14" />
               <i v-else class="bi bi-check-lg me-1"></i>
               Marcar como completada
@@ -90,12 +109,21 @@
       </div>
     </Transition>
   </Teleport>
+
+  <RegistroLoteModal v-if="registrando && loteCompleto" v-model="registrando" :lote="loteCompleto"
+                     accion-inicial="riego" :riego-inicial="riegoInicial" @saved="onRiegoRegistrado" />
+  <RegistroSalaModal v-if="registrando && salaCompleta" v-model="registrando" :sala="salaCompleta"
+                     accion-inicial="riego" :riego-inicial="riegoInicial" @saved="onRiegoRegistrado" />
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useTareasStore } from '../stores/tareas.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import RegistroLoteModal from './lotes/registro/RegistroLoteModal.vue'
+import RegistroSalaModal from './salas/RegistroSalaModal.vue'
+import { getLote, getSala } from '../lib/api.js'
+import { resumenRiego as resumenDeRiego } from '../composables/useCompletarRiego.js'
 
 const props = defineProps({
   show:  { type: Boolean, default: false },
@@ -113,6 +141,40 @@ const macetaOrigen  = ref(null)
 const macetaDestino = ref(null)
 
 const esTrasplante = computed(() => props.tarea?.tipo === 'trasplante' && !!props.tarea?.lote)
+
+// ── Riego: registrar el riego del lote o de la sala con lo que dice la tarea ──
+const esRiego = computed(() => props.tarea?.tipo === 'riego' && !!(props.tarea?.lote || props.tarea?.sala))
+const resumenRiego = computed(() => resumenDeRiego(props.tarea))
+const riegoInicial = computed(() => {
+  const r = props.tarea?.riego
+  return r ? { receta_id: r.receta?.id || null, litros: r.litros, ph: r.ph, ec: r.ec } : null
+})
+const registrando  = ref(false)
+const abriendo     = ref(false)
+const loteCompleto = ref(null)
+const salaCompleta = ref(null)
+// El registro necesita el lote (o la sala) entero: estado, cama, plantas. La tarea trae sólo el id.
+async function registrarRiego() {
+  error.value = ''
+  abriendo.value = true
+  try {
+    if (props.tarea.lote) {
+      loteCompleto.value = (await getLote(props.tarea.lote.id)).data
+      salaCompleta.value = null
+    } else {
+      salaCompleta.value = (await getSala(props.tarea.sala.id)).data
+      loteCompleto.value = null
+    }
+    registrando.value = true
+  } catch {
+    error.value = `No se pudo abrir ${props.tarea.lote ? 'el lote' : 'la sala'}. Probá de nuevo.`
+  } finally { abriendo.value = false }
+}
+// Guardado el riego, la tarea se completa con las horas y notas de este modal.
+async function onRiegoRegistrado() {
+  registrando.value = false
+  await confirmar()
+}
 
 watch(() => props.tarea, (val) => {
   if (val) {
@@ -153,6 +215,13 @@ async function confirmar() {
 </script>
 
 <style scoped>
+.mct__riego {
+  background: var(--c-sky-100); border: 1px solid var(--c-sky-100); border-radius: 12px;
+  padding: .75rem .85rem;
+}
+.mct__riego-titulo { font-size: .82rem; font-weight: 700; color: var(--c-sky-600); margin-bottom: .35rem; }
+.mct__riego .mct__hint { margin: 0; }
+.mct__riego-plan { margin: 0 0 .35rem; font-size: .9rem; font-weight: 600; color: var(--c-slate-900); }
 .mct__trasplante {
   background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;
   padding: .75rem .85rem; margin-bottom: 1rem;
@@ -239,12 +308,12 @@ async function confirmar() {
 }
 
 .mct__footer {
-  display: flex; align-items: center; justify-content: flex-end; gap: .75rem;
+  display: flex; align-items: center; justify-content: flex-end; gap: .75rem; flex-wrap: wrap;
   padding: 1rem 1.5rem; border-top: 1px solid var(--c-slate-100);
 }
 
 .mct__btn-ghost {
-  height: 40px; padding: 0 1.1rem; border: 1.5px solid #d1d5db;
+  height: 40px; padding: 0 1.1rem; white-space: nowrap; border: 1.5px solid #d1d5db;
   border-radius: 8px; background: transparent; color: #374151;
   font-size: .85rem; font-weight: 500; cursor: pointer; transition: background .15s;
 }
@@ -252,7 +321,7 @@ async function confirmar() {
 .mct__btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
 
 .mct__btn-primary {
-  height: 40px; padding: 0 1.25rem; border: none;
+  height: 40px; padding: 0 1.25rem; white-space: nowrap; border: none;
   border-radius: 8px; background: #1b5e20; color: #fff;
   font-size: .85rem; font-weight: 600; cursor: pointer;
   display: inline-flex; align-items: center; gap: .35rem;

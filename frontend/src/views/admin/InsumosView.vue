@@ -12,6 +12,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoDispensacion from './DepositoDispensacion.vue'
 import DepositoSalon from './DepositoSalon.vue'
 import { hoyISO } from '../../utils/dates.js'
+import { useRouter } from 'vue-router'
 
 const store = useInsumosStore()
 const sede  = useSedeStore()
@@ -239,9 +240,7 @@ const entradaForm = ref(null)
 function abrirEntrada(insumo = null) {
   cerrarMenu()
   entradaForm.value = {
-    modo: insumo ? 'existente' : (store.items.length ? 'existente' : 'nuevo'),
     insumo_id: insumo?.id ?? store.items[0]?.id ?? null,
-    nombre: '', unidad_medida: 'unidad', categoria_contable_id: categoriasDelTab.value[0]?.id ?? null,
     cantidad: null, costo_total_ars: null, proveedor: '', fecha: hoyISO(),
     sede_id: insumo?.sede_id ?? sedeFiltro.value ?? null,
     medio_pago: 'efectivo', pagado: true,
@@ -251,30 +250,18 @@ const MEDIOS_PAGO = [
   { v: 'efectivo', l: 'Efectivo' }, { v: 'transferencia', l: 'Transferencia' }, { v: 'mercado_pago', l: 'Mercado Pago' },
 ]
 const entradaInsumoSel = computed(() => store.items.find(i => i.id === entradaForm.value?.insumo_id) || null)
-const entradaUnidad = computed(() =>
-  entradaForm.value?.modo === 'existente' ? (entradaInsumoSel.value?.unidad_medida || 'u') : entradaForm.value?.unidad_medida)
+const entradaUnidad = computed(() => entradaInsumoSel.value?.unidad_medida || 'u')
 const entradaCostoUnit = computed(() => {
   const f = entradaForm.value
   return f?.cantidad > 0 && f?.costo_total_ars >= 0 ? f.costo_total_ars / f.cantidad : null
 })
 async function confirmarEntrada() {
   const f = entradaForm.value
-  if (f.modo === 'nuevo' && !f.nombre.trim()) { toast.warning('Poné el nombre del insumo'); return }
-  if (f.modo === 'existente' && !f.insumo_id) { toast.warning('Elegí el insumo'); return }
+  if (!f.insumo_id) { toast.warning('Elegí el insumo'); return }
   if (!(f.cantidad > 0)) { toast.warning('Poné la cantidad'); return }
   if (!(f.costo_total_ars >= 0)) { toast.warning('Poné el costo total'); return }
   try {
-    let id = f.insumo_id
-    if (f.modo === 'nuevo') {
-      const nuevo = await store.crear({
-        nombre: f.nombre.trim(), unidad_medida: f.unidad_medida,
-        categoria_contable_id: f.categoria_contable_id, sede_id: f.sede_id,
-        deposito_id: depositoActivoId.value,
-        tipo: esCultivo.value ? 'cultivo' : 'general', // compat con el enum viejo hasta unificar en Producto
-      })
-      id = nuevo.id
-    }
-    await store.comprar(id, {
+    await store.comprar(f.insumo_id, {
       cantidad: f.cantidad, costo_total_ars: f.costo_total_ars,
       proveedor: f.proveedor?.trim() || undefined, fecha: f.fecha,
       sede_id: f.sede_id ?? undefined, generar_egreso: true,
@@ -282,6 +269,49 @@ async function confirmarEntrada() {
     })
     toast.success('Entrada registrada · egreso contable generado')
     entradaForm.value = null
+    await recargar()
+  } catch { toast.error(store.saveError) }
+}
+
+// ── Producto nuevo ──────────────────────────────────────────────
+// Dar de alta un producto pregunta si se compró. «Sí» va a Contabilidad → Nueva compra con el
+// producto ya escrito: es la única puerta de una compra (asiento, categoría, caja, sede del
+// depósito) y crea el producto en el mismo acto, así que no se duplica acá. «No» lo da de alta
+// sin stock y sin registro contable, y lo dice.
+const router = useRouter()
+const productoForm = ref(null)
+function abrirProductoNuevo() {
+  productoForm.value = {
+    nombre: '', unidad_medida: esCultivo.value ? 'mililitro' : 'unidad',
+    categoria_contable_id: categoriasDelTab.value[0]?.id ?? null, stock_minimo: null,
+    compra: null, // 'si' | 'no' — se pregunta, no se presupone
+  }
+}
+const productoDuplicado = computed(() => {
+  const n = productoForm.value?.nombre?.trim().toLowerCase()
+  return n ? store.items.find(i => i.nombre.trim().toLowerCase() === n) || null : null
+})
+async function confirmarProductoNuevo() {
+  const f = productoForm.value
+  if (!f.nombre.trim()) { toast.warning('Poné el nombre del producto'); return }
+  if (!f.compra) { toast.warning('Indicá si registrás la compra'); return }
+  if (f.compra === 'si') {
+    productoForm.value = null
+    router.push({ name: 'contabilidad', query: {
+      nuevo: 'compra', deposito: depositoActivo.value?.id, nombre: f.nombre.trim(),
+      unidad: f.unidad_medida, categoria: f.categoria_contable_id ?? undefined,
+    } })
+    return
+  }
+  try {
+    await store.crear({
+      nombre: f.nombre.trim(), unidad_medida: f.unidad_medida,
+      categoria_contable_id: f.categoria_contable_id, stock_minimo: f.stock_minimo || 0,
+      sede_id: depositoActivo.value?.sede_id ?? null, deposito_id: depositoActivo.value?.id,
+      tipo: esCultivo.value ? 'cultivo' : 'general', // compat con el enum viejo hasta unificar en Producto
+    })
+    toast.success('Producto dado de alta, sin stock y sin registro contable')
+    productoForm.value = null
     await recargar()
   } catch { toast.error(store.saveError) }
 }
@@ -437,6 +467,7 @@ async function revertirCompra(compra) {
         <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
              Acá solo se gestiona lo que ya existe (reponer/editar/merma/eliminar). -->
         <RouterLink to="/recetas" class="btn" title="Recetas de nutrientes: se arman con lo del depósito y se aplican al regar"><i class="bi bi-journal-text" aria-hidden="true"></i> Recetas</RouterLink>
+        <button v-if="!esSoloLectura && depositoActivo" class="btn" @click="abrirProductoNuevo"><i class="bi bi-plus-lg" aria-hidden="true"></i> Producto nuevo</button>
         <RouterLink v-if="!esSoloLectura" :to="{ name: 'contabilidad', query: { nuevo: 'compra', deposito: depositoActivo?.id } }" class="btn btn--primary" title="Registrar la compra: el gasto y la entrada al depósito en un paso"><i class="bi bi-plus-lg" aria-hidden="true"></i> Comprar</RouterLink>
       </div>
     </header>
@@ -561,27 +592,13 @@ async function revertirCompra(compra) {
     <div v-modal="() => entradaForm = null" v-if="entradaForm" class="ov" @click.self="entradaForm = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Reponer stock</h3>
-        <p class="modal__hint">Registrás una reposición con su costo. Se suma al depósito y genera el <b>egreso contable</b>. Para un producto <b>nuevo</b>, compralo desde Contabilidad → Nuevo movimiento.</p>
+        <p class="modal__hint">Registrás una reposición con su costo. Se suma al depósito y genera el <b>egreso contable</b>. Para un producto que todavía no existe, usá «Producto nuevo».</p>
 
-        <template v-if="entradaForm.modo === 'existente'">
-          <label class="fld">Insumo
-            <select v-model="entradaForm.insumo_id" class="inp">
-              <option v-for="i in store.items" :key="i.id" :value="i.id">{{ i.nombre }}<template v-if="multiSede"> · {{ i.sede_nombre || 'pool' }}</template></option>
-            </select>
-          </label>
-        </template>
-        <template v-else>
-          <label class="fld">Nombre<input v-model.trim="entradaForm.nombre" class="inp" maxlength="60" placeholder="Ej: Fertilizante base" /></label>
-          <div class="dp__grid2">
-            <label class="fld">Unidad<select v-model="entradaForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
-            <label class="fld">Categoría
-              <select v-model="entradaForm.categoria_contable_id" class="inp">
-                <option :value="null">— Sin categoría —</option>
-                <option v-for="c in categoriasDelTab" :key="c.id" :value="c.id">{{ c.label }}</option>
-              </select>
-            </label>
-          </div>
-        </template>
+        <label class="fld">Insumo
+          <select v-model="entradaForm.insumo_id" class="inp">
+            <option v-for="i in store.items" :key="i.id" :value="i.id">{{ i.nombre }}<template v-if="multiSede"> · {{ i.sede_nombre || 'pool' }}</template></option>
+          </select>
+        </label>
 
         <div class="dp__grid2">
           <label class="fld">Cantidad ({{ entradaUnidad }})<input v-model.number="entradaForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
@@ -608,6 +625,45 @@ async function revertirCompra(compra) {
         </label>
 
         <div class="modal__actions"><button class="btn" @click="entradaForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="confirmarEntrada">Registrar entrada</button></div>
+      </div>
+    </div>
+
+    <!-- Modal PRODUCTO NUEVO: pregunta si se compró (Contabilidad) o sólo se da de alta -->
+    <div v-modal="() => productoForm = null" v-if="productoForm" class="ov" @click.self="productoForm = null">
+      <div class="dpdlg dpdlg--wide" data-testid="producto-nuevo">
+        <h3 class="modal__title">Producto nuevo · {{ depositoActivo?.nombre }}</h3>
+        <label class="fld">Nombre<input v-model.trim="productoForm.nombre" class="inp" maxlength="60" placeholder="Ej: Big Bloom" /></label>
+        <p v-if="productoDuplicado" class="modal__hint modal__hint--warn">Ya existe <b>{{ productoDuplicado.nombre }}</b> en este depósito. Si es el mismo, usá «Reponer» en esa fila.</p>
+        <div class="dp__grid2">
+          <label class="fld">Unidad<select v-model="productoForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
+          <label class="fld">Categoría
+            <select v-model="productoForm.categoria_contable_id" class="inp">
+              <option :value="null">— Sin categoría —</option>
+              <option v-for="c in categoriasDelTab" :key="c.id" :value="c.id">{{ c.label }}</option>
+            </select>
+          </label>
+        </div>
+        <label class="fld">Stock mínimo (opcional)<input v-model.number="productoForm.stock_minimo" type="number" min="0" step="any" class="inp" placeholder="Avisa cuando queda esto o menos" /></label>
+
+        <p class="dp__pregunta">¿Registrás la compra en Contabilidad?</p>
+        <div class="dp__opciones" role="radiogroup">
+          <label class="dp__opcion" :class="{ 'is-on': productoForm.compra === 'si' }">
+            <input v-model="productoForm.compra" type="radio" value="si" />
+            <span><b>Sí, lo compré</b><small>Vas a Contabilidad con el producto ya cargado: ahí ponés cantidad, monto y de dónde salió la plata. Entra al depósito con su costo.</small></span>
+          </label>
+          <label class="dp__opcion" :class="{ 'is-on': productoForm.compra === 'no' }">
+            <input v-model="productoForm.compra" type="radio" value="no" />
+            <span><b>No, sólo darlo de alta</b><small>Queda en el depósito sin stock, para usarlo en recetas.</small></span>
+          </label>
+        </div>
+        <p v-if="productoForm.compra === 'no'" class="modal__hint modal__hint--warn">
+          <b>No se genera ningún registro contable</b> ni entra stock. Cuando lo compres, registrá la compra en Contabilidad → Nueva compra (o «Reponer» en su fila) para que el gasto y el costo queden bien.
+        </p>
+
+        <div class="modal__actions">
+          <button class="btn" @click="productoForm = null">Cancelar</button>
+          <button class="btn btn--primary" :disabled="store.saving || !productoForm.compra" @click="confirmarProductoNuevo">{{ productoForm.compra === 'si' ? 'Ir a registrar la compra' : 'Dar de alta' }}</button>
+        </div>
       </div>
     </div>
 
@@ -861,6 +917,12 @@ async function revertirCompra(compra) {
 /* .dpdlg — NO usar la clase `.modal`: choca con Bootstrap (display:none) y el modal no se ve. */
 .dpdlg { position: relative; display: block; background: #fff; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgb(15 23 42 / .25), 0 2px 8px rgb(15 23 42 / .1); max-height: 90vh; overflow-y: auto; }
 .dpdlg--wide { max-width: 460px; }
+.dp__pregunta { font-size: .82rem; color: var(--c-slate-600); margin: 0 0 .4rem; }
+.dp__opciones { display: grid; gap: .5rem; margin-bottom: .9rem; }
+.dp__opcion { display: flex; gap: .6rem; align-items: flex-start; padding: .65rem .75rem; border: 1px solid var(--c-slate-200); border-radius: 10px; cursor: pointer; font-size: .85rem; color: var(--c-slate-700); }
+.dp__opcion input { margin-top: .2rem; }
+.dp__opcion small { display: block; color: var(--c-slate-500); margin-top: .15rem; line-height: 1.35; }
+.dp__opcion.is-on { border-color: var(--c-leaf-600); background: var(--c-leaf-50); }
 .modal__title { margin: 0 0 .25rem; font-size: 1.1rem; font-weight: 750; letter-spacing: -.02em; color: var(--c-slate-900); }
 .modal__hint { color: var(--c-slate-500); font-size: .82rem; margin: 0 0 1.1rem; line-height: 1.45; }
 .modal__hint--warn { background: #fdf6ec; border: 1px solid #f4e0c3; border-radius: 9px; padding: .6rem .8rem; color: #92400e; }

@@ -1,20 +1,27 @@
 require 'rails_helper'
 
-# AC: el admin da de alta a alguien y tiene que poder decirle CÓMO ENTRA. Y cuando esa
-# persona olvide la contraseña, tiene que poder resolverlo sin depender de que el club
-# tenga el correo configurado.
+# AC: quien da de alta a alguien tiene que poder decirle CÓMO ENTRA. Y cuando esa persona olvide
+# la contraseña, tiene que poder resolverlo sin depender de que el club tenga el correo
+# configurado. Desde el 12-oct-2026 el alta la hace la plataforma (super admin); el restablecer
+# sigue siendo del admin de la organización.
 RSpec.describe 'Equipo — credenciales', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let!(:sede) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+  let(:super_admin) { create(:user, :super_admin, club: nil) }
 
   before { sign_in_as(admin) }
 
   def json = JSON.parse(response.body)
 
-  def crear!(rol: 'cultivador', email: 'nuevo@club.com')
-    post '/api/usuarios', params: {
-      user: { first_name: 'Ana', last_name: 'Gómez', email: email, role: rol }
+  # Lo que antes devolvía el alta del admin en `credenciales`, el alta de la plataforma lo devuelve
+  # en la raíz (`email`, `password_inicial`, `mail_enviado`).
+  def credenciales = json.slice('email', 'password_inicial', 'mail_enviado')
+
+  def crear!(rol: 'cultivador', email: 'nuevo@club.com', extra: {})
+    sign_in_as(super_admin)
+    post '/api/super_admin/users', params: {
+      user: { club_id: club.id, first_name: 'Ana', last_name: 'Gómez', email: email, role: rol }.merge(extra)
     }, as: :json
   end
 
@@ -23,8 +30,8 @@ RSpec.describe 'Equipo — credenciales', type: :request do
       crear!
 
       expect(response).to have_http_status(:created)
-      expect(json['credenciales']['email']).to eq('nuevo@club.com')
-      expect(json['credenciales']['password_inicial']).to be_present
+      expect(credenciales['email']).to eq('nuevo@club.com')
+      expect(credenciales['password_inicial']).to be_present
     end
 
     # El frontend mandaba '123456Aa' para TODOS: cada usuario de cada club nacía con la
@@ -33,26 +40,16 @@ RSpec.describe 'Equipo — credenciales', type: :request do
     # cultivadores rebotan por cupo antes de llegar a la contraseña, que es lo que se prueba acá.
     it 'cada usuario nace con una contraseña distinta' do
       crear!(email: 'uno@club.com', rol: 'cultivador')
-      una = json['credenciales']['password_inicial']
+      una = credenciales['password_inicial']
       crear!(email: 'dos@club.com', rol: 'dispensador')
-      otra = json['credenciales']['password_inicial']
+      otra = credenciales['password_inicial']
 
       expect(una).not_to eq(otra)
     end
 
-    it 'ignora la contraseña que mande el cliente' do
-      post '/api/usuarios', params: {
-        user: { first_name: 'B', last_name: 'C', email: 'x@club.com', role: 'cultivador',
-                password: '123456Aa', password_confirmation: '123456Aa' }
-      }, as: :json
-
-      expect(json['credenciales']['password_inicial']).not_to eq('123456Aa')
-      expect(User.find_by(email: 'x@club.com').valid_password?('123456Aa')).to be(false)
-    end
-
     it 'la contraseña generada sirve para entrar' do
       crear!
-      pass = json['credenciales']['password_inicial']
+      pass = credenciales['password_inicial']
 
       expect(User.find_by(email: 'nuevo@club.com').valid_password?(pass)).to be(true)
     end
@@ -63,13 +60,13 @@ RSpec.describe 'Equipo — credenciales', type: :request do
     it 'manda el link cuando el usuario tiene una casilla real' do
       expect { crear! }.to have_enqueued_mail(AccesoMailer, :restablecer_contrasena)
 
-      expect(json['credenciales']['mail_enviado']).to be(true)
+      expect(credenciales['mail_enviado']).to be(true)
     end
 
     it 'avisa que no salió cuando el login es inventado y no hay mail personal' do
       crear!(email: "nuevo@#{club.slug}.com")
 
-      expect(json['credenciales']['mail_enviado']).to be(false)
+      expect(credenciales['mail_enviado']).to be(false)
     end
   end
 

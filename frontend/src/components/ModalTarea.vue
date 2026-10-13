@@ -171,6 +171,34 @@
               </div>
             </template>
 
+            <!-- Cómo regar: lo mismo que se carga al registrar un riego. Al completar la tarea, el
+                 registro del riego se abre con esto precargado (12-oct-2026). -->
+            <template v-if="form.tipo === 'riego'">
+              <div class="mt-divider"><span>Cómo regar</span></div>
+              <div class="mt-field">
+                <label class="mt-label">Receta <span class="mt-opt">opcional</span></label>
+                <select v-model="form.receta_id" class="mt-input" @change="aplicarObjetivosDeReceta">
+                  <option value="">{{ recetasRiego.length ? 'Agua sola / sin receta' : 'Todavía no hay recetas de riego' }}</option>
+                  <option v-for="r in recetasRiego" :key="r.id" :value="r.id">{{ r.nombre }}</option>
+                </select>
+              </div>
+              <div class="mt-row mt-row--3">
+                <div class="mt-field">
+                  <label class="mt-label">Litros <span class="mt-opt">opcional</span></label>
+                  <input v-model.number="form.riego_litros" type="number" min="0" step="0.5" class="mt-input" placeholder="20" />
+                </div>
+                <div class="mt-field">
+                  <label class="mt-label">pH <span class="mt-opt">opcional</span></label>
+                  <input v-model.number="form.riego_ph" type="number" min="0" max="14" step="0.1" class="mt-input" placeholder="6.0" />
+                </div>
+                <div class="mt-field">
+                  <label class="mt-label">EC <span class="mt-opt">opcional</span></label>
+                  <input v-model.number="form.riego_ec" type="number" min="0" step="0.1" class="mt-input" placeholder="1.6" />
+                </div>
+              </div>
+              <p class="mt-hint">Al completarla vas a poder registrar el riego con esto ya cargado.</p>
+            </template>
+
             <!-- Descripción -->
             <div class="mt-field">
               <label class="mt-label">Descripción <span class="mt-opt">opcional</span></label>
@@ -296,7 +324,7 @@ import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import { formatFechaCorta, formatFechaLarga } from '../utils/fecha.js'
-import { getUserSalasAsignadas } from '../lib/api.js'
+import { getUserSalasAsignadas, listRecetas } from '../lib/api.js'
 import AppDatePicker from './ui/AppDatePicker.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { hoyISO, toISO } from '../utils/dates.js'
@@ -430,9 +458,29 @@ function formVacio() {
     asignada_a_id: '', sala_id: '', lote_id: '',
     fecha_programada: hoyISO(),
     recordatorio: '',
+    receta_id: '', riego_litros: null, riego_ph: null, riego_ec: null,
   }
 }
 const form = ref(formVacio())
+
+// Recetas de riego activas, para «Cómo regar». Se piden una vez, al elegir Riego.
+const recetasRiego = ref([])
+let recetasPedidas = false
+watch(() => props.show && form.value.tipo === 'riego', async (pedir) => {
+  if (!pedir || recetasPedidas) return
+  recetasPedidas = true
+  try {
+    const { data } = await listRecetas('riego')
+    recetasRiego.value = (data?.data || data || []).filter(r => r.activa !== false)
+  } catch { recetasPedidas = false }
+})
+// Elegir una receta trae su pH y EC objetivo: es lo que la receta dice. Se pueden cambiar.
+function aplicarObjetivosDeReceta() {
+  const r = recetasRiego.value.find(x => String(x.id) === String(form.value.receta_id))
+  if (!r) return
+  if (r.ph_objetivo != null) form.value.riego_ph = Number(r.ph_objetivo)
+  if (r.ec_objetivo != null) form.value.riego_ec = Number(r.ec_objetivo)
+}
 
 async function seleccionarUsuario(u) {
   const uid = u ? (String(form.value.asignada_a_id) === String(u.id) ? '' : u.id) : ''
@@ -473,6 +521,10 @@ watch(() => props.show, (val) => {
       lote_id:          t.lote_id || t.lote?.id || '',
       fecha_programada: t.fecha_programada || hoyISO(),
       recordatorio:     t.recordatorio || '',
+      receta_id:        t.riego?.receta?.id || '',
+      riego_litros:     t.riego?.litros ?? null,
+      riego_ph:         t.riego?.ph ?? null,
+      riego_ec:         t.riego?.ec ?? null,
     }
   } else {
     mostrarSala.value = false
@@ -499,6 +551,11 @@ async function guardar() {
     sala_id:       form.value.sala_id || null,
     lote_id:       form.value.lote_id || null,
     recordatorio:  form.value.recordatorio || null,
+    // Sólo una tarea de riego lleva cómo regar (el backend igual lo limpia en las otras).
+    receta_id:     form.value.tipo === 'riego' ? (form.value.receta_id || null) : null,
+    riego_litros:  form.value.tipo === 'riego' ? (form.value.riego_litros || null) : null,
+    riego_ph:      form.value.tipo === 'riego' ? (form.value.riego_ph ?? null) : null,
+    riego_ec:      form.value.tipo === 'riego' ? (form.value.riego_ec ?? null) : null,
   }
 
   guardando.value = true
@@ -620,6 +677,8 @@ async function guardar() {
 .mt-hint  { font-size: .72rem; color: var(--c-slate-400); margin: 0; }
 .mt-row   { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
 @media (max-width: 440px) { .mt-row { grid-template-columns: 1fr; } }
+.mt-row--3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 440px) { .mt-row--3 { grid-template-columns: repeat(3, 1fr); gap: .5rem; } }
 
 /* ── Inputs ── */
 .mt-input {

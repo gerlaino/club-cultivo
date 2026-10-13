@@ -41,6 +41,7 @@
           <Sparkles :size="20" :stroke-width="1.75" />
         </button>
 
+        <BuscadorGlobal class="atb__icon-btn" />
         <!-- Help -->
         <button class="atb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
           <HelpCircle :size="20" :stroke-width="1.75" />
@@ -115,6 +116,7 @@
 </template>
 
 <script setup>
+import BuscadorGlobal from './BuscadorGlobal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
@@ -280,7 +282,13 @@ async function handleLogout() {
   background: #d97706; color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
   padding: 2px 5px; border-radius: 10px; min-width: 15px; text-align: center;
 }
-.atb__page-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); flex: 1; }
+.atb__page-title { font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-900); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* En el ancho de un teléfono, menos aire: con la lupa del buscador (12-oct-2026) la barra se pasaba
+   del ancho y la página scrolleaba de costado. El título se recorta antes que los botones. */
+@media (max-width: 480px) {
+  .atb__inner { padding: 0 var(--sp-3); gap: var(--sp-2); }
+  .atb__right { gap: 4px; }
+}
 
 /* Right actions */
 .atb__right {

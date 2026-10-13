@@ -199,3 +199,17 @@ Uno por vez. Si algo no coincide con lo que ves en la pantalla, mandá una captu
 ### Pendientes viejos que siguen abiertos
 - Rotar `SECRET_KEY_BASE` (Render → `cultivo-staging-api` → Environment → generar un valor nuevo).
 - Confirmar que `APP_HOST` = `cultivoespacial.com` en `cultivo-staging-api` (los links de los mails).
+
+### Mercado Pago (suscripciones, 12-oct-2026)
+Hasta que esto esté cargado, super admin ve «Mercado Pago no está configurado» y nadie puede
+suscribirse (nada se rompe).
+1. **Mercado Pago → Tus integraciones → crear la aplicación** (producto: Suscripciones). Copiar el
+   **Access Token de producción**.
+2. **Webhooks** de esa aplicación: URL `https://cultivoespacial.com/webhooks/mercado_pago`, eventos
+   **Planes y suscripciones** (los avisos `subscription_preapproval` y
+   `subscription_authorized_payment`). Copiar la **clave secreta** que muestra.
+3. **Render → `cultivo-staging-api` y el worker → Environment**: `MP_ACCESS_TOKEN` (paso 1) y
+   `MP_WEBHOOK_SECRET` (paso 2). Guardar: redeploya solo.
+4. **Super admin → Organizaciones**: cargar el precio del autocultivo en pesos.
+5. Probar con credenciales de prueba antes de cobrar de verdad: el link, suscribirse con un
+   usuario de prueba de MP, y ver que la ficha pase a «Activa» y aparezca el cobro.

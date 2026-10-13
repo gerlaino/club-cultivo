@@ -50,8 +50,10 @@ const conMouse = () => typeof window !== 'undefined' &&
 
 function opciones(binding) {
   const v = binding.value
-  if (typeof v === 'function') return { cerrar: v, sucio: null }
-  return { cerrar: v?.cerrar || v?.close || null, sucio: v?.sucio || null }
+  if (typeof v === 'function') return { cerrar: v, sucio: null, descartable: false }
+  // `descartable`: lo que se tipea no es trabajo que se pierda (un buscador): ESC cierra sin
+  // preguntar.
+  return { cerrar: v?.cerrar || v?.close || null, sucio: v?.sucio || null, descartable: !!v?.descartable }
 }
 
 // ¿Hay trabajo a medio hacer? Dos fuentes, y las dos hacen falta:
@@ -60,6 +62,7 @@ function opciones(binding) {
 //   · lo que el modal sepa de sí mismo y no esté en un input — el carrito de la dispensa son
 //     divs, no campos, y se pierde igual.
 function estaSucio(entrada) {
+  if (entrada.opts.descartable) return false
   return entrada.tecleado || entrada.opts.sucio?.() === true
 }
 

@@ -9,6 +9,7 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { reenviarConfirmacion } from '../lib/api.js'
+import MiSuscripcion from './personal/MiSuscripcion.vue'
 
 const auth = useAuthStore()
 
@@ -31,6 +32,8 @@ const titulo   = computed(() => {
   if (personal.value && auth.clubSuspendidoMotivo === 'prueba_terminada') return 'Terminó tu prueba gratis'
   return personal.value ? 'Tu cuenta está pausada' : 'Organización suspendida'
 })
+// Se despausa sola pagando (12-oct-2026): fin de prueba o falta de pago de un autocultivo.
+const pagaSola = computed(() => personal.value && ['prueba_terminada', 'no_pago'].includes(auth.clubSuspendidoMotivo))
 const reenviado = ref(false)
 async function reenviar() {
   try { await reenviarConfirmacion(auth.clubSuspendidoEmail) } catch {}
@@ -52,7 +55,12 @@ async function salir() {
         {{ personal ? 'Tu cuenta está pausada por ahora' : 'El acceso de tu organización está temporalmente suspendido' }},
         así que las secciones de la app no van a responder.
       </p>
-      <p v-if="detalle" class="susp__text susp__text--motivo">{{ detalle }}</p>
+      <p v-if="detalle && !pagaSola" class="susp__text susp__text--motivo">{{ detalle }}</p>
+      <!-- Autocultivo pausado por fin de prueba o falta de pago: se resuelve acá, suscribiéndose. -->
+      <div v-if="pagaSola" class="susp__pago">
+        <p class="susp__text susp__text--motivo">{{ auth.clubSuspendidoMotivo === 'no_pago' ? 'No entró el último pago.' : 'Para seguir, suscribite.' }} Apenas Mercado Pago confirme el pago, la cuenta vuelve sola.</p>
+        <MiSuscripcion />
+      </div>
       <template v-if="porMail && auth.clubSuspendidoEmail">
         <p class="susp__text">Lo mandamos a <strong>{{ auth.clubSuspendidoEmail }}</strong>. Si no lo encontrás, revisá en Spam.</p>
         <button v-if="!reenviado" class="susp__btn susp__btn--sec" @click="reenviar">Mandarme el link de nuevo</button>
@@ -79,6 +87,7 @@ async function salir() {
 .susp__title { margin: 0 0 .75rem; font-size: 1.25rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
 .susp__text { margin: 0 0 .6rem; font-size: .9rem; color: #475569; line-height: 1.6; }
 .susp__text--motivo { color: #0f172a; font-weight: 600; }
+.susp__pago { margin: .9rem 0; padding: .9rem; border: 1px solid #e2e8f0; border-radius: 12px; }
 .susp__resguardo { display: flex; align-items: flex-start; gap: .5rem; text-align: left; margin: 1.1rem 0 1.4rem; padding: .75rem .9rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; font-size: .82rem; color: #15803d; line-height: 1.55; }
 .susp__resguardo i { flex-shrink: 0; margin-top: .1rem; }
 .susp__btn { background: #1b5e20; color: #fff; border: none; border-radius: 9px; padding: .6rem 1.4rem; font-size: .875rem; font-weight: 700; cursor: pointer; }

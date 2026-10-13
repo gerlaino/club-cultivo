@@ -27,6 +27,20 @@ RSpec.describe 'GET /plants/:id/plant_activities (historial de la planta)', type
     expect(tipos).to include('transplant', 'lote_fase', 'lote_actividad', 'registro_ambiental_lote')
   end
 
+  # AC (Germán, 12-oct-2026): en la ficha de la planta se ve QUÉ se le aplicó, no sólo que hubo
+  # «Riego · Nutrición»: la receta, cada producto con su cantidad, los litros. Sin costos.
+  it 'cada riego dice qué se aplicó: receta, productos, cantidades y litros' do
+    create(:registro_ambiental, lote: lote, user: admin, registrado_en: 1.day.ago, tareas_realizadas: %w[riego nutricion],
+                                volumen_l: 20, nutricion: { 'receta_nombre' => 'Flora 1', 'litros' => 20, 'costo_ars' => 900,
+                                                            'items' => [{ 'nombre' => 'Big Bloom', 'cantidad' => 40, 'unidad' => 'mililitro', 'costo_ars' => 900 }] })
+
+    get "/plants/#{plant.id}/plant_activities", headers: auth_headers
+    reg = JSON.parse(response.body).find { |a| a['activity_type'] == 'registro_ambiental_lote' }
+    expect(reg['metadata']['volumen_l']).to eq(20.0)
+    expect(reg['metadata']['aplicado']).to eq('Flora 1 · 20 L: Big Bloom 40 ml')
+    expect(reg['metadata']['aplicado']).not_to include('$')
+  end
+
   it 'NO hereda las notas del lote (ej. el descarte de OTRA planta)' do
     otra = create(:plant, lote: lote)
     patch "/plants/#{otra.id}", params: { plant: { state: 'descartada' }, motivo: 'se secó' }, headers: auth_headers, as: :json

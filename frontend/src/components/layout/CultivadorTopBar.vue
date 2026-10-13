@@ -23,6 +23,7 @@
       <div class="ctb__right">
 
         <!-- Help -->
+        <BuscadorGlobal class="ctb__icon-btn" />
         <button class="ctb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
           <HelpCircle :size="20" :stroke-width="1.75" />
           <span v-if="helpDot" class="ctb__help-dot" />
@@ -111,6 +112,7 @@
 </template>
 
 <script setup>
+import BuscadorGlobal from './BuscadorGlobal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'

@@ -151,6 +151,7 @@ onMounted(cargar)
 .cq__tipo { font-size: var(--fs-12); font-weight: 700; border-radius: var(--r-pill); padding: 2px 10px; background: var(--c-leaf-100); color: var(--c-leaf-700); }
 .cq__tipo--personal { background: var(--c-sky-100); color: var(--c-sky-600); }
 .cq__tipo--baja { background: var(--c-rust-100); color: var(--c-rust-600); }
+.cq__tipo--usuario { background: var(--c-amber-100); color: var(--c-gold-500); }
 .cq__nombre { font-size: var(--fs-16); color: var(--c-ink-900); }
 .cq__cuando { margin-left: auto; font-size: var(--fs-12); color: var(--c-slate-500); }
 .cq__datos { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); font-size: var(--fs-14); color: var(--c-slate-600); }

@@ -144,6 +144,18 @@ describe('v-modal — ESC con trabajo a medio hacer', () => {
     expect(cerrar).not.toHaveBeenCalled()
   })
 
+  // Un buscador (Ctrl+K): lo tipeado es una consulta, no un dato que se pierda.
+  it('un modal descartable cierra con ESC aunque se haya escrito', async () => {
+    const cerrar = vi.fn()
+    w = mount(Modal, { props: { opts: { cerrar, descartable: true } }, attachTo: document.body })
+
+    await w.find('.busca').setValue('gorilla')
+    esc()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(useConfirm().state.open).toBe(false)
+    expect(cerrar).toHaveBeenCalled()
+  })
+
   // Un modal de edición nace con los campos llenos. Si eso contara como "sucio", preguntaría
   // siempre y la pregunta dejaría de significar algo.
   it('un campo precargado por código NO cuenta como sucio', async () => {

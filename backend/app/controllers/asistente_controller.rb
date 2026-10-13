@@ -208,6 +208,7 @@ class AsistenteController < BaseController
       render json: { error: resultado[:error] }, status: :unprocessable_entity
     else
       anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
+      anotar_repetidas!(resultado['acciones'], contexto)
       resultado['correccion_id'] = registrar_propuesta(texto, resultado['acciones'])
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
@@ -331,6 +332,29 @@ class AsistenteController < BaseController
   # Después de que el modelo interpreta, la BASE arma la lista concreta de tareas que ese
   # registro daría por hechas —con id y título— para que se vean y se puedan destildar antes de
   # guardar. El modelo no elige tareas: sólo entiende que dijiste "regué".
+  # Lo repetido (dos veces en el mismo dictado, o ya registrado hoy) se marca en la tarjeta y la
+  # pantalla pregunta antes de guardar (`Registros::Repetidos`). Nunca hace fallar el dictado.
+  def anotar_repetidas!(acciones, contexto)
+    club = current_user.club
+    resolver = lambda do |accion|
+      datos = accion['datos'].is_a?(Hash) ? accion['datos'] : {}
+      if accion['tipo'] == 'registro_ambiental_sala'
+        sala = sala_de(accion, datos, club, contexto)
+        next [nil, nil] unless sala
+
+        [sala.lotes.where.not(estado: 'finalizado').pluck(:id), club.personal? ? 'este espacio' : "la sala #{sala.nombre}"]
+      else
+        lote = accion['lote_codigo'].present? ? lotes_visibles(club).find_by(codigo: accion['lote_codigo']) : nil
+        next [nil, nil] unless lote
+
+        [[lote.id], club.personal? ? 'estas plantas' : "el lote #{lote.codigo}"]
+      end
+    end
+    Registros::Repetidos.new(acciones: acciones, club: club, resolver: resolver).anotar!
+  rescue StandardError => e
+    Rails.logger.warn("[asistente] no se pudieron marcar repetidas: #{e.message}")
+  end
+
   def anotar_tareas_a_cerrar!(acciones, contexto)
     club         = current_user.club
     privilegiado = current_user.admin? || current_user.supervisor?

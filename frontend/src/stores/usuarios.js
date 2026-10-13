@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { listUsers, getUser, createUser, updateUser, deleteUser, resetUserPassword } from "../lib/api"
+import { listUsers, getUser, updateUser, deleteUser, resetUserPassword } from "../lib/api"
 
 export const useUsuariosStore = defineStore("usuarios", {
   state: () => ({
@@ -42,22 +42,8 @@ export const useUsuariosStore = defineStore("usuarios", {
       }
     },
 
-    async create(payload) {
-      this.saving = true; this.error = null
-      try {
-        const { data } = await createUser(payload)
-        const user = data?.data || data
-        this.items = [user, ...this.items]
-        // Las credenciales vienen del backend y se ven UNA vez: hay que mostrárselas al admin,
-        // no anunciarlas en un toast que se va solo.
-        return { ...user, credenciales: data?.credenciales || null }
-      } catch (e) {
-        this.error = e?.response?.data?.errors?.join(", ") || e.message
-        throw e
-      } finally {
-        this.saving = false
-      }
-    },
+    // Sin `create`: el alta del equipo la hace la plataforma (super admin) desde el 12-oct-2026;
+    // la organización la pide (`pedirUsuario`).
 
     async update(id, payload) {
       this.saving = true; this.error = null

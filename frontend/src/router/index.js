@@ -449,7 +449,13 @@ const routes = [
     name: "plantas",
     component: () => import("../views/PlantasView.vue"),
     meta: { requiresAuth: true },
-    beforeEnter: requiresPermission("plantas", "index"),
+    // La lista de TODAS las plantas sólo queda en autocultivo (son pocas y es como piensa esa
+    // persona). En una organización tardaba y nadie la miraba: a una planta se llega por su lote
+    // o por el buscador de arriba (Ctrl+K) (Germán, 12-oct-2026). La ficha (/plantas/:id) sigue.
+    beforeEnter: [
+      requiresPermission("plantas", "index"),
+      () => (useClubStore().data && !useClubStore().data.personal ? '/lotes' : true),
+    ],
   },
   {
     path: "/plantas/nueva",

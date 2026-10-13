@@ -1,5 +1,37 @@
 # Changelog
 
+## Octubre 2026 (fd) — Las 8 cositas de Germán: usuarios por la plataforma, Mercado Pago, buscador, producto sin compra, tarea de riego (12-oct)
+
+Germán revisó la app y anotó ocho ideas; las aprobó todas («lo mejor que quede»). Después sumó tres
+más mientras se hacían.
+
+- **Usuarios**: el admin ya no da de alta, **pide** («Pedir un usuario» en Equipo → bandeja de
+  Consultas de super admin, con el aviso si pasa el cupo). Alta única en super admin
+  (`Equipo::DarDeAlta`); el cupo avisa (409) y se confirma; el excedente se ve en la ficha de la
+  organización. Manual de Equipo y ayuda actualizados. El asistente de alta de Equipo se sacó.
+- **Mercado Pago**: suscripciones (`suscripciones`, `suscripcion_cobros`, `ajustes_plataforma`).
+  Super admin genera el link de cada organización con su monto y carga el precio del autocultivo
+  (cabecera de Organizaciones); el autocultivo se suscribe desde Preferencias, el aviso de fin de
+  prueba y el cartel de cuenta pausada. Webhook firmado e idempotente que extiende el plan y
+  despausa. **Falta cargar `MP_ACCESS_TOKEN` y `MP_WEBHOOK_SECRET` en Render (web y worker) y la
+  URL `https://<host>/webhooks/mercado_pago` en Mercado Pago.**
+- **/plantas** sale del menú de las organizaciones (sigue en autocultivo); **buscador general**
+  arriba (lupa o Ctrl+K: plantas, lotes, salas, genéticas y pacientes según el rol, `/buscar`).
+- **Producto sin compra**: «Producto nuevo» en el Depósito pregunta si se compró (sí → Contabilidad
+  prellenada; no → sin stock y sin registro contable, avisado); «Producto nuevo» dentro de la
+  receta. **Bug de seguridad arreglado**: reponer/ajustar/editar/borrar del depósito no pedían rol.
+- **Rendición**: la tarjeta de quien recibe rearmada (quién y cuánto declara arriba; caja, contado,
+  motivo y Recibir en una fila); «No estoy de acuerdo» sin `window.prompt`. El e2e de rendición
+  estaba roto desde el 12-sep (solapa vieja, texto viejo): verde.
+- **Tarea de riego** con receta, litros, pH y EC; al completarla se registra el riego precargado.
+- **Pedidos de la misma tarde**: el dictado marca lo repetido y pregunta; «Últimas acciones» en el
+  inicio del autocultivo (compu y teléfono); la ficha de la planta dice qué se aplicó en cada riego
+  (y el diario del teléfono se ve entero); guía de nutrientes centrada y con las medidas de Recetas.
+- El ESC en un buscador ya no pregunta «¿Cerrar sin guardar?» (`v-modal` con `descartable`). La
+  barra de arriba no se pasa del ancho de un teléfono con la lupa.
+- Las cuentas de paciente de Mitocondria no fueron un error: se crean al admitir con el portal
+  activo. Queda para cuando se haga el portal a fondo.
+
 ## Octubre 2026 (fc) — Limpieza de la revisión del admin: íconos, vocabulario y números (12-oct)
 
 - **Íconos**: tres íconos que no existen en Bootstrap Icons 1.13 (`bi-seedling`, `bi-calendar-year`,

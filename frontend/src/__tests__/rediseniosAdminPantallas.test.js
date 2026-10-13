@@ -15,6 +15,7 @@ const listMovimientosRecurrentes = vi.fn(() => Promise.resolve({ data: { fijos: 
 ] } }))
 const listUsers = vi.fn()
 const getEquipoActividad = vi.fn()
+const pedirUsuario = vi.fn()
 
 // Un solo módulo (`src/lib/api.js`), importado con y sin extensión: una sola fábrica.
 vi.mock('../lib/api.js', () => ({
@@ -26,6 +27,7 @@ vi.mock('../lib/api.js', () => ({
   listSedes: vi.fn(() => Promise.resolve({ data: [] })),
   asignarSedeAUsuario: vi.fn(),
   getEquipoActividad: (...a) => getEquipoActividad(...a),
+  pedirUsuario: (...a) => pedirUsuario(...a),
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }), useRoute: () => ({ query: {} }) }))
 vi.mock('../composables/useToast.js', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
@@ -162,6 +164,28 @@ describe('Equipo — actividad y cupo', () => {
     return w
   }
   const fila = (w, nombre) => w.findAll('tbody tr').find(r => r.text().includes(nombre))
+
+  // AC (Germán, 12-oct-2026): el admin no da de alta, PIDE. Lo da de alta la plataforma.
+  it('ofrece «Pedir un usuario» y no un alta', async () => {
+    const w = await equipo()
+    const textos = w.findAll('button').map(b => b.text())
+    expect(textos.some(t => t.includes('Pedir un usuario'))).toBe(true)
+    expect(textos.some(t => /Incorporar persona|Crear usuario|Nuevo usuario/.test(t))).toBe(false)
+  })
+
+  it('el pedido viaja con nombre y rol, y avisa si ese rol ya llenó el cupo', async () => {
+    pedirUsuario.mockResolvedValue({ data: { ok: true, codigo: 'CE-000007' } })
+    const w = await equipo()
+    await w.findAll('button').find(b => b.text().includes('Pedir un usuario')).trigger('click')
+    const modal = () => w.find('[data-testid="pedir-usuario"]')
+    await modal().find('select').setValue('dispensador')
+    expect(modal().find('.uv__pedido-cupo').text()).toContain('2 de 2')
+    await modal().findAll('input')[0].setValue('Ana')
+    await modal().findAll('button').find(b => b.text() === 'Enviar pedido').trigger('click')
+    await flushPromises()
+    expect(pedirUsuario).toHaveBeenCalledWith(expect.objectContaining({ nombre: 'Ana', rol: 'dispensador' }))
+    expect(w.find('[data-testid="pedir-usuario"]').exists()).toBe(false)
+  })
 
   it('el cupo por rol, con el rol lleno marcado', async () => {
     const w = await equipo()

@@ -69,6 +69,18 @@ module Lotes
       Array(n['items']).map { |i| producto(i, parte) }
     end
 
+    # «Flora 1 · 10 L (su parte de la sala) · $450: Big Bloom 20 ml, Base 10 ml»: lo que recibió el
+    # lote en UN registro. Una sola cuenta para el historial del lote y la ficha de la planta (que
+    # lo muestra sin costo: lo lee quien cultiva).
+    def texto_de_copia(n, lote_id, personal: false)
+      parte = parte_de_copia(n, lote_id)
+      prods = productos_de_copia(n, lote_id).map { |p| self.class.linea_producto(p) }
+      cabeza = "#{n['receta_nombre'] || 'productos sueltos'} · #{self.class.num(n['litros'].to_f * parte)} L" \
+               "#{parte < 1 ? (personal ? ' (su parte del espacio)' : ' (su parte de la sala)') : ''}" \
+               "#{@con_costo && n['costo_ars'].to_f.positive? ? " · $#{(n['costo_ars'].to_f * parte).round(0)}" : ''}"
+      [cabeza, prods.join(', ').presence].compact.join(': ')
+    end
+
     private
 
     attr_reader :lote

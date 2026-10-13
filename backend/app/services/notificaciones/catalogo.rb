@@ -51,7 +51,7 @@ module Notificaciones
         roles: %w[admin], feature: nil, default: true },
       # De la PLATAFORMA: le llega al super admin, que no tiene organización.
       { clave: 'consulta_nueva',   grupo: TE_PIDEN, label: 'Consulta nueva desde la página',
-        desc: 'Alguien dejó sus datos en cultivoespacial.com (organización, uso personal o arrepentimiento).',
+        desc: 'Alguien dejó sus datos en cultivoespacial.com (organización, uso personal o arrepentimiento), o una organización pidió un usuario.',
         roles: %w[super_admin], feature: nil, personal: false, default: true },
 
       # ── Recordatorios ────────────────────────────────────────────────────────────────

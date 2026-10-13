@@ -174,11 +174,11 @@ RSpec.describe 'Baja programada de Producción y dispensa: el Delivery se va con
     it 'el backend rechaza crear un repartidor sin el pack, no sólo la pantalla' do
       club.update!(features: { 'cultivo' => true })
       create(:sede, club: club)
-      sign_in_as(admin)
+      sign_in_as(create(:user, :super_admin, club: nil)) # el alta es de la plataforma (12-oct-2026)
 
       expect {
-        post '/api/usuarios', params: { user: { email: 'r@test.com', role: 'delivery',
-                                                first_name: 'Repa', last_name: 'Tidor' } }
+        post '/api/super_admin/users', params: { user: { club_id: club.id, email: 'r@test.com', role: 'delivery',
+                                                         first_name: 'Repa', last_name: 'Tidor' } }
       }.not_to change(User, :count)
 
       expect(response).to have_http_status(:unprocessable_entity)

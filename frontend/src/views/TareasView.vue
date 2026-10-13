@@ -82,6 +82,7 @@
                   <span v-if="t.sala" class="pend__chip">{{ t.sala.nombre }}</span>
                   <span v-if="t.lote" class="pend__chip">{{ nombreLote(t.lote) }}</span>
                   <span v-if="t.origen_plan_id" class="pend__chip pend__chip--plan">Plan</span>
+                  <span v-if="t.riego" class="pend__chip pend__chip--riego">{{ resumenRiego(t) }}</span>
                 </span>
                 <span v-if="t.asignada_a && !esPersonal" class="pend__asig" :title="t.asignada_a.nombre">
                   {{ iniciales(t.asignada_a.nombre) }}
@@ -316,6 +317,7 @@ import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
+import { pideRegistroDeRiego, resumenRiego } from '../composables/useCompletarRiego.js'
 import { listSalas, listLotes, listUsers, listSedes, getTareasSemana } from '../lib/api'
 import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
@@ -537,6 +539,12 @@ async function noSeHizoUna(t) {
 // que entrar al detalle y usar el modal de completar.
 async function completarUna(t) {
   if (enCurso.value.has(t.id)) return
+  // Una tarea de riego que dice cómo regar abre «Completar» para registrar el riego.
+  if (pideRegistroDeRiego(t)) {
+    tareaCompletando.value = t
+    showModalCompletar.value = true
+    return
+  }
   enCurso.value.add(t.id)
   try {
     if (!await tareasStore.completar(t.id, null)) return
@@ -732,6 +740,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 .pend__chip--hoy      { background: #eff6ff; color: #2563eb; }
 .pend__chip--prog     { background: #fffbeb; color: #b45309; }
 .pend__chip--plan     { background: #7c3aed; color: #fff; }
+.pend__chip--riego { background: var(--c-sky-100); color: var(--c-sky-600); }
 .pend__asig { width: 20px; height: 20px; border-radius: 50%; background: #e0e7ff; color: #4338ca; font-size: .6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: auto; }
 .pend__chev { color: var(--c-slate-300); font-size: .85rem; flex-shrink: 0; }
 .pend__done { flex-shrink: 0; height: 40px; padding: 0 1rem; border-radius: 10px; border: 0; background: var(--c-leaf-800); color: #fff; font-weight: 700; font-size: .85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }

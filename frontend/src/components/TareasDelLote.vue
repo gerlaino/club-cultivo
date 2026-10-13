@@ -256,10 +256,13 @@
       @applied="onPlanAplicado"
     />
 
+    <ModalCompletarTarea :show="!!tareaRiego" :tarea="tareaRiego" @completada="riegoCompletado" @cerrar="tareaRiego = null" />
   </div>
 </template>
 
 <script setup>
+import ModalCompletarTarea from './ModalCompletarTarea.vue'
+import { useCompletarRiego } from '../composables/useCompletarRiego.js'
 import { ref, computed, onMounted } from 'vue'
 import { useNoSeHizo } from '../composables/useNoSeHizo.js'
 import { listTareas, createRegistroAmbiental, createLoteEvento, completarTareasMasivo, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
@@ -523,6 +526,8 @@ async function iniciar(t) {
 }
 
 function completar(t) {
+  // La de riego que dice cómo regar: se completa registrando el riego con eso cargado.
+  if (pideRegistro(t)) return
   tareaCompletando.value = t
   horasForm.value        = t.horas_estimadas || null
   notasForm.value        = ''
@@ -531,6 +536,13 @@ function completar(t) {
 }
 
 const { marcarNoSeHizo } = useNoSeHizo()
+const { tareaRiego, pideRegistro } = useCompletarRiego()
+async function riegoCompletado() {
+  const t = tareaRiego.value
+  tareaRiego.value = null
+  emit('tarea-completada', t)
+  await cargarTareas()
+}
 async function noSeHizoCompletando() {
   const t = tareaCompletando.value
   if (!t) return

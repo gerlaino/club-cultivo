@@ -5,9 +5,12 @@ class InsumosController < ApplicationController
   before_action :authenticate_user!
   before_action :asegurar_depositos, only: [:index, :show]
   before_action :require_lectura,  only: [:index, :show]
-  before_action :require_gestion,  only: [:create, :update, :comprar, :revertir_compra, :reconteo, :destroy]
+  before_action :require_alta,     only: [:create]
+  # UNA sola declaración por callback: Rails toma la última, y con dos `require_gestion` (la de
+  # transferir venía abajo) reponer, ajustar, editar y borrar quedaban sin control de rol.
+  before_action :require_gestion,  only: [:update, :comprar, :revertir_compra, :reconteo, :destroy,
+                                          :transferir, :transferir_deposito]
   before_action :require_consumo,  only: [:consumir]
-  before_action :require_gestion,  only: [:transferir, :transferir_deposito]
   before_action :set_insumo,       only: [:show, :update, :comprar, :consumir, :transferir, :transferir_deposito, :revertir_compra, :reconteo, :destroy]
 
   # GET /insumos?sede_id=<id|pool>&tipo=<cultivo|general>&activos=true
@@ -33,10 +36,20 @@ class InsumosController < ApplicationController
     )
   end
 
-  # POST /insumos
+  # POST /insumos — dar de alta un producto SIN compra: nace con stock 0 y sin asiento. La compra
+  # (con su egreso, su caja y su categoría) tiene una sola puerta: Contabilidad → Nueva compra, que
+  # crea el producto en el mismo acto. Esto existe para que una receta pueda nombrar un producto
+  # que todavía no se cargó (Germán, 12-oct-2026): la pantalla avisa que no hay registro contable.
+  #
+  # Lo puede hacer el cultivador porque arma las recetas, y dar de alta un nombre no mueve plata
+  # ni stock. Reponer, ajustar y borrar siguen siendo de administración.
   def create
     insumo = current_user.club.insumos.build(insumo_params)
     if insumo.save
+      # Sin depósito explícito (la receta no sabe de depósitos) cae en el de su sede ya, y no en
+      # el próximo GET: la respuesta tiene que decir dónde quedó.
+      Finanzas::SembrarDepositos.new(current_user.club).call if insumo.deposito_id.nil?
+      insumo.reload
       render json: serialize(insumo), status: :created
     else
       render json: { errors: insumo.errors.full_messages }, status: :unprocessable_entity
@@ -239,6 +252,11 @@ class InsumosController < ApplicationController
   ROLES_LECTURA = %w[admin supervisor cultivador auditor].freeze
   ROLES_GESTION = %w[admin supervisor].freeze
   ROLES_CONSUMO = %w[admin supervisor cultivador].freeze
+  ROLES_ALTA    = %w[admin supervisor cultivador].freeze
+
+  def require_alta
+    render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_ALTA.include?(current_user&.role)
+  end
 
   def require_lectura
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_LECTURA.include?(current_user&.role)

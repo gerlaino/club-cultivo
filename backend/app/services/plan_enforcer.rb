@@ -242,6 +242,16 @@ class PlanEnforcer
 
   def usuarios_de_rol(rol) = @club.users.del_equipo.where(role: rol.to_s).count
 
+  # Cuántos hay POR ENCIMA del plan, por rol: los que super admin dio de alta pasándose del cupo
+  # (12-oct-2026). No se bloquea —se puede cobrar aparte—, pero tiene que quedar a la vista.
+  def excedentes_de_usuarios
+    tope = tope_por_rol
+    return {} if tope.nil? || !equipo?
+
+    @club.users.del_equipo.where.not(role: ROLES_SIN_TOPE).group(:role).count
+         .filter_map { |rol, n| [rol, n - tope] if n > tope }.to_h
+  end
+
   def usuarios_por_rol = @limite[:usuarios_por_rol]
 
   # Cuántos de un mismo rol puede tener HOY. En «Hasta 100 pacientes» el cupo es por sede: dos de

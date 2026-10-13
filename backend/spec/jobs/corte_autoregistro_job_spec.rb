@@ -58,4 +58,29 @@ RSpec.describe CorteAutoregistroJob do
     described_class.perform_now(hoy: hoy)
     expect(club.reload).not_to be_suspendido
   end
+
+  # AC (12-oct-2026): quien pagaba con Mercado Pago y venció lo pagado (canceló o rebotó el cobro)
+  # se pausa por falta de pago; el próximo cobro lo despausa. Sin suscripción, nadie lo corta.
+  describe 'con suscripción de Mercado Pago' do
+    def pagaba(email, hasta:)
+      reg = autoregistrado(email: email, mail_enviado_at: 1.day.ago, hasta: hasta)
+      reg.update!(confirmado_at: Time.current)
+      reg.club.update!(plan_trial: false)
+      reg.club.suscripciones.create!(mp_preapproval_id: "pre_#{email}", estado: 'cancelada', origen: 'autocultivo',
+                                     monto_ars: 9900, payer_email: email, motivo: 'Autocultivo')
+      reg
+    end
+
+    it 'vencido lo pagado, se pausa por falta de pago' do
+      reg = pagaba('e@ej.com', hasta: hoy - 1)
+      described_class.perform_now(hoy: hoy)
+      expect(reg.club.reload.suspension_motivo).to eq('no_pago')
+    end
+
+    it 'con lo pagado vigente, no' do
+      reg = pagaba('f@ej.com', hasta: hoy + 10)
+      described_class.perform_now(hoy: hoy)
+      expect(reg.club.reload).not_to be_suspendido
+    end
+  end
 end

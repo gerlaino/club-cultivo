@@ -67,7 +67,17 @@
           <button class="rnd__btn rnd__btn--primary" :disabled="guardando" @click="conformar(miAjustada, true)">
             Estoy de acuerdo
           </button>
-          <button class="rnd__btn" :disabled="guardando" @click="noConforme(miAjustada)">No</button>
+          <button class="rnd__btn" :disabled="guardando" @click="desacuerdo = ''">No</button>
+        </div>
+        <!-- No estar de acuerdo NO devuelve la plata ni reabre nada: queda escrito y se habla. -->
+        <div v-if="desacuerdo !== null" class="rnd__desacuerdo">
+          <label class="rnd__campo rnd__campo--motivo">
+            <span class="rnd__campo-lbl">¿Qué pasó? Lo ve administración</span>
+            <input v-model="desacuerdo" type="text" class="rnd__input rnd__input--motivo" maxlength="300" />
+          </label>
+          <button class="rnd__btn" :disabled="guardando" @click="desacuerdo = null">Cancelar</button>
+          <button class="rnd__btn rnd__btn--primary" :disabled="guardando || !desacuerdo.trim()"
+                  @click="conformar(miAjustada, false, desacuerdo.trim())">Enviar</button>
         </div>
       </div>
 
@@ -90,49 +100,61 @@
 
     <!-- ══ RECEPTOR: contar y recibir ════════════════════════════════════════ -->
     <template v-else>
-      <div v-for="r in porRecibir" :key="r.id" class="rnd__box rnd__box--recibir">
-        <div>
-          <p class="rnd__titulo">{{ r.delivery }} te está rindiendo</p>
-          <p class="rnd__sub">
-            {{ r.cobros }} entrega{{ r.cobros === 1 ? '' : 's' }} · declara ${{ fmt(r.declarado_ars) }}
-          </p>
-        </div>
-        <!-- DÓNDE ENTRA EL EFECTIVO. El que atiende no elige: cae en la caja de su mostrador,
-             que es el cajón que tiene abierto adelante. Administración sí — puede haber varios
-             mostradores abiertos, y puede no querer ninguno (se lo lleva y queda asentado como
-             ingreso del club). Antes esto se DEDUCÍA de las sedes del que recibía, y con dos
-             cajas abiertas la plata no entraba a ninguna. -->
-        <div v-if="r.elijo_destino" class="rnd__destino">
-          <label class="rnd__destino-lbl" :for="`destino-${r.id}`">¿En qué caja entra?</label>
-          <select :id="`destino-${r.id}`" v-model="destino[r.id]" class="rnd__select">
-            <option value="">Elegí la caja</option>
-            <option v-for="c in cajasAbiertas" :key="c.sede_id" :value="String(c.sede_id)">
-              Caja de {{ c.sede }}{{ c.abierta_por ? ` — la abrió ${c.abierta_por}` : '' }}
-            </option>
-            <!-- SÓLO cuando no hay ninguna abierta. Con una caja disponible, el efectivo entra
-                 ahí: si después te lo llevás, lo sacás del cajón y queda a tu nombre. Dejarlo
-                 como una opción más era ofrecer que la plata no la tuviera nadie. -->
-            <option v-if="!cajasAbiertas.length" value="club">
-              No hay ninguna caja abierta — queda asentada en la organización
-            </option>
-          </select>
-          <p v-if="cajasAbiertas.length" class="rnd__destino-hint">
-            ¿Te la llevás? Recibila igual en la caja y después sacala del cajón: así queda
-            registrado quién la tiene.
-          </p>
+      <div v-for="r in porRecibir" :key="r.id" class="rnd__box rnd__box--recibir rnd__box--col">
+        <!-- Arriba quién y cuánto dice que trae; abajo, en UNA fila alineada por la base, lo que
+             hace quien recibe: dónde entra, cuánto contó y (si falta) por qué. -->
+        <div class="rnd__head">
+          <div>
+            <p class="rnd__titulo">{{ r.delivery }} te está rindiendo</p>
+            <p class="rnd__sub">{{ r.cobros }} entrega{{ r.cobros === 1 ? '' : 's' }} cobrada{{ r.cobros === 1 ? '' : 's' }} en efectivo</p>
+          </div>
+          <div class="rnd__declara">
+            <span class="rnd__declara-lbl">Declara</span>
+            <span class="rnd__declara-n">${{ fmt(r.declarado_ars) }}</span>
+          </div>
         </div>
 
-        <div class="rnd__acc">
+        <div class="rnd__form">
+          <!-- DÓNDE ENTRA EL EFECTIVO. El que atiende no elige: cae en la caja de su mostrador,
+               que es el cajón que tiene abierto adelante. Administración sí — puede haber varios
+               mostradores abiertos, y puede no querer ninguno (se lo lleva y queda asentado como
+               ingreso del club). Antes esto se DEDUCÍA de las sedes del que recibía, y con dos
+               cajas abiertas la plata no entraba a ninguna. -->
+          <label v-if="r.elijo_destino" class="rnd__campo rnd__campo--destino">
+            <span class="rnd__campo-lbl">¿En qué caja entra?</span>
+            <select v-model="destino[r.id]" class="rnd__select">
+              <option value="">Elegí la caja</option>
+              <option v-for="c in cajasAbiertas" :key="c.sede_id" :value="String(c.sede_id)">
+                Caja de {{ c.sede }}{{ c.abierta_por ? ` — la abrió ${c.abierta_por}` : '' }}
+              </option>
+              <!-- SÓLO cuando no hay ninguna abierta. Con una caja disponible, el efectivo entra
+                   ahí: si después te lo llevás, lo sacás del cajón y queda a tu nombre. Dejarlo
+                   como una opción más era ofrecer que la plata no la tuviera nadie. -->
+              <option v-if="!cajasAbiertas.length" value="club">
+                No hay ninguna caja abierta — queda asentada en la organización
+              </option>
+            </select>
+          </label>
           <!-- Se cuenta primero. Lo declarado ya está a la vista porque no es la medición: es lo
                que la otra persona dice que trae, y contra eso se contrasta. -->
-          <input v-model.number="contado[r.id]" type="number" min="0" step="100"
-                 class="rnd__input" placeholder="Cuento" :aria-label="`Contado de ${r.delivery}`" />
-          <input v-if="falta(r)" v-model="motivo[r.id]" type="text" class="rnd__input rnd__input--motivo"
-                 placeholder="Por qué falta" />
+          <label class="rnd__campo rnd__campo--monto">
+            <span class="rnd__campo-lbl">Contaste</span>
+            <input v-model.number="contado[r.id]" type="number" min="0" step="100"
+                   class="rnd__input" placeholder="$" :aria-label="`Contado de ${r.delivery}`" />
+          </label>
+          <label v-if="falta(r)" class="rnd__campo rnd__campo--motivo">
+            <span class="rnd__campo-lbl">Por qué falta</span>
+            <input v-model="motivo[r.id]" type="text" class="rnd__input rnd__input--motivo"
+                   placeholder="Ej: dio vuelto de más" />
+          </label>
           <button class="rnd__btn rnd__btn--primary" :disabled="guardando" @click="recibir(r)">
             Recibir
           </button>
         </div>
+        <p v-if="r.elijo_destino && cajasAbiertas.length" class="rnd__destino-hint">
+          ¿Te la llevás? Recibila igual en la caja y después sacala del cajón: así queda registrado
+          quién la tiene.
+        </p>
         <p v-if="falta(r)" class="rnd__falta">
           Faltan ${{ fmt(Math.abs(falta(r))) }} — quedan a cuenta de {{ r.delivery }}, no se dan por perdidos.
         </p>
@@ -205,6 +227,8 @@ const cajasAbiertas = ref([])
 const miSaldo     = ref(0)
 const motivo      = ref({})
 const guardando   = ref(false)
+// El «No» de la conformidad: null = cerrado; '' = abierto esperando el motivo.
+const desacuerdo  = ref(null)
 
 const soyRepartidor = computed(() => auth.user?.role === 'delivery')
 const miPendiente   = computed(() => rendiciones.value.find(r => r.estado === 'pendiente'))
@@ -284,18 +308,13 @@ async function conformar (r, ok, notas) {
   try {
     await conformarRendicion(r.id, { conforme: ok, notas })
     toast.success(ok ? 'Conformado' : 'Quedó anotado que no estás de acuerdo')
+    desacuerdo.value = null
     await cargar()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo registrar.')
   } finally { guardando.value = false }
 }
 
-// No estar de acuerdo NO devuelve la plata ni reabre nada: queda escrito y se habla.
-function noConforme (r) {
-  const notas = window.prompt('¿Qué pasó? Queda anotado para que lo vea administración.')
-  if (notas === null) return
-  conformar(r, false, notas)
-}
 
 onMounted(async () => {
   await cargar()
@@ -359,10 +378,22 @@ onMounted(async () => {
 .rnd__input { width: 120px; text-align: right; font-family: var(--font-mono); }
 .rnd__input--motivo { width: 180px; text-align: left; font-family: var(--font-ui); }
 .rnd__select { min-width: 170px; }
-.rnd__destino { margin-top: .6rem; display: flex; flex-direction: column; gap: .3rem; }
-.rnd__destino-lbl { font-size: .78rem; font-weight: 600; color: var(--c-slate-600); }
-.rnd__destino-hint { margin: 0; font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
-.rnd__destino .rnd__select { width: 100%; min-width: 0; }
+.rnd__destino-hint { margin: 0; font-size: var(--fs-12); color: var(--c-slate-500); line-height: 1.35; }
+
+/* Tarjeta de quien recibe: cabecera (quién · cuánto declara) y una fila de campos alineada. */
+.rnd__box--col { flex-direction: column; align-items: stretch; gap: 12px; }
+.rnd__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.rnd__declara { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.rnd__declara-lbl { font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--c-ink-500); }
+.rnd__declara-n { font-family: var(--font-mono); font-size: 1.25rem; font-weight: 700; color: var(--c-ink-900); font-variant-numeric: tabular-nums; }
+.rnd__form { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.rnd__campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rnd__campo-lbl { font-size: var(--fs-12); font-weight: 600; color: var(--c-slate-600); }
+.rnd__campo--destino { flex: 2 1 240px; }
+.rnd__campo--monto { flex: 0 0 140px; }
+.rnd__campo--motivo { flex: 1 1 200px; }
+.rnd__campo .rnd__select, .rnd__campo .rnd__input { width: 100%; min-width: 0; }
+.rnd__desacuerdo { flex-basis: 100%; display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 
 .rnd__btn {
   border-radius: 9px; padding: 9px 16px; font-size: var(--fs-14); font-weight: 600;
@@ -390,6 +421,8 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .rnd__box { flex-direction: column; align-items: stretch; }
   .rnd__acc { justify-content: stretch; }
-  .rnd__input, .rnd__select, .rnd__btn { flex: 1; }
+  .rnd__acc .rnd__input, .rnd__acc .rnd__select, .rnd__acc .rnd__btn { flex: 1; }
+  .rnd__form { flex-direction: column; align-items: stretch; }
+  .rnd__campo--destino, .rnd__campo--monto, .rnd__campo--motivo { flex: none; }
 }
 </style>

@@ -454,7 +454,6 @@ export const assetDownloadUrl = (path) => {
   if (!url) return null
   return url + (url.includes('?') ? '&' : '?') + 'disposition=attachment'
 }
-export const createUser        = (payload) => api.post('/usuarios', { user: payload });
 export const updateUser        = (id, payload) => api.put(`/usuarios/${id}`, { user: payload });
 export const deleteUser        = (id) => api.delete(`/usuarios/${id}`);
 export const resetUserPassword = (id) => api.post(`/usuarios/${id}/reset_password`);
@@ -629,8 +628,11 @@ export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sede
 // Qué bloquea y qué cambia si a alguien se le cambia el rol (`Acceso::CambiarRol#efectos`).
 // Equipo: qué hizo hoy cada persona, horas del mes, pendientes, último acceso y cupo por rol.
 export const getEquipoActividad = () => api.get('/usuarios/actividad')
+export const pedirUsuario       = (payload) => api.post('/usuarios/pedido', payload)
 export const getCambioDeRol = (userId, rol) => api.get(`/usuarios/${userId}/cambio_de_rol`, { params: { rol } })
 export const getPanelConduccion = (params = {}) => api.get('/panel_conduccion', { params })
+export const buscarGeneral       = (q) => api.get('/buscar', { params: { q } })
+export const getUltimasAcciones = (limite = 8) => api.get('/ultimas_acciones', { params: { limite } })
 export const getDetalleCierrePanel = (id) => api.get(`/panel_conduccion/cierres/${id}`)
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 // LA LLAVE DEL CANDADO: marcar visto congela la corrección del cierre, así que se tiene que
@@ -1080,3 +1082,12 @@ export const updateAdminTurno             = (id, payload) => api.patch(`/admin/t
 export const deleteAdminTurno             = (id)      => api.delete(`/admin/turnos/${id}`)
 
 export default api;
+
+// ── Mercado Pago: suscripciones (12-oct-2026) ─────────────────────────────────
+export const getSuscripcionClub      = (clubId)          => api.get(`/super_admin/clubs/${clubId}/suscripcion`)
+export const crearSuscripcionClub    = (clubId, payload) => api.post(`/super_admin/clubs/${clubId}/suscripcion`, payload)
+export const cancelarSuscripcionClub = (clubId)          => api.post(`/super_admin/clubs/${clubId}/suscripcion/cancelar`)
+export const getPrecioAutocultivo    = ()                => api.get('/super_admin/precio_autocultivo')
+export const guardarPrecioAutocultivo = (monto_ars)      => api.put('/super_admin/precio_autocultivo', { monto_ars })
+export const getMiSuscripcion        = ()                => api.get('/suscripcion')
+export const crearMiSuscripcion      = (payload)         => api.post('/suscripcion', payload)

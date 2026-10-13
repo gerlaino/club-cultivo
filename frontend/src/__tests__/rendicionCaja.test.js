@@ -82,7 +82,8 @@ describe('El receptor cuenta y recibe', () => {
     const w = await montar('admin', 5)
 
     expect(w.text()).toContain('Juan te está rindiendo')
-    expect(w.text()).toContain('4 entregas · declara $100.000')
+    expect(w.text()).toContain('4 entregas cobradas en efectivo')
+    expect(w.find('.rnd__declara-n').text()).toBe('$100.000')
   })
 
   it('sin contar no se recibe', async () => {
@@ -187,9 +188,10 @@ describe('La conformidad del repartidor', () => {
 
   // No estar de acuerdo no devuelve la plata ni reabre nada: queda escrito.
   it('y puede decir que no, con lo que pasó', async () => {
-    vi.stubGlobal('prompt', () => 'yo entregué los 100')
     const w = await montar('delivery')
     await w.findAll('.rnd__btn')[1].trigger('click')
+    await w.find('.rnd__desacuerdo input').setValue('yo entregué los 100')
+    await w.findAll('.rnd__desacuerdo .rnd__btn').find(b => b.text() === 'Enviar').trigger('click')
     await flushPromises()
 
     expect(conformarRendicion).toHaveBeenCalledWith(9, { conforme: false, notas: 'yo entregué los 100' })
@@ -307,7 +309,7 @@ describe('Dónde entra el efectivo', () => {
                      cobros: 1, puedo_recibir: true, elijo_destino: false }]
     const w = await montar('dispensador', 5)
 
-    expect(w.find('.rnd__destino').exists()).toBe(false)
+    expect(w.find('.rnd__campo--destino').exists()).toBe(false)
 
     await w.find('.rnd__input').setValue(100000)
     await w.find('.rnd__btn--primary').trigger('click')
@@ -325,9 +327,9 @@ describe('Dónde entra el efectivo', () => {
 
     // Arranca en el placeholder, no en blanco: un select apuntando a `undefined` no matchea
     // ninguna opción y se dibuja vacío, sin el aviso de que falta contestarlo.
-    expect(w.find('.rnd__destino select').element.value).toBe('')
+    expect(w.find('.rnd__campo--destino select').element.value).toBe('')
 
-    const opciones = w.find('.rnd__destino select').findAll('option').map(o => o.text())
+    const opciones = w.find('.rnd__campo--destino select').findAll('option').map(o => o.text())
     expect(opciones).toContain('Caja de Example — la abrió Ada')
     // El efectivo ENTRA A UNA CAJA: llevárselo es sacarlo del cajón después, y eso queda
     // registrado a nombre de quien lo saca. Con una caja abierta no se ofrece la organización.
@@ -341,7 +343,7 @@ describe('Dónde entra el efectivo', () => {
                      cobros: 1, puedo_recibir: true, elijo_destino: true }]
     const w = await montar('admin', 5)
 
-    const opciones = w.find('.rnd__destino select').findAll('option').map(o => o.text())
+    const opciones = w.find('.rnd__campo--destino select').findAll('option').map(o => o.text())
     expect(opciones.some(o => /No hay ninguna caja abierta/i.test(o))).toBe(true)
   })
 
@@ -361,7 +363,7 @@ describe('Dónde entra el efectivo', () => {
                      cobros: 1, puedo_recibir: true, elijo_destino: true }]
     const w = await montar('admin', 5)
     await w.find('.rnd__input').setValue(100000)
-    await w.find('.rnd__destino select').setValue('3')
+    await w.find('.rnd__campo--destino select').setValue('3')
     await w.find('.rnd__btn--primary').trigger('click')
     await flushPromises()
 

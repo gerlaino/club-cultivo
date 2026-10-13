@@ -1,4 +1,5 @@
 <script setup>
+import MiSuscripcion from '../components/personal/MiSuscripcion.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useClubStore } from '../stores/club'
@@ -301,7 +302,11 @@ function showToast(type, msg) {
               Los admins no tienen tope.
             </p>
 
-            <p class="pv__plan-contacto">
+            <!-- Autocultivo: la suscripción con Mercado Pago (12-oct-2026). -->
+            <div v-if="esPersonal" id="plan" class="pv__plan-suscripcion">
+              <MiSuscripcion />
+            </div>
+            <p v-else class="pv__plan-contacto">
               Para cambiar de plan o sumar módulos, escribinos.
             </p>
           </div>
@@ -622,5 +627,6 @@ function showToast(type, msg) {
    `.pv__btn-outline`, que ya existía más arriba: sólo le hace falta no venir subrayado y no
    estirarse a todo el ancho de la card, que es flex-column. */
 .pv__link-modulo { align-self: flex-start; text-decoration: none; }
+.pv__plan-suscripcion { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--c-slate-200); }
 </style>
 

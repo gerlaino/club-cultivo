@@ -25,6 +25,7 @@ class Club < ApplicationRecord
   has_many :users
   # Sólo los usos personales que se registraron solos desde /bienvenida.
   has_one :registro_personal, dependent: :destroy
+  has_many :suscripciones, class_name: 'Suscripcion', dependent: :destroy
   has_many :salas,                dependent: :destroy
   has_many :camas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy

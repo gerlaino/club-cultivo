@@ -39,7 +39,8 @@ export const NAV_GROUPS = [
       { to: '/mi-cultivo', label: 'Mi cultivo', soloPersonal: true },
       { to: '/salas', label: 'Salas', labelPersonal: 'Espacios' },
       { to: '/lotes', label: 'Lotes', soloOrganizacion: true },
-      { to: '/plantas', label: 'Plantas' },
+      // Sólo autocultivo: en una organización a una planta se llega por su lote o el buscador.
+      { to: '/plantas', label: 'Plantas', soloPersonal: true },
       { to: '/geneticas', label: 'Genéticas' },
       // Recetas de nutrientes: en organización se arman con lo del depósito; el cultivador de
       // casa no tiene depósito, así que acá viven también sus nutrientes.

@@ -184,10 +184,13 @@ RSpec.describe 'Uso personal', type: :request do
     let(:admin) { create(:user, :admin, club: club) }
     before { sign_in_as(admin) }
 
+    # El alta es de la plataforma desde el 12-oct-2026; tampoco ella le suma gente a un autocultivo.
     it 'no puede dar de alta a nadie, ni siquiera otro admin' do
+      sign_in_as(create(:user, :super_admin, club: nil))
       %w[admin cultivador].each do |rol|
-        post '/api/usuarios', params: { user: { email: "#{rol}@casa.com", password: 'Clave1234!',
-                                                first_name: 'Otro', last_name: 'X', role: rol } }
+        post '/api/super_admin/users', params: { user: { club_id: club.id, email: "#{rol}@casa.com",
+                                                         first_name: 'Otro', last_name: 'X', role: rol,
+                                                         exceder_cupo: true } }
 
         expect(response).to have_http_status(:payment_required), "#{rol}: #{response.body}"
         expect(json['mensaje']).to include('una sola persona')

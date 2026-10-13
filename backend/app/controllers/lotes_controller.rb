@@ -1022,12 +1022,7 @@ class LotesController < ApplicationController
       if (n = r.nutricion.presence)
         # Lo que recibió ESTE lote (su parte si se regó la sala entera) y, por producto, la
         # salvedad si no salió del depósito (`Lotes::Nutricion`).
-        parte = nutri.parte_de_copia(n, @lote.id)
-        prods = nutri.productos_de_copia(n, @lote.id).map { |p| Lotes::Nutricion.linea_producto(p) }
-        chips << ["#{n['receta_nombre'] || 'productos sueltos'} · #{Lotes::Nutricion.num(n['litros'].to_f * parte)} L" \
-                  "#{parte < 1 ? (current_user.club&.personal? ? ' (su parte del espacio)' : ' (su parte de la sala)') : ''}" \
-                  "#{n['costo_ars'].to_f.positive? ? " · $#{(n['costo_ars'].to_f * parte).round(0)}" : ''}",
-                  prods.join(', ').presence].compact.join(': ')
+        chips << nutri.texto_de_copia(n, @lote.id, personal: current_user.club&.personal?)
       elsif r.fertilizacion
         chips << "fertilización#{r.notas_fertilizacion.present? ? " (#{r.notas_fertilizacion})" : ''}"
       end

@@ -17,43 +17,20 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     render json: users.map { |u| serialize_user(u) }
   end
 
+  # El alta del equipo de una organización: la única puerta desde el 12-oct-2026 (el admin la
+  # pide). Las reglas viven en `Equipo::DarDeAlta`; pasarse del cupo del plan responde 409 con
+  # el detalle y se confirma reenviando con `exceder_cupo: true`.
   def create
     club = Club.find(params[:user][:club_id])
-
-    rol = params.dig(:user, :role).to_s
-
-    # El rol tiene que servirle a lo que la organización contrató. Crear un cultivador en una
-    # organización sin la suite de Cultivo da de alta a alguien que loguea a una app sin una
-    # sola pantalla — y el que lo nota es el cliente, no nosotros.
-    if (faltante = club.modulo_faltante_para_rol(rol))
-      return render json: { errors: ["#{Club::ROLES_META.dig(rol, :label) || rol} necesita el módulo " \
-                                     "#{Club.label_modulo(faltante)}, que esta organización no tiene activo."] },
-                    status: :unprocessable_entity
-    end
-
-    # El plan también limita los usuarios: crearlos desde el panel de plataforma se salteaba
-    # el límite que sí se aplica cuando los crea el club (ver club_users_controller). El cupo
-    # es por ROL desde que "5 usuarios" dejó de significar algo.
-    enforcer = PlanEnforcer.new(club)
-    unless enforcer.puede_crear_usuario?(rol)
-      info = enforcer.info
-      return render json: PlanEnforcer.error_limite_rol(rol, plan: info[:label],
-                                                        tope: enforcer.tope_por_rol),
-                    status: :payment_required
-    end
-
-    user     = club.users.build(user_params)
-    # Sin contraseña escrita, se genera una temporal y dictable. Antes caía en una FIJA para toda
-    # la plataforma, que además venía precargada en el formulario.
-    password = params[:user][:password].presence || User.password_temporal
-    user.password = password
-
-    if user.save
-      # En claro: es temporal y hay que poder dictársela a quien va a usarla.
-      render json: serialize_user(user).merge(password_inicial: password), status: :created
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
+    exceder = params[:exceder_cupo].presence || params.dig(:user, :exceder_cupo)
+    r = Equipo::DarDeAlta.new(club: club, atributos: user_params, password: params.dig(:user, :password),
+                              exceder_cupo: ActiveModel::Type::Boolean.new.cast(exceder)).call
+    # En claro: es temporal y hay que poder dictársela a quien va a usarla.
+    render json: serialize_user(r.user).merge(password_inicial: r.password_inicial, mail_enviado: r.mail_enviado,
+                                              excede_cupo: r.excede_cupo),
+           status: :created
+  rescue Equipo::DarDeAlta::Error => e
+    render json: { errors: [e.message], mensaje: e.message, **e.extra }, status: e.status
   end
 
   def update

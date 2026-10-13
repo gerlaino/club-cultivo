@@ -114,6 +114,10 @@ class PlantActivitiesController < ApplicationController
       plagas_observadas:    r.plagas_observadas,
       fuente:               r.fuente,
       riego_planta:         mia && RiegoPlantaSerializer.call(mia),
+      volumen_l:            no_regada ? nil : r.volumen_l&.to_f,
+      # QUÉ se aplicó, de la copia que deja el registro (`Nutricion::Aplicar`): la receta y cada
+      # producto con su cantidad. Sin costos: el historial de la planta lo lee quien cultiva.
+      aplicado:             no_regada || r.nutricion.blank? ? nil : nutricion_sin_costo.texto_de_copia(r.nutricion, r.lote_id, personal: @plant.lote&.club&.personal?),
     }.compact
     return nil if no_regada && tareas.empty? && meta.except(:tareas_realizadas, :fuente).empty?
 
@@ -128,6 +132,8 @@ class PlantActivitiesController < ApplicationController
       _heredado:   true,
     }
   end
+
+  def nutricion_sin_costo = (@nutricion_sin_costo ||= Lotes::Nutricion.new(@plant.lote, con_costo: false))
 
   FASE_LABELS = {
     'semilla' => 'Enraizado', 'esqueje' => 'Enraizado', 'germinacion' => 'Enraizado',

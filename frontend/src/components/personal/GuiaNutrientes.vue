@@ -104,26 +104,26 @@ async function aplicar() {
 .gnu__cargando { color: var(--c-ink-700); }
 .gnu__aviso { display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-3) var(--sp-4); border-radius: 12px; background: var(--c-amber-100); color: var(--c-ink-900); font-size: var(--fs-14); line-height: 1.45; }
 .gnu__aviso i { color: var(--c-gold-500); margin-top: 2px; }
-.gnu__fase { border: 1px solid var(--c-leaf-100); border-radius: 14px; background: var(--c-paper); padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
+.gnu__fase { border: 1px solid var(--c-slate-200); border-radius: 14px; background: #fff; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
 .gnu__fase-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
-.gnu__fase-t { margin: 0; font-size: var(--fs-18); font-weight: 800; color: var(--c-ink-900); }
-.gnu__predomina { font-size: var(--fs-13); font-weight: 700; color: var(--c-leaf-800); background: var(--c-leaf-100); padding: 3px 10px; border-radius: 999px; }
-.gnu__detalle { margin: 0; color: var(--c-ink-700); line-height: 1.5; }
-.gnu__rangos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-2); }
+.gnu__fase-t { margin: 0; font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); }
+.gnu__predomina { font-size: var(--fs-12); font-weight: 700; color: var(--c-leaf-800); background: var(--c-leaf-100); padding: 3px 10px; border-radius: 999px; }
+.gnu__detalle { margin: 0; color: var(--c-ink-700); font-size: var(--fs-14); line-height: 1.55; }
+.gnu__rangos { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-2); }
 .gnu__rango { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3); border-radius: 10px; background: var(--c-leaf-50); border: 1px solid var(--c-leaf-100); }
 .gnu__rango-k { font-size: var(--fs-12); font-weight: 700; color: var(--c-ink-700); text-transform: uppercase; letter-spacing: .04em; }
-.gnu__rango-v { font-size: var(--fs-18); color: var(--c-ink-900); }
+.gnu__rango-v { font-size: var(--fs-18); font-weight: 700; color: var(--c-ink-900); font-variant-numeric: tabular-nums; }
 .gnu__rango-tuyo { font-size: var(--fs-12); color: var(--c-ink-700); }
 .gnu__rango-cmp { font-size: var(--fs-12); color: var(--c-ink-700); }
 .gnu__rango-cmp--ok { color: var(--c-leaf-800); font-weight: 600; }
 .gnu__rango-cmp--fuera { color: var(--c-gold-500); font-weight: 600; }
-.gnu__notas { display: flex; flex-direction: column; gap: var(--sp-2); color: var(--c-ink-700); font-size: var(--fs-14); line-height: 1.5; }
+.gnu__notas { display: flex; flex-direction: column; gap: var(--sp-2); color: var(--c-ink-700); font-size: var(--fs-13); line-height: 1.5; padding: var(--sp-3) var(--sp-4); border-radius: 12px; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); }
 .gnu__notas p { margin: 0; }
 .gnu__aplicar { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
 .gnu__aplicar-p { margin: 0; color: var(--c-ink-700); font-size: var(--fs-14); }
 .gnu__aplicada { margin: 0; color: var(--c-leaf-800); font-weight: 600; }
-.gnu__btn { border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 700; background: var(--c-leaf-800); color: var(--c-paper); cursor: pointer; }
+.gnu__btn { border: 0; border-radius: 10px; padding: 10px 16px; font-size: var(--fs-14); font-weight: 700; background: var(--c-leaf-800); color: #fff; cursor: pointer; }
 .gnu__btn:disabled { opacity: .6; cursor: default; }
-.gnu__fuentes { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-12); color: var(--c-ink-700); }
+.gnu__fuentes { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-12); color: var(--c-ink-500); padding-top: var(--sp-3); border-top: 1px solid var(--c-slate-200); }
 .gnu__fuentes a { color: var(--c-leaf-800); }
 </style>

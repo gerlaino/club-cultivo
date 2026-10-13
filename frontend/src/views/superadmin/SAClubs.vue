@@ -4,6 +4,7 @@ import { formatPrecio } from '../../lib/formatters.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { listSuperAdminClubs } from '../../lib/api.js'
+import SAPrecioAutocultivo from '../../components/superadmin/SAPrecioAutocultivo.vue'
 
 const router  = useRouter()
 const clubs   = ref([])
@@ -149,6 +150,9 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- El precio fijo del autocultivo (Mercado Pago). Las organizaciones tienen el suyo, en su ficha. -->
+    <SAPrecioAutocultivo class="sac__precio" />
+
     <div class="sa-filtros">
       <label for="sac-buscar" class="visually-hidden">Buscar organización</label>
       <input id="sac-buscar" v-model="search" class="sa-buscar" placeholder="Buscar por nombre, slug, mail o ciudad" />
@@ -228,4 +232,5 @@ onMounted(async () => {
 .sac__silencio { color: var(--c-gold-500); }
 .sac__abrir { font-weight: 600; font-size: .82rem; color: var(--c-leaf-800); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sac__precio { margin-bottom: 1rem; }
 </style>

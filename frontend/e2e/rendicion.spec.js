@@ -43,7 +43,8 @@ test('la rendición del repartidor, de punta a punta', async ({ page }) => {
   await entrar(page, 'dispensador')
   await page.goto('/mostrador')
   await expect(page.getByText(/te está rindiendo/)).toBeVisible()
-  await expect(page.getByText(/2 entregas · declara \$100\.000/)).toBeVisible()
+  await expect(page.getByText(/2 entregas cobradas en efectivo/)).toBeVisible()
+  await expect(page.locator(".rnd__declara-n")).toHaveText("$100.000")
 
   // El paquete que vuelve se lista: se desarma solo, no se elige.
   await expect(page.getByText('Trae 1 paquete sin entregar')).toBeVisible()
@@ -84,9 +85,9 @@ test('el admin ve la rendición en el historial y lo acumulado en la ficha', asy
   const errores = vigilarErrores(page)
   await entrar(page, 'admin')
 
-  // El historial, en la solapa del mostrador.
-  await page.goto('/mostrador')
-  await page.locator('.mst__tab', { hasText: 'Rendiciones' }).click()
+  // El historial: Comercial → Rendiciones. Salió del mostrador el 12-sep-2026 (es plata del
+  // delivery, no de la mesa) y este caso seguía buscando la solapa vieja.
+  await page.goto('/delivery/rendiciones')
   const fila = page.locator('.rnd__tabla tbody tr').first()
   await expect(fila).toContainText('Beto')
   await expect(fila).toContainText('$100.000')
@@ -99,7 +100,7 @@ test('el admin ve la rendición en el historial y lo acumulado en la ficha', asy
   const id = await idDeUsuario(page, USUARIOS.delivery)
   expect(id, 'no se encontró al repartidor en el equipo').toBeTruthy()
   await page.goto(`/usuarios/${id}`)
-  await expect(page.getByText('Tiene del club')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Tiene de la organización')).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('.udc__acuenta-val')).toContainText('20.000')
   await expect(page.getByText(/No es una pérdida/)).toBeVisible()
 

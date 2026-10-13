@@ -65,62 +65,23 @@ class ClubUsersController < ApplicationController
   end
 
   # POST /usuarios
+  #
+  # Las altas del equipo las hace la plataforma desde super admin (Germán, 12-oct-2026): el alta es
+  # el momento de vender y el cupo lo maneja quien cobra (`SuperAdmin::UsersController#create`). El
+  # admin las PIDE (`pedido`). La pantalla ya no ofrece el alta; esto la cierra también por la API.
   def create
-    # No se pueden dar de alta usuarios operativos hasta que el club tenga al
-    # menos una sede: esos roles se asignan a sedes/salas y, sin sede, loguearían
-    # a una app vacía (inconsistencia de onboarding). El admin sí puede crearse.
-    nuevo_rol = params.dig(:user, :role).to_s
+    render json: { errors: ['Los usuarios del equipo los da de alta Cultivo Espacial. Pedilo desde Equipo → «Pedir un usuario».'] },
+           status: :forbidden
+  end
 
-    # El cupo es POR ROL, así que hay que saber cuál antes de preguntarlo. En Básico va uno de
-    # cada uno; en Total, los que necesite.
-    enforcer = PlanEnforcer.new(current_user.club)
-    unless enforcer.puede_crear_usuario?(nuevo_rol)
-      info = enforcer.info
-      return render json: PlanEnforcer.error_limite_rol(nuevo_rol, plan: info[:label],
-                                                        tope: enforcer.tope_por_rol),
-                    status: :payment_required
-    end
-
-    # Sólo los roles que la pantalla ofrece. No alcanza con sacarlos del formulario: el endpoint
-    # acepta lo que le manden, y un rol no ofrecido entraría igual por la API. Mismo criterio que
-    # el alta de club (`Club::ROLES_ALTA`).
-    # `roles_para_alta` y no la constante: delivery sólo se ofrece si la organización tiene el
-    # módulo. Crear un repartidor sin Delivery daría de alta a alguien que no puede entrar.
-    unless current_user.club.roles_para_alta.include?(nuevo_rol)
-      faltante = current_user.club.modulo_faltante_para_rol(nuevo_rol)
-      motivo = if faltante
-                 "#{Club::ROLES_META.dig(nuevo_rol, :label) || nuevo_rol} necesita el módulo " \
-                 "#{Club.label_modulo(faltante)}, que no está activo en esta organización."
-               else
-                 "El rol #{nuevo_rol.presence || '(vacío)'} no se puede asignar desde acá."
-               end
-      return render json: { errors: [motivo] }, status: :unprocessable_entity
-    end
-
-    unless nuevo_rol == 'admin' || current_user.club.sedes.exists?
-      return render json: { errors: ['Creá al menos una sede antes de dar de alta usuarios operativos.'] }, status: :unprocessable_entity
-    end
-
-    user = User.new(user_params)
-    user.club_id = current_user.club_id
-
-    # Contraseña inicial: SIEMPRE generada acá y distinta para cada uno. El frontend mandaba
-    # una fija ('123456Aa') para todos, así que todo usuario de todo club nacía con la misma
-    # clave conocida. Se ignora cualquier password que venga del cliente.
-    tmp_password = User.password_temporal
-    user.password = user.password_confirmation = tmp_password
-
-    if user.save
-      # El mail es la vía cómoda, no la única: si el club no tiene SMTP nunca llega y nadie se
-      # entera. La contraseña se devuelve para que el admin pueda dársela en mano.
-      enviado = enviar_instrucciones(user)
-      render json: {
-        data: usuario_json(user),
-        credenciales: { email: user.email, password_inicial: tmp_password, mail_enviado: enviado },
-      }, status: :created
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
+  # POST /usuarios/pedido  { nombre, apellido?, email?, rol, nota? } — pedirle un usuario a la
+  # plataforma. Cae en la bandeja de Consultas de super admin (`Equipo::PedirUsuario`).
+  def pedido
+    datos = params.permit(:nombre, :apellido, :email, :rol, :nota).to_h.symbolize_keys
+    s = Equipo::PedirUsuario.new(club: current_user.club, por: current_user, **datos).call
+    render json: { ok: true, codigo: s.codigo }, status: :created
+  rescue Equipo::PedirUsuario::Error => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # PUT/PATCH /usuarios/:id

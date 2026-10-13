@@ -27,6 +27,7 @@
       <div class="dtb__right">
 
         <!-- Help -->
+        <BuscadorGlobal class="dtb__icon-btn" />
         <button class="dtb__icon-btn dtb__help-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
           <HelpCircle :size="20" :stroke-width="1.75" />
           <span v-if="helpDot" class="dtb__help-dot" />
@@ -74,6 +75,7 @@
 </template>
 
 <script setup>
+import BuscadorGlobal from './BuscadorGlobal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'

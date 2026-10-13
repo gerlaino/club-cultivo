@@ -90,7 +90,7 @@ const CONTENT = {
     {
       title: 'Usuarios y sedes',
       items: [
-        { label: 'Crear usuario', text: 'En Usuarios → Nuevo usuario. Elegí el rol primero: cada rol tiene campos específicos. El supervisor requiere sede asignada.' },
+        { label: 'Sumar a alguien al equipo', text: 'En Equipo → Pedir un usuario. Contanos nombre, rol y (si tiene) su mail: lo damos de alta nosotros y te avisamos. Si el rol ya llenó el cupo de tu plan, la pantalla te lo dice antes de pedir.' },
         { label: 'Asignar sede a supervisor', text: 'Al crear un supervisor podés seleccionar la sede en el mismo wizard. También desde el detalle del usuario.' },
         { label: 'Sedes', text: 'Creá y gestioná sedes desde el menú Sedes. Cada sede puede tener sus propios usuarios, salas y stocks.' },
       ]

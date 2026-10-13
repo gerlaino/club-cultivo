@@ -85,17 +85,35 @@ RSpec.describe 'SuperAdmin: módulos y roles coherentes', type: :request do
       expect(JSON.parse(response.body)['errors'].join).to include('Cultivo')
     end
 
-    # El cupo de «Hasta 50 pacientes» es dos de cada rol. El mensaje tiene que nombrar el ROL:
-    # "permite hasta 2 usuarios" no se entiende ni se puede accionar.
-    it 'rechaza el tercero del mismo rol en «Hasta 50 pacientes» y lo dice por su nombre' do
+    # El cupo de «Hasta 50 pacientes» es dos de cada rol. Desde el 12-oct-2026 la plataforma puede
+    # pasarse (se cobra aparte), pero no sin enterarse: el tercero pide confirmación y el mensaje
+    # nombra el ROL ("permite hasta 2 usuarios" no se entiende ni se puede accionar).
+    it 'el tercero del mismo rol en «Hasta 50 pacientes» pide confirmación y lo dice por su nombre' do
       club = create(:club, plan: 'basico')
+      ActsAsTenant.with_tenant(club) { create(:sede, club: club) }
+      create_list(:user, 2, club: club, role: 'cultivador')
+
+      expect {
+        post '/api/super_admin/users',
+             params: { user: { email: 'c2@y.test', role: 'cultivador', club_id: club.id } }, as: :json
+      }.not_to change(User, :count)
+      expect(response).to have_http_status(:conflict)
+      body = JSON.parse(response.body)
+      expect(body['mensaje']).to include('Cultivador')
+      expect(body).to include('excede_cupo' => true, 'tope' => 2, 'actuales' => 2)
+    end
+
+    it 'confirmado, lo da de alta y queda contado como por encima del plan' do
+      club = create(:club, plan: 'basico')
+      ActsAsTenant.with_tenant(club) { create(:sede, club: club) }
       create_list(:user, 2, club: club, role: 'cultivador')
 
       post '/api/super_admin/users',
-           params: { user: { email: 'c2@y.test', role: 'cultivador', club_id: club.id } }, as: :json
+           params: { exceder_cupo: true, user: { email: 'c2@y.test', role: 'cultivador', club_id: club.id } }, as: :json
 
-      expect(response).to have_http_status(:payment_required)
-      expect(JSON.parse(response.body)['mensaje']).to include('cultivador')
+      expect(response).to have_http_status(:created)
+      expect(JSON.parse(response.body)['excede_cupo']).to be(true)
+      expect(PlanEnforcer.new(club).excedentes_de_usuarios).to eq('cultivador' => 1)
     end
 
     # «Hasta 100 pacientes»: dos de cada rol EN CADA SEDE. Con dos sedes entran cuatro.
@@ -110,7 +128,7 @@ RSpec.describe 'SuperAdmin: módulos y roles coherentes', type: :request do
 
       post '/api/super_admin/users',
            params: { user: { email: 'c5@y.test', role: 'cultivador', club_id: club.id } }, as: :json
-      expect(response).to have_http_status(:payment_required)
+      expect(response).to have_http_status(:conflict)
     end
 
     # El admin no es un puesto de trabajo: es quien contrata, y son dos socios más veces de las

@@ -148,9 +148,10 @@
             <div class="rc__field">
               <span class="rc__label">Productos y dosis {{ form.uso === 'top_dress' ? 'por m²' : form.uso === 'mezcla' ? 'por litro de tierra' : 'por litro' }}</span>
               <div v-for="(it, i) in form.items" :key="i" class="rc__item-row">
-                <select v-model="it.insumo_id" class="rc__input rc__input--grow">
+                <select :value="it.insumo_id" class="rc__input rc__input--grow" @change="elegirProducto(it, $event)">
                   <option value="" disabled>{{ esPersonal ? 'Nutriente' : 'Producto del depósito' }}</option>
                   <option v-for="ins in opcionesDeReceta" :key="ins.id" :value="ins.id">{{ ins.nombre }}{{ ins.activo === false ? ' (archivado)' : '' }}</option>
+                  <option :value="NUEVO">+ {{ esPersonal ? 'Nutriente nuevo' : 'Producto nuevo' }}…</option>
                 </select>
                 <input v-model.number="it.dosis" type="number" step="0.01" min="0" class="rc__input rc__input--num" placeholder="2" />
                 <select v-model="it.unidad" class="rc__input rc__input--u">
@@ -158,8 +159,29 @@
                 </select>
                 <button type="button" class="rc__icon" @click="quitarItem(i)"><i class="bi bi-x"></i></button>
               </div>
+              <!-- Alta de un producto que todavía no está cargado: nace sin stock y sin asiento. -->
+              <div v-if="nuevoProd" class="rc__nuevo" data-testid="receta-producto-nuevo">
+                <div class="rc__item-row">
+                  <input v-model.trim="nuevoProd.nombre" class="rc__input rc__input--grow" maxlength="60" :placeholder="esPersonal ? 'Nombre del nutriente' : 'Nombre del producto'" />
+                  <select v-model="nuevoProd.unidad_medida" class="rc__input rc__input--u">
+                    <option value="mililitro">ml</option><option value="litro">L</option>
+                    <option value="gramo">g</option><option value="kilogramo">kg</option>
+                  </select>
+                </div>
+                <span v-if="nuevoProdExistente" class="rc__hint rc__hint--warn">Ya existe «{{ nuevoProdExistente.nombre }}». <button type="button" class="rc__link" @click="usarExistente">Usar ese</button></span>
+                <span class="rc__hint rc__hint--warn">
+                  <template v-if="esPersonal">Queda sin stock. Cuando lo compres, cargalo con «Repuse».</template>
+                  <template v-else>Se da de alta sin stock y <b>no genera registro contable</b>. Cuando lo compren, registren la compra en Contabilidad para que el gasto y el costo queden bien.</template>
+                </span>
+                <div class="rc__nuevo-acc">
+                  <button type="button" class="rc__btn-ghost" @click="nuevoProd = null">Cancelar</button>
+                  <button type="button" class="rc__btn-primary" :disabled="creandoProd || !nuevoProd.nombre" @click="crearProductoNuevo">
+                    <DsSpinner v-if="creandoProd" :size="14" /><span v-else>Dar de alta</span>
+                  </button>
+                </div>
+              </div>
               <button type="button" class="rc__link" @click="agregarItem"><i class="bi bi-plus"></i> Agregar producto</button>
-              <span v-if="!insumos.length" class="rc__hint">{{ esPersonal ? 'Primero cargá un nutriente (arriba).' : 'Primero cargá los productos en el depósito.' }}</span>
+              <span v-if="!insumos.length" class="rc__hint">Si el producto no está cargado, elegí «+ {{ esPersonal ? 'Nutriente nuevo' : 'Producto nuevo' }}» en la lista.</span>
             </div>
             <div v-if="form.uso === 'riego'" class="rc__row">
               <label class="rc__field">
@@ -418,9 +440,43 @@ function duplicar(r) {
   form.value = { ...vacio(), uso: r.uso || 'riego', nombre: `${r.nombre} (copia)`, fase: r.fase || '', ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas || '',
                  items: r.items.map(it => ({ insumo_id: it.insumo_id, dosis: Number(it.dosis), unidad: it.unidad })) }
 }
+// ── Producto nuevo desde la receta ──
+// Una receta no se traba porque el producto no esté cargado (Germán, 12-oct-2026): se da de alta
+// ahí mismo, sin stock y sin asiento, y queda ATADO a la receta por su id —un texto suelto no se
+// podría descontar al regar—. Al aplicar, lo que falte lo avisa `Nutricion::Aplicar`.
+const NUEVO = '__nuevo__'
+const nuevoProd = ref(null)
+const creandoProd = ref(null)
+const UNIDAD_DE_DOSIS = u => (String(u).startsWith('g') ? 'gramo' : 'mililitro')
+function elegirProducto(it, ev) {
+  if (ev.target.value !== NUEVO) { it.insumo_id = Number(ev.target.value) || ev.target.value; return }
+  ev.target.value = it.insumo_id ?? ''
+  nuevoProd.value = { item: it, nombre: '', unidad_medida: UNIDAD_DE_DOSIS(it.unidad) }
+}
+const nuevoProdExistente = computed(() => {
+  const n = nuevoProd.value?.nombre?.trim().toLowerCase()
+  return n ? insumos.value.find(i => String(i.nombre || '').trim().toLowerCase() === n) || null : null
+})
+function usarExistente() {
+  nuevoProd.value.item.insumo_id = nuevoProdExistente.value.id
+  nuevoProd.value = null
+}
+async function crearProductoNuevo() {
+  const f = nuevoProd.value
+  creandoProd.value = true
+  try {
+    const { data } = await createInsumo({ nombre: f.nombre, unidad_medida: f.unidad_medida, tipo: 'cultivo' })
+    const creado = data.insumo || data
+    todosInsumos.value = [...todosInsumos.value, creado]
+    f.item.insumo_id = creado.id
+    toast.success(esPersonal.value ? `${creado.nombre} agregado` : `${creado.nombre} dado de alta, sin stock ni registro contable`)
+    nuevoProd.value = null
+  } catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo dar de alta') }
+  finally { creandoProd.value = false }
+}
 function agregarItem() { form.value.items.push({ insumo_id: '', dosis: null, unidad: unidadesDelUso.value[0] }) }
 function quitarItem(i) { const it = form.value.items[i]; if (it.id) { it._destroy = true; form.value.items = form.value.items.filter(x => x !== it).concat([it]) } else form.value.items.splice(i, 1) }
-function cerrar() { form.value = null }
+function cerrar() { form.value = null; nuevoProd.value = null }
 async function guardar() {
   formError.value = null
   const vivos = form.value.items.filter(it => !it._destroy)
@@ -600,6 +656,9 @@ async function reactivarNutriente(i) {
 .rc__icon--danger:hover { background: #fef2f2; color: #dc2626; }
 .rc__radio { display: flex; align-items: center; gap: .45rem; font-size: .88rem; cursor: pointer; }
 .rc__hint--warn { color: #b45309; font-weight: 600; }
+.rc__nuevo { display: flex; flex-direction: column; gap: .4rem; padding: .6rem; margin: .2rem 0 .4rem; border: 1px dashed var(--c-leaf-300); border-radius: 10px; background: var(--c-leaf-50); }
+.rc__nuevo .rc__hint--warn { font-weight: 500; }
+.rc__nuevo-acc { display: flex; justify-content: flex-end; gap: .5rem; }
 .rc__nutriente-main { display: flex; flex-direction: column; }
 .rc__nutriente-nombre { font-weight: 700; }
 .rc__nutriente-stock { font-size: .8rem; color: var(--c-ink-500); }

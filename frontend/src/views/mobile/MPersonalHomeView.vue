@@ -93,6 +93,9 @@
       </div>
     </section>
 
+    <!-- ── Lo último que se hizo (12-oct-2026) ── -->
+    <UltimasAcciones movil class="mph__ultimas" />
+
     <!-- ── Lotes en curso ── -->
     <section class="mph__section">
       <div class="mph__section-head">
@@ -145,10 +148,14 @@
         </RouterLink>
       </div>
     </section>
+    <ModalCompletarTarea :show="!!tareaRiego" :tarea="tareaRiego" @completada="riegoCompletado" @cerrar="tareaRiego = null" />
   </div>
 </template>
 
 <script setup>
+import ModalCompletarTarea from '../../components/ModalCompletarTarea.vue'
+import UltimasAcciones from '../../components/personal/UltimasAcciones.vue'
+import { useCompletarRiego } from '../../composables/useCompletarRiego.js'
 // El inicio del cultivador de casa. No es el del admin de una organización —que mira cómo va
 // el día de OTROS y desbloquea lo que traba— sino el de quien hace todo: qué le toca hoy,
 // cómo viene la carpa, en qué día de fase va cada lote. Mismo estado que el resto de la app
@@ -203,6 +210,8 @@ const tareasHoy = computed(() => {
 
 const completando = ref(null)
 const { marcarNoSeHizo } = useNoSeHizo()
+const { tareaRiego, pideRegistro } = useCompletarRiego()
+async function riegoCompletado() { tareaRiego.value = null; await tareas.fetchDashboard() }
 async function noSeHizo(t) {
   completando.value = t.id
   try {
@@ -211,6 +220,7 @@ async function noSeHizo(t) {
 }
 
 async function completar(t) {
+  if (pideRegistro(t)) return
   completando.value = t.id
   try {
     if (!await tareas.completar(t.id, null, '')) return
@@ -367,4 +377,5 @@ useRecargaEnCambios('fotos', async () => { fotosRecientes.value = (await getFoto
 .mph__lote-fase { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mph__lote-estado { font-size: .74rem; font-weight: 700; }
 .mph__lote-dias { font-size: .72rem; color: var(--c-ink-500, #6b7280); }
+.mph__ultimas { margin: 1.2rem 1.1rem 0; }
 </style>

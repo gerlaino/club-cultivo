@@ -125,15 +125,18 @@
       <div class="mpd__card-title">{{ esPersonal ? 'Diario' : 'Historial reciente' }}</div>
       <div v-if="!activities.length" class="mpd__hist-empty">Sin actividades registradas</div>
       <div v-else class="mpd__hist-list">
-        <div v-for="a in activities.slice(0, 8)" :key="a.id" class="mpd__hist-item">
+        <div v-for="a in (verTodo ? activities : activities.slice(0, 8))" :key="a.id" class="mpd__hist-item">
           <div class="mpd__hist-dot" :style="{ background: actColor(a.activity_type) }"></div>
           <div class="mpd__hist-info">
             <div class="mpd__hist-tipo">{{ actLabel(a.activity_type) }}</div>
-            <div class="mpd__hist-fecha">{{ formatFecha(a.created_at) }}</div>
+            <div class="mpd__hist-fecha">{{ formatFecha(a.occurred_at || a.created_at) }}</div>
           </div>
           <div v-if="detalleAct(a)" class="mpd__hist-desc">{{ detalleAct(a) }}</div>
         </div>
       </div>
+      <button v-if="activities.length > 8" type="button" class="mpd__hist-mas" @click="verTodo = !verTodo">
+        {{ verTodo ? 'Ver menos' : `Ver todo (${activities.length})` }}
+      </button>
     </div>
 
     <!-- Autocultivo: cosechar ESTA planta; las otras que se cargaron con ella siguen. -->
@@ -241,6 +244,8 @@ const saludLabel = (s) => SALUD_LABEL[s] || s || '—'
 const planta     = ref(null)
 const lote       = ref(null)
 const activities = ref([])
+// El diario entero: los 8 últimos de entrada, y todo lo aplicado a la planta con un toque.
+const verTodo = ref(false)
 const loading    = ref(true)
 const showRegistrar = ref(false)
 const showRiegoLote = ref(false)
@@ -311,6 +316,8 @@ function detalleAct(a) {
   if (a.activity_type !== 'registro_ambiental_lote') return a.description || ''
   const partes = []
   if (m.riego_planta?.texto) partes.push(m.riego_planta.texto)
+  else if (m.volumen_l) partes.push(`${m.volumen_l} L`)
+  if (m.aplicado) partes.push(m.aplicado)
   if (m.ph) partes.push(`pH ${m.ph}`)
   if (m.ec) partes.push(`EC ${m.ec}`)
   if (m.temperatura) partes.push(`${m.temperatura} °C`)
@@ -462,6 +469,7 @@ async function cosechar(conEtiqueta) {
 .mpd__hist-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; }
 .mpd__hist-tipo { font-size: .88rem; font-weight: 600; }
 .mpd__hist-fecha { font-size: .74rem; color: var(--c-ink-500); }
+.mpd__hist-mas { margin-top: 10px; background: none; border: 0; padding: 0; font-size: .84rem; font-weight: 600; color: var(--c-leaf-700); cursor: pointer; }
 .mpd__hist-desc { grid-column: 2; font-size: .84rem; color: var(--c-ink-700); }
 
 .mpd__cosechar { margin: 16px 16px 0; width: calc(100% - 32px); min-height: 52px; border-radius: 14px; border: 2px solid var(--c-leaf-700); background: var(--c-slate-50); color: var(--c-leaf-800); font: inherit; font-weight: 700; }

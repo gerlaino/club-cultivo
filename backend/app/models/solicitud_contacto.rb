@@ -11,6 +11,9 @@ class SolicitudContacto < ApplicationRecord
     'organizacion' => 'Organización',
     'personal'     => 'Uso personal',
     'baja'         => 'Arrepentimiento / baja',
+    # Un admin pide que le demos de alta a alguien de su equipo: los usuarios los crea la
+    # plataforma desde super admin (Germán, 12-oct-2026). Ver `Equipo::PedirUsuario`.
+    'usuario'      => 'Pedido de usuario',
   }.freeze
 
   belongs_to :atendida_por, class_name: 'User', optional: true

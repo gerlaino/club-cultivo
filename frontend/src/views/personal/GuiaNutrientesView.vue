@@ -14,8 +14,9 @@ import GuiaNutrientes from '../../components/personal/GuiaNutrientes.vue'
 </script>
 
 <style scoped>
-.gnv { padding: var(--sp-6) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-5); max-width: 960px; }
-.gnv__t { margin: 0; font-size: var(--fs-32); font-weight: 800; letter-spacing: -.02em; color: var(--c-ink-900); }
-.gnv__p { margin: 2px 0 0; color: var(--c-ink-700); }
-@media (max-width: 640px) { .gnv { padding: 16px 16px 32px; } .gnv__t { font-size: 1.6rem; } }
+/* Centrada y con las medidas de «Nutrientes y recetas», que está al lado en el menú. */
+.gnv { padding: var(--sp-6) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-5); max-width: 880px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.gnv__t { margin: 0 0 .2rem; font-size: var(--fs-24); font-weight: 800; letter-spacing: -.03em; color: var(--c-ink-900); }
+.gnv__p { margin: 0; color: var(--c-ink-500); font-size: var(--fs-14); line-height: 1.5; max-width: 60ch; }
+@media (max-width: 640px) { .gnv { padding: 16px 16px 32px; } .gnv__t { font-size: var(--fs-20); } }
 </style>

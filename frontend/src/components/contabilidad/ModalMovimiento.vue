@@ -28,6 +28,8 @@ const props = defineProps({
   movimientoEditar: { type: Object, default: null },
   flujoInicial:     { type: String, default: '' },        // abre directo un flujo (ej. desde Depósito)
   depositoInicial:  { type: [String, Number], default: null },
+  // { descripcion, unidad, categoria_contable_id }: un producto nuevo que viene del Depósito.
+  prefillInicial:   { type: Object, default: null },
   guardando:        { type: Boolean, default: false },     // lo maneja el padre: es él quien await-ea
   errorGuardado:    { type: String, default: '' },
 })
@@ -456,6 +458,7 @@ function elegirFlujo(key) {
   if (f.pideDestino && props.depositoInicial) {
     destino.value = { ...destinoVacio(), deposito_id: props.depositoInicial }
   }
+  aplicarPrefill()
   paso.value = 'form'
 }
 
@@ -481,7 +484,19 @@ function abrirLibre(tipo = 'egreso') {
   errores.value = {}
   crearCat.value = null; errorCrear.value = ''
   if (props.depositoInicial) destino.value = { ...destinoVacio(), deposito_id: props.depositoInicial }
+  aplicarPrefill()
   paso.value = 'form'
+}
+
+// El nombre ES el del producto nuevo (`destinoEfectivo` lo toma de la descripción) y la unidad la
+// del insumo. La categoría es la que se eligió en el Depósito (allá sólo se ofrecen egresos del
+// sector de ese depósito); el catálogo puede llegar después de abrir, así que no se filtra acá.
+function aplicarPrefill() {
+  const p = props.prefillInicial
+  if (!p) return
+  if (p.descripcion) form.value.descripcion = p.descripcion
+  if (p.unidad) form.value.unidad = p.unidad
+  if (p.categoria_contable_id && form.value.tipo === 'egreso') form.value.categoria_contable_id = p.categoria_contable_id
 }
 
 // Cambiar entre salió/entró conserva lo ya escrito: sólo se limpia la categoría, que es de

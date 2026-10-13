@@ -167,6 +167,8 @@ const props = defineProps({
   // Abrir ya en el formulario de UNA acción («riego»): es lo que hace el «+» del teléfono.
   // Sin esto, «Regar» era llegar al paso 1 y volver a elegir Riego.
   accionInicial: { type: String, default: null },
+  // Cómo regar, cuando se registra el riego de una TAREA que lo dice ({ receta_id, litros, ph, ec }).
+  riegoInicial: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'saved', 'alimentar-cama'])
 // Riego por planta: las que están en pie (las mismas que acepta el backend, `Plant.en_pie`).
@@ -257,9 +259,21 @@ watch(() => props.modelValue, (open) => {
     seleccionadas.value = [props.accionInicial]
     paso.value = 2
   }
+  aplicarRiegoInicial()
 // `immediate`: en el teléfono la ficha se dibuja recién con el lote cargado, y si llega con
 // `?accion=` el modal se monta YA abierto; sin esto la apertura no pasaba por acá.
 }, { immediate: true })
+
+// La tarea de riego dice cómo regar: el formulario arranca con eso. Se puede cambiar: lo que queda
+// registrado es lo que se hizo.
+function aplicarRiegoInicial() {
+  const r = props.riegoInicial
+  if (!r) return
+  Object.assign(formData.value.riego, {
+    volumen: r.litros ?? null, ph: r.ph ?? null, ec: r.ec ?? null,
+    ...(r.receta_id ? { fertilizo: true, modo_nutricion: 'receta', receta_id: r.receta_id } : {}),
+  })
+}
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 

@@ -814,9 +814,12 @@ onMounted(async () => {
                           <div v-if="a.metadata?.ph"          class="pd__metrica"><span><i class="bi bi-eyedropper" aria-hidden="true"></i></span><span>pH {{ a.metadata.ph }}</span></div>
                           <div v-if="a.metadata?.ec"          class="pd__metrica"><span>⚡</span><span>EC {{ a.metadata.ec }}</span></div>
                           <div v-if="a.metadata?.co2"         class="pd__metrica"><span>💨</span><span>{{ a.metadata.co2 }} ppm</span></div>
+                          <div v-if="a.metadata?.volumen_l && !a.metadata?.riego_planta" class="pd__metrica"><span><i class="bi bi-droplet-half" aria-hidden="true"></i></span><span>{{ a.metadata.volumen_l }} L</span></div>
                           <!-- Riego por planta: lo que recibió ESTA planta. -->
                           <div v-if="a.metadata?.riego_planta" class="pd__metrica"><span><i class="bi bi-droplet" aria-hidden="true"></i></span><span>{{ a.metadata.riego_planta.texto }}</span></div>
                         </div>
+                        <!-- Qué se aplicó (receta y productos), no sólo que hubo «Nutrición». -->
+                        <div v-if="a.metadata?.aplicado" class="pd__act-aplicado"><strong>Aplicado:</strong> {{ a.metadata.aplicado }}</div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
 
@@ -1508,6 +1511,7 @@ onMounted(async () => {
 .pd__placeholder { padding: 1rem 1.1rem; color: var(--c-slate-400); font-size: .875rem; }
 
 /* Actividades / historial */
+.pd__act-aplicado { margin-top: .35rem; font-size: .82rem; color: var(--c-leaf-700); }
 .pd__actividades { display: flex; flex-direction: column; }
 .pd__actividad   { display: flex; gap: .75rem; padding: .9rem 1.1rem; border-bottom: 1px solid #f0fdf4; }
 .pd__actividad:last-child { border-bottom: none; }

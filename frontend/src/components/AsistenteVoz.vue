@@ -149,6 +149,11 @@
                       {{ descripcionAccion(accion) }}
                     </div>
                     <div class="av__accion-meta">{{ metaAccion(accion) }}</div>
+                    <!-- Parece repetida (lo marca el backend): se avisa acá y se pregunta al guardar. -->
+                    <div v-if="accion.repetida || accion.ya_registrado" class="av__repetida" data-testid="accion-repetida">
+                      <i class="bi bi-exclamation-triangle"></i>
+                      <span>{{ [accion.repetida, accion.ya_registrado].filter(Boolean).join(' ') }} Si no va dos veces, quitala con la ×.</span>
+                    </div>
 
                     <!-- Qué tareas da por hechas este registro. Va SIEMPRE a la vista, no detrás
                          de "Editar": antes se cerraban solas, en tanda y después de guardar, y
@@ -366,6 +371,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api, { consumoIA } from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { useConfirm } from '../composables/useConfirm.js'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
@@ -407,6 +413,7 @@ const procesando            = ref(false)
 const ejecutando            = ref(false)
 const transcripcion         = ref('')
 const editandoTranscripcion = ref(false)
+const { confirm } = useConfirm()
 const resumen               = ref('')
 const acciones              = ref([])
 // Ata el dictado con lo que se guarda, para poder medir después cuánto hubo que corregir.
@@ -592,8 +599,24 @@ function toggleEditor(i) { acciones.value[i]._expandido = !acciones.value[i]._ex
 function quitarAccion(i) { acciones.value.splice(i, 1) }
 function volverEscuchar() { paso.value = 'escuchar' }
 
+// Lo que parece repetido no se guarda sin preguntar: puede ser un error del dictado (la misma
+// acción dos veces) o algo que ya se cargó hoy (12-oct-2026).
+const repetidas = computed(() => acciones.value.filter(a => a.repetida || a.ya_registrado))
+
 async function ejecutarAcciones() {
   if (ejecutando.value) return   // un toque por dictado: el segundo no manda otro pedido
+  if (repetidas.value.length) {
+    const n = repetidas.value.length
+    const ok = await confirm({
+      title: n === 1 ? '¿Registrarla igual?' : `¿Registrar las ${n} igual?`,
+      message: `${n === 1 ? 'Hay una acción que parece repetida' : `Hay ${n} acciones que parecen repetidas`}: ` +
+               `${repetidas.value.map(a => a.repetida || a.ya_registrado).join(' ')}\n\n` +
+               'Si fue un error, volvé y quitala con la ×.',
+      confirmText: 'Guardar igual',
+      cancelText: 'Revisar',
+    })
+    if (!ok) return
+  }
   ejecutando.value = true
   try {
     const accionesLimpias = acciones.value.map(({ _expandido, ...a }) => a)
@@ -799,6 +822,8 @@ function metaAccion(accion) {
 .av__btn-procesar:hover { background:#dcfce7; border-color:#1b5e20; }
 
 .av__resumen-header { margin-bottom:1.25rem; }
+.av__repetida { display:flex; align-items:flex-start; gap:6px; margin-top:6px; padding:6px 9px; border-radius:8px; background:var(--c-amber-100); color:var(--c-gold-500); font-size:12px; line-height:1.35; }
+.av__repetida i { margin-top:1px; }
 .av__resumen-badge { display:inline-flex; align-items:center; gap:7px; background:#e8f5e9; color:#1b5e20; border-radius:20px; font-size:12px; font-weight:600; padding:5px 14px; margin-bottom:8px; }
 .av__resumen-texto { font-size:14px; color:#4a7c59; line-height:1.5; font-style:italic; }
 

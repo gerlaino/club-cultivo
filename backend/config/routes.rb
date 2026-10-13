@@ -32,6 +32,8 @@ Rails.application.routes.draw do
   # Webhooks externos — sin prefijo /api para URLs fijas de hardware
   namespace :webhooks do
     post 'lecturas', to: 'lecturas#create'
+    # Avisos de Mercado Pago (suscripciones). URL fija: se carga en «Tus integraciones → Webhooks».
+    post 'mercado_pago', to: 'mercado_pago#create'
   end
 
   # ══════════════════════════════════════════════════════════════
@@ -251,6 +253,14 @@ Rails.application.routes.draw do
       end
     end
 
+    # El buscador general de la barra de arriba (Ctrl+K): plantas, lotes, salas, genéticas y
+    # pacientes, cada sección según lo que el rol ya ve. Reemplaza a la lista de todas las plantas.
+    get "buscar", to: "buscar#index"
+    # Lo último que se hizo en el cultivo (inicio del autocultivo).
+    get "ultimas_acciones", to: "ultimas_acciones#index"
+    # La suscripción del autocultivo con Mercado Pago, desde la propia cuenta.
+    resource :suscripcion, only: %i[show create], controller: "suscripciones"
+
     resources :plants do
       collection do
         get 'por_qr/:codigo_qr', action: :por_qr
@@ -436,7 +446,8 @@ Rails.application.routes.draw do
 
     resources :usuarios, controller: :club_users do
       # Actividad del día, horas del mes y cupo por rol, para la lista de Equipo.
-      collection { get :actividad }
+      # `pedido`: el admin pide un usuario; lo da de alta super admin (12-oct-2026).
+      collection { get :actividad; post :pedido }
       member do
         post   :reset_password
         get    :salas_asignadas
@@ -773,6 +784,10 @@ Rails.application.routes.draw do
           # va por su propia puerta y deja una fila para poder facturarla.
           post   :ia_recarga
         end
+        # Cobro con Mercado Pago (12-oct-2026).
+        resource :suscripcion, only: %i[show create], controller: 'suscripciones' do
+          post :cancelar
+        end
         # Lo que anotamos sobre la organización (CRM mínimo). Se crea y se borra, no se edita.
         resources :notas, only: [:index, :create, :destroy], controller: 'club_notas'
       end
@@ -781,6 +796,8 @@ Rails.application.routes.draw do
         # el panel: había que crear un segundo admin o meter mano en la consola.
         member { post :reset_password }
       end
+      get :precio_autocultivo, to: 'suscripciones#precio_autocultivo'
+      put :precio_autocultivo, to: 'suscripciones#guardar_precio_autocultivo'
       get :catalogo, to: 'catalogo#show'
       # La cuenta de lo que se está por dar de alta: el wizard no suma precios por su cuenta.
       get 'catalogo/cotizar', to: 'catalogo#cotizar'

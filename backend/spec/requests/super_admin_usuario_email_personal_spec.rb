@@ -13,7 +13,10 @@ RSpec.describe 'SuperAdmin: alta de usuario con mail real', type: :request do
   let(:club)        { create(:club) }
   let(:super_admin) { create(:user, :super_admin, club: nil) }
 
-  before { sign_in_as(super_admin) }
+  before do
+    create(:sede, club: club) # sin sede no hay operativos
+    sign_in_as(super_admin)
+  end
 
   def crear(params)
     post '/api/super_admin/users', params: { user: { club_id: club.id, role: 'cultivador',

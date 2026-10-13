@@ -51,14 +51,15 @@ RSpec.describe 'Club nuevo — el primer día', type: :request do
     end
   end
 
+  # El alta del equipo es de la plataforma (super admin) desde el 12-oct-2026; el orden es el mismo.
   describe 'el orden en que hay que hacer las cosas' do
-    before { sign_in_as(admin) }
+    before { sign_in_as(create(:user, :super_admin, club: nil)) }
 
     # Sin sede no hay dónde poner una sala, ni a qué asignar a alguien. El error tiene que
     # decir por dónde empezar, no sólo que falta algo.
     it 'no se puede dar de alta gente operativa antes de crear una sede' do
-      post '/api/usuarios', params: {
-        user: { first_name: 'Ana', last_name: 'Gómez', email: 'ana@club.com', role: 'cultivador' }
+      post '/api/super_admin/users', params: {
+        user: { club_id: club.id, first_name: 'Ana', last_name: 'Gómez', email: 'ana@club.com', role: 'cultivador' }
       }, as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -66,18 +67,18 @@ RSpec.describe 'Club nuevo — el primer día', type: :request do
     end
 
     it 'pero el admin sí se puede crear: alguien tiene que configurar el club' do
-      post '/api/usuarios', params: {
-        user: { first_name: 'Otro', last_name: 'Admin', email: 'otro@club.com', role: 'admin' }
+      post '/api/super_admin/users', params: {
+        user: { club_id: club.id, first_name: 'Otro', last_name: 'Admin', email: 'otro@club.com', role: 'admin' }
       }, as: :json
 
       expect(response).to have_http_status(:created)
     end
 
     it 'con la sede creada, ya se puede sumar al equipo' do
-      create(:sede, club: club, created_by: admin, tipo: 'produccion')
+      ActsAsTenant.with_tenant(club) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
 
-      post '/api/usuarios', params: {
-        user: { first_name: 'Ana', last_name: 'Gómez', email: 'ana@club.com', role: 'cultivador' }
+      post '/api/super_admin/users', params: {
+        user: { club_id: club.id, first_name: 'Ana', last_name: 'Gómez', email: 'ana@club.com', role: 'cultivador' }
       }, as: :json
 
       expect(response).to have_http_status(:created)

@@ -33,7 +33,7 @@ class TareasController < ApplicationController
   # GET /api/v1/tareas
   # Soporta filtros: estado, asignada_a_id, sala_id, lote_id, tipo, fecha_desde, fecha_hasta, scope
   def index
-    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :plant, :origen_plan)
+    tareas = @club.tareas.includes(:asignada_a, :creada_por, :sala, :lote, :plant, :origen_plan, :receta)
 
     # Supervisor solo ve tareas de sus sedes
     if current_user.supervisor?
@@ -82,7 +82,7 @@ class TareasController < ApplicationController
     # sin fecha). Mismo scope que stats.pendientes, así el KPI y la lista coinciden.
     # Acotado a 100 — con stats.pendientes el front avisa si se truncó.
     pendientes = base.pendientes_al_dia
-                     .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan)
+                     .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan, :receta)
                      .order(Arel.sql('fecha_programada ASC NULLS LAST'))
                      .por_prioridad
                      .limit(PENDIENTES_LIMIT)
@@ -290,7 +290,7 @@ class TareasController < ApplicationController
                         "(NOT (#{hecha}) AND tareas.fecha_programada BETWEEN :d0 AND :d1)",
                         t0: desde.in_time_zone.beginning_of_day, t1: hasta.in_time_zone.end_of_day,
                         d0: desde, d1: hasta)
-                 .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan)
+                 .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan, :receta)
                  .order(:fecha_programada, :prioridad).to_a
     dia_de = ->(t) { t.completada? && t.fecha_completada ? t.fecha_completada.in_time_zone.to_date : t.fecha_programada }
     previstas = previstas_de_planes(desde, hasta)
@@ -378,7 +378,8 @@ class TareasController < ApplicationController
       :fecha_programada, :horas_estimadas, :horas_reales,
       :notas_completado, :horas_aplicadas_al_lote,
       :recurrente, :frecuencia, :intervalo, :recurrencia_hasta, :recurrencia_veces,
-      :recordatorio
+      :recordatorio,
+      :receta_id, :riego_litros, :riego_ph, :riego_ec
     )
   end
 
@@ -430,6 +431,11 @@ class TareasController < ApplicationController
       # La genética viaja para que el autocultivo nombre «las plantas de tal genética» y no el código.
       lote: t.lote ? { id: t.lote.id, codigo: t.lote.codigo, genetica_nombre: t.lote.genetica&.nombre } : nil,
       plant: t.plant ? { id: t.plant.id, codigo_qr: t.plant.codigo_qr, nombre: t.plant.nombre } : nil,
+      # Cómo regar: lo que el registro de riego precarga al completar la tarea.
+      riego:             (if t.parametros_riego?
+                            { receta: t.receta && { id: t.receta.id, nombre: t.receta.nombre },
+                              litros: t.riego_litros&.to_f, ph: t.riego_ph&.to_f, ec: t.riego_ec&.to_f }
+                          end),
       recurrente:        t.recurrente,
       frecuencia:        t.frecuencia,
       parent_tarea_id:   t.parent_tarea_id,

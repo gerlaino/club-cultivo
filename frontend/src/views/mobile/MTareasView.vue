@@ -66,6 +66,7 @@
         </div>
         <div class="mta__card-body">
           <div class="mta__card-titulo">{{ t.titulo }}</div>
+          <div v-if="t.riego" class="mta__riego">{{ resumenRiego(t) }}</div>
           <div class="mta__card-meta">
             <!-- Una tarea hecha ya no está atrasada: mostrar las dos cosas juntas se contradice. -->
             <span v-if="t._atrasada && !cerrada(t)" class="mta__atrasada">⏰ Atrasada</span>
@@ -178,10 +179,13 @@
         </button>
       </div>
     </SheetBottom>
+    <ModalCompletarTarea :show="!!tareaRiego" :tarea="tareaRiego" @completada="riegoCompletado" @cerrar="tareaRiego = null" />
   </div>
 </template>
 
 <script setup>
+import ModalCompletarTarea from '../../components/ModalCompletarTarea.vue'
+import { useCompletarRiego, resumenRiego } from '../../composables/useCompletarRiego.js'
 import { ref, computed, onMounted } from 'vue'
 import { tareaCerrada } from '../../lib/tareaEstado.js'
 import { useNoSeHizo } from '../../composables/useNoSeHizo.js'
@@ -350,12 +354,15 @@ async function eliminarActiva() {
 
 // Los botones de la tarjeta: lo mismo que la hoja, sin abrirla.
 const rapida = ref(null)
+const { tareaRiego, pideRegistro } = useCompletarRiego()
+function riegoCompletado() { marcarEnDia(tareaRiego.value.id, 'completada'); tareaRiego.value = null }
 function marcarEnDia(id, estado) {
   const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
   const idx = diaData?.tareas.findIndex(x => x.id === id) ?? -1
   if (idx !== -1) diaData.tareas[idx] = { ...diaData.tareas[idx], estado }
 }
 async function hechoRapido(t) {
+  if (pideRegistro(t)) return
   rapida.value = t.id
   try {
     if (!await tareasStore.completar(t.id, undefined, '')) return
@@ -594,4 +601,5 @@ onMounted(async () => {
 }
 .mta__btn-full { width: 100%; }
 .mta__btn-primary:disabled { opacity: .6; }
+.mta__riego { font-size: .78rem; color: var(--c-sky-600); margin: .1rem 0 .2rem; }
 </style>

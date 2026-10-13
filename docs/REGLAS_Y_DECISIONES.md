@@ -1756,6 +1756,41 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
   agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
   repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
+- **Los usuarios del equipo los da de alta la plataforma** (12-oct-2026, Germán): el admin los
+  PIDE (Equipo → «Pedir un usuario», cae en Consultas de super admin, `Equipo::PedirUsuario`);
+  `POST /usuarios` responde 403. El alta tiene una sola puerta, `Equipo::DarDeAlta` (super admin):
+  roles del arranque, sede antes que los operativos, contraseña generada. **El cupo del plan avisa,
+  no bloquea**: pasarlo responde 409 y se confirma con `exceder_cupo` — el excedente se cobra
+  aparte y se ve en la ficha (`PlanEnforcer#excedentes_de_usuarios`). En autocultivo no hay equipo.
+- **Un producto puede nacer sin compra** (12-oct-2026): desde el Depósito («Producto nuevo»)
+  se pregunta si se compró; «sí» va a Contabilidad → Nueva compra prellenada (la ÚNICA puerta de
+  una compra: asiento, categoría, caja); «no» lo da de alta sin stock **y lo dice: no genera
+  registro contable**. Una receta puede dar de alta el producto que le falta (el cultivador
+  también: no mueve plata ni stock). Aplicar la receta no bloquea por stock (regla del 20-sep).
+- **Un callback por nombre en cada controller** (12-oct-2026): dos `before_action :require_gestion`
+  con distinto `only:` → Rails se queda con el último. En `InsumosController` dejaba reponer,
+  ajustar, editar y borrar sin control de rol desde `d34213c9`.
+- **La tarea de riego dice cómo regar** (12-oct-2026): receta, litros, pH y EC
+  (`tareas.receta_id`, `riego_*`; las repeticiones los heredan). Si los tiene, «Hecho» abre
+  «Completar», que registra el riego del lote o la sala con eso precargado (el registro de
+  siempre: descuenta la receta, avisa faltantes) y después cierra la tarea
+  (`useCompletarRiego`). Las tareas de riego sin parámetros se cierran con un toque como antes.
+- **Lo repetido en el dictado se pregunta** (12-oct-2026): `Registros::Repetidos` marca la
+  acción que está dos veces en el mismo dictado o que ya se registró hoy en ese lote/sala
+  (`registrado_en`, no `created_at`); la pantalla lo muestra en la tarjeta y pide confirmación
+  antes de guardar. Regla fija en el backend, nunca a criterio del modelo.
+- **Lo aplicado se dice con UNA cuenta** (12-oct-2026): `Lotes::Nutricion#texto_de_copia` arma
+  «receta · litros (su parte) · $: productos» para el historial del lote, la ficha de la planta
+  (sin costo) y las últimas acciones del autocultivo.
+- **Mercado Pago: la verdad está en nuestra base** (12-oct-2026): `suscripciones` /
+  `suscripcion_cobros`, alimentadas SÓLO por el webhook firmado (`/webhooks/mercado_pago`,
+  `MP_WEBHOOK_SECRET`), que vuelve a pedirle el recurso a MP y es idempotente (`mp_id` único). La
+  vuelta del navegador no confirma nada. Una suscripción viva por organización (generar otra
+  cancela la anterior). Organización: link con su monto, lo genera super admin. Autocultivo: se
+  suscribe solo al precio fijo de `AjustePlataforma` (en pesos; rige para las nuevas). Cada cobro
+  aprobado extiende un mes **desde lo pagado** (no desde la gracia de 3 días) y despausa
+  `prueba_terminada`/`no_pago`; vencido lo pagado con suscripción, `CorteAutoregistroJob` pausa
+  por `no_pago`. `/suscripcion` anda con la cuenta pausada por esos dos motivos.
 - **Trazabilidad** cierra el balance: producido − dispensado − merma = en stock.
 - **INASE** agrupa por variedad acreditable, no por genética del club.
 - **Pérdidas** es informe nuevo: plantas descartadas por motivo, merma, vencido en góndola.

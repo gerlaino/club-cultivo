@@ -4,12 +4,11 @@ import { useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from '../stores/club.js'
-import { listSalas, listSedes, asignarSedeAUsuario, getEquipoActividad } from '../lib/api.js'
+import { getEquipoActividad, pedirUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
-import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede, sedesParaRol } from '../lib/roles.js'
+import { rolesParaAlta, rolInfo, rolEstilo } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
 const club            = useClubStore()
@@ -87,8 +86,6 @@ const ROLES = computed(() => rolesParaAlta().filter(r => {
 
 function getRoleInfo(role) { return rolInfo(role) }
 function roleStyle(role)   { return rolEstilo(role) }
-function roleColor(role)   { return rolColor(role) }
-function roleBg(role)      { return rolBg(role) }
 
 const AVATAR_COLORS = ['#1A3D2E','#1A1F36','#172B1F','#C2410C','#1A2F1E','#2A2F38','#1F1810']
 function getInitials(user) {
@@ -98,59 +95,34 @@ function getInitials(user) {
 }
 function getAvatarColor(user) { return AVATAR_COLORS[(user.id || 0) % AVATAR_COLORS.length] }
 
-// Credenciales del usuario recién creado: se muestran una vez y no se pueden recuperar
-// después (para eso está "Restablecer contraseña" en su ficha).
-const credencialesNuevas = ref(null)
 // ── Modal ─────────────────────────────────────────────────────────────────
 const showModal  = ref(false)
 const editing    = ref(false)
 const originalRole = ref(null)
-const wizardStep = ref(1)
-
-const todasLasSalas       = ref([])
-const todasLasSedes       = ref([])
-// Sólo las sedes donde el rol elegido tiene algo que hacer (regla del backend, vía /me).
-const sedesParaElRol      = computed(() => sedesParaRol(form.value.role, todasLasSedes.value, auth.user?.reglas_cultivo))
-const sedesSeleccionadas  = ref([])
-
 const form = ref({ id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" })
 
-const roleConfig = computed(() => ({
-  sedes:         !!rolHintSede(form.value.role) || rolPideSede(form.value.role),
-  sedeRequerida: rolPideSede(form.value.role),
-  sedeHint:      rolHintSede(form.value.role),
-}))
-
-const salasDeLaSede = computed(() =>
-  todasLasSalas.value.filter(s => {
-    if (s.sede?.id !== form.value.sede_id) return false
-    return form.value.role === 'manicura' ? s.kind === 'manicura' : s.kind !== 'manicura'
-  })
-)
-
-const formValidStep2 = computed(() => {
-  const base = form.value.first_name.trim() && form.value.last_name.trim() && form.value.email.trim()
-  if (!base) return false
-  if (roleConfig.value.sedeRequerida && sedesSeleccionadas.value.length === 0) return false
-  return true
-})
-
-watch(showModal, async (val) => {
-  if (val && !editing.value) {
-    try {
-      const [resSalas, resSedes] = await Promise.all([listSalas(), listSedes()])
-      todasLasSalas.value = resSalas.data || []
-      todasLasSedes.value = resSedes.data || []
-    } catch {}
-  }
-})
-
-function startCreate() {
-  editing.value            = false
-  wizardStep.value         = 1
-  sedesSeleccionadas.value = []
-  form.value               = { id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" }
-  showModal.value          = true
+// ── Pedir un usuario ──────────────────────────────────────────────────────
+// Las altas las hace Cultivo Espacial desde super admin (Germán, 12-oct-2026): acá se PIDEN y el
+// pedido le llega a la plataforma. El backend ya no acepta altas desde la organización.
+const pedido = ref(null)
+const enviandoPedido = ref(false)
+function startPedido() {
+  pedido.value = { nombre: '', apellido: '', email: '', rol: ROLES.value[0]?.value || 'cultivador', nota: '' }
+}
+// Si ese rol ya llenó su cupo, se avisa antes de pedir: el alta quedaría por encima del plan.
+const pedidoCupo = computed(() => cupo.value?.por_rol?.find(r => r.rol === pedido.value?.rol) || null)
+const pedidoPasaCupo = computed(() => pedidoCupo.value?.tope != null && pedidoCupo.value.usados >= pedidoCupo.value.tope)
+async function enviarPedido() {
+  const p = pedido.value
+  if (!p.nombre.trim()) { toast.warning('Poné el nombre de la persona'); return }
+  enviandoPedido.value = true
+  try {
+    const { data } = await pedirUsuario({ ...p, nombre: p.nombre.trim(), apellido: p.apellido.trim(), email: p.email.trim() })
+    pedido.value = null
+    toast.success(`Pedido enviado (${data.codigo}). Te avisamos cuando esté dado de alta.`)
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo enviar el pedido.')
+  } finally { enviandoPedido.value = false }
 }
 
 const router = useRouter()
@@ -164,17 +136,7 @@ function startEdit(u) {
 }
 
 function closeModal() {
-  showModal.value  = false
-  wizardStep.value = 1
-  sedesSeleccionadas.value = []
-}
-
-function nextStep() {
-  if (wizardStep.value === 1) wizardStep.value = 2
-}
-
-function prevStep() {
-  if (wizardStep.value === 2) { wizardStep.value = 1; sedesSeleccionadas.value = [] }
+  showModal.value = false
 }
 
 async function save() {
@@ -201,47 +163,12 @@ async function save() {
       })
       closeModal()
       toast.success('Usuario actualizado correctamente.')
-    } catch (e) {
+    } catch {
       toast.error(store.error || 'Error al actualizar.')
     }
     return
   }
 
-  if (!formValidStep2.value) return
-  try {
-    const nuevo = await store.create({
-      first_name:            form.value.first_name,
-      last_name:             form.value.last_name,
-      email:                 form.value.email,
-      email_personal:        form.value.email_personal,
-      role:                  form.value.role,
-      // La contraseña la genera el backend, distinta para cada uno. Antes se mandaba una fija
-      // desde acá, así que todo usuario de todo club nacía con la misma clave conocida.
-    })
-
-    // Asignar sedes seleccionadas
-    if (nuevo?.id && sedesSeleccionadas.value.length > 0) {
-      await Promise.all(sedesSeleccionadas.value.map(sedeId => asignarSedeAUsuario(nuevo.id, sedeId)))
-    }
-
-    // Asignar sala inicial (cultivador/manicura)
-    // (sala assignment queda para el perfil — no hay endpoint create-with-sala)
-
-    closeModal()
-    // Un toast se va solo y la contraseña se pierde: queda en pantalla hasta que el admin la
-    // haya pasado, con el aviso de si el mail salió o no.
-    if (nuevo?.credenciales) {
-      credencialesNuevas.value = { ...nuevo.credenciales, nombre: `${form.value.first_name} ${form.value.last_name}`.trim(), mail_con_link: true }
-    } else {
-      toast.success('Usuario creado.')
-    }
-  } catch (e) {
-    if (e.response?.status === 402) {
-      toast.error(e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo.')
-    } else {
-      toast.error(store.error || 'Error al crear usuario.')
-    }
-  }
 }
 
 async function removeOne(u) {
@@ -271,8 +198,8 @@ async function removeOne(u) {
           <input v-model="q" class="uv__search-input" placeholder="Buscar por nombre o email…" />
           <span v-if="q" class="uv__search-clear" @click="q = ''"><i class="bi bi-x"></i></span>
         </div>
-        <button class="uv__btn-primary" @click="startCreate">
-          <i class="bi bi-plus-lg"></i> Incorporar persona
+        <button class="uv__btn-primary" @click="startPedido">
+          <i class="bi bi-person-plus"></i> Pedir un usuario
         </button>
       </div>
     </div>
@@ -300,9 +227,9 @@ async function removeOne(u) {
     <div v-else-if="filteredUsers.length === 0" class="uv__empty">
       <div class="uv__empty-icon"><i class="bi bi-people"></i></div>
       <h3 class="uv__empty-title">{{ q ? 'Sin resultados' : 'Sin usuarios todavía' }}</h3>
-      <p class="uv__empty-desc">{{ q ? 'Probá con otro término de búsqueda.' : 'Agregá el primer miembro del equipo.' }}</p>
-      <button v-if="!q" class="uv__btn-primary" @click="startCreate">
-        <i class="bi bi-plus-lg"></i> Crear primer usuario
+      <p class="uv__empty-desc">{{ q ? 'Probá con otro término de búsqueda.' : 'Pedí el primer usuario del equipo: lo damos de alta nosotros.' }}</p>
+      <button v-if="!q" class="uv__btn-primary" @click="startPedido">
+        <i class="bi bi-person-plus"></i> Pedir un usuario
       </button>
     </div>
 
@@ -380,6 +307,42 @@ async function removeOne(u) {
 
     <!-- ── MODAL ── -->
     <Teleport to="body">
+      <div v-modal="() => pedido = null" v-if="pedido" class="uv__overlay" @click.self="pedido = null">
+        <div class="uv__modal uv__modal--pedido" data-testid="pedir-usuario">
+          <div class="uv__modal-header">
+            <div class="uv__modal-header-left">
+              <h3 class="uv__modal-title">Pedir un usuario</h3>
+            </div>
+            <button class="uv__modal-close" @click="pedido = null"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="uv__modal-body">
+            <p class="uv__hint uv__hint--intro">Las altas del equipo las hace Cultivo Espacial. Contanos a quién sumar y con qué rol: cuando esté dado de alta te avisamos y le llega cómo entrar.</p>
+            <div class="uv__pedido-grid">
+              <label class="uv__field"><span class="uv__label">Nombre</span><input v-model="pedido.nombre" class="uv__input" maxlength="60" /></label>
+              <label class="uv__field"><span class="uv__label">Apellido</span><input v-model="pedido.apellido" class="uv__input" maxlength="60" /></label>
+            </div>
+            <label class="uv__field"><span class="uv__label">Mail <span class="uv__opt">opcional</span></span>
+              <input v-model="pedido.email" type="email" class="uv__input" maxlength="160" placeholder="Para mandarle cómo entrar" />
+            </label>
+            <label class="uv__field"><span class="uv__label">Rol</span>
+              <select v-model="pedido.rol" class="uv__input">
+                <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
+              </select>
+            </label>
+            <p v-if="pedidoPasaCupo" class="uv__pedido-cupo">
+              {{ pedidoCupo.label }} ya tiene {{ pedidoCupo.usados }} de {{ pedidoCupo.tope }} en tu plan: este alta queda por encima del plan y se cobra aparte.
+            </p>
+            <label class="uv__field"><span class="uv__label">Nota <span class="uv__opt">opcional</span></span>
+              <input v-model="pedido.nota" class="uv__input" maxlength="300" placeholder="Ej: entra el lunes, turno tarde, sede norte" />
+            </label>
+          </div>
+          <div class="uv__modal-footer">
+            <button class="uv__btn-ghost" @click="pedido = null">Cancelar</button>
+            <button class="uv__btn-primary" :disabled="enviandoPedido || !pedido.nombre.trim()" @click="enviarPedido">Enviar pedido</button>
+          </div>
+        </div>
+      </div>
+
       <div v-modal="closeModal" v-if="showModal" class="uv__overlay" @click.self="closeModal">
         <div class="uv__modal">
 
@@ -387,146 +350,14 @@ async function removeOne(u) {
           <div class="uv__modal-header">
             <div class="uv__modal-header-left">
               <h3 class="uv__modal-title">
-                {{ editing ? 'Editar usuario' : (wizardStep === 1 ? 'Nuevo usuario' : `Nuevo ${getRoleInfo(form.role).label}`) }}
+                Editar usuario
               </h3>
-              <!-- Step indicator (solo en creación) -->
-              <div v-if="!editing" class="uv__steps">
-                <div class="uv__step" :class="{ 'uv__step--active': wizardStep >= 1, 'uv__step--done': wizardStep > 1 }">
-                  <span class="uv__step-dot">{{ wizardStep > 1 ? '✓' : '1' }}</span>
-                  <span class="uv__step-lbl">Rol</span>
-                </div>
-                <div class="uv__step-line" :class="{ 'uv__step-line--done': wizardStep > 1 }"></div>
-                <div class="uv__step" :class="{ 'uv__step--active': wizardStep >= 2 }">
-                  <span class="uv__step-dot">2</span>
-                  <span class="uv__step-lbl">Datos</span>
-                </div>
-              </div>
             </div>
             <button class="uv__modal-close" @click="closeModal"><i class="bi bi-x-lg"></i></button>
           </div>
 
-          <!-- ── PASO 1: Selector de rol ── -->
-          <div v-if="!editing && wizardStep === 1" class="uv__modal-body">
-            <p class="uv__step-intro">¿Qué tipo de usuario vas a crear?</p>
-            <div class="uv__role-grid">
-              <button
-                v-for="r in ROLES"
-                :key="r.value"
-                type="button"
-                class="uv__role-card"
-                :class="{ 'uv__role-card--active': form.role === r.value }"
-                :style="form.role === r.value ? { borderColor: roleColor(r.value), background: roleBg(r.value) } : {}"
-                @click="form.role = r.value"
-              >
-                <i :class="['bi', r.icon, 'uv__role-card-ico']" :style="form.role === r.value ? { color: roleColor(r.value) } : {}"></i>
-                <span class="uv__role-card-name" :style="form.role === r.value ? { color: roleColor(r.value) } : {}">{{ r.label }}</span>
-                <span class="uv__role-card-desc">{{ r.desc }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- ── PASO 2: Formulario por rol ── -->
-          <div v-else-if="!editing && wizardStep === 2" class="uv__modal-body">
-
-            <!-- Preview del rol seleccionado -->
-            <div class="uv__rol-preview" :style="{ borderColor: roleColor(form.role), background: roleBg(form.role) }">
-              <i :class="['bi', getRoleInfo(form.role).icon]" :style="{ color: roleColor(form.role) }"></i>
-              <span :style="{ color: roleColor(form.role), fontWeight: 700 }">{{ getRoleInfo(form.role).label }}</span>
-              <span class="uv__rol-preview-desc">{{ getRoleInfo(form.role).desc }}</span>
-            </div>
-
-            <div class="uv__form-grid">
-
-              <!-- Nombre / Apellido -->
-              <div class="uv__field">
-                <label class="uv__label">Nombre <span class="uv__req">*</span></label>
-                <input class="uv__input" v-model.trim="form.first_name" placeholder="Juan" />
-              </div>
-              <div class="uv__field">
-                <label class="uv__label">Apellido <span class="uv__req">*</span></label>
-                <input class="uv__input" v-model.trim="form.last_name" placeholder="Pérez" />
-              </div>
-
-              <!-- Usuario de ingreso (login) -->
-              <div class="uv__field uv__field--full">
-                <label class="uv__label">Usuario de ingreso <span class="uv__req">*</span></label>
-                <input type="email" class="uv__input" v-model.trim="form.email" placeholder="rol@nombreclub.com" autocomplete="off" />
-                <span class="uv__hint">Es con lo que se loguea. Puede ser inventado (no necesita ser un mail real). La contraseña se genera sola y te la mostramos al terminar.</span>
-              </div>
-
-              <!-- Email personal (real) -->
-              <div class="uv__field uv__field--full">
-                <label class="uv__label">Email personal <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
-                <input type="email" class="uv__input" v-model.trim="form.email_personal" placeholder="persona@gmail.com" autocomplete="off" />
-                <span class="uv__hint">El mail REAL del usuario, para poder mandarle correos.</span>
-              </div>
-
-              <!-- Sedes (supervisor, medico, dispensador, delivery) -->
-              <div v-if="roleConfig.sedes" class="uv__field uv__field--full">
-                <label class="uv__label">
-                  Sedes asignadas
-                  <span v-if="roleConfig.sedeRequerida" class="uv__req"> *</span>
-                  <span v-else class="uv__opt"> (opcional)</span>
-                </label>
-
-                <div v-if="sedesParaElRol.length === 0" class="uv__sedes-empty">
-                  <i class="bi bi-building-dash"></i> {{ todasLasSedes.length ? 'Ninguna sede de la organización es del tipo que atiende este rol.' : 'No hay sedes configuradas en la organización.' }}
-                </div>
-                <div v-else class="uv__sedes-list">
-                  <label
-                    v-for="s in sedesParaElRol"
-                    :key="s.id"
-                    class="uv__sede-item"
-                    :class="{ 'uv__sede-item--checked': sedesSeleccionadas.includes(s.id) }"
-                  >
-                    <input
-                      type="checkbox"
-                      :value="s.id"
-                      v-model="sedesSeleccionadas"
-                      class="uv__sede-check"
-                    />
-                    <div class="uv__sede-info">
-                      <span class="uv__sede-nombre">{{ s.nombre }}</span>
-                      <span v-if="s.tipo" class="uv__sede-tipo">{{ s.tipo }}</span>
-                    </div>
-                    <i v-if="sedesSeleccionadas.includes(s.id)" class="bi bi-check-circle-fill uv__sede-check-ico"></i>
-                  </label>
-                </div>
-
-                <div v-if="roleConfig.sedeRequerida && sedesSeleccionadas.length === 0" class="uv__sede-warn">
-                  <i class="bi bi-exclamation-triangle-fill"></i>
-                  {{ form.role === 'cultivador' ? 'El cultivador necesita una sede asignada para ver salas y lotes.' : 'El supervisor necesita al menos una sede asignada para poder operar.' }}
-                </div>
-                <p v-else-if="roleConfig.sedeHint" class="uv__hint">{{ roleConfig.sedeHint }}</p>
-              </div>
-
-              <!-- Sede + sala (cultivador/manicura) -->
-              <template v-if="roleConfig.salas">
-                <div class="uv__field uv__field--full">
-                  <label class="uv__label">Sede <span class="uv__opt">(opcional)</span></label>
-                  <select class="uv__input" v-model="form.sede_id" @change="form.sala_id = ''">
-                    <option value="">Sin sede asignada</option>
-                    <option v-for="s in sedesParaElRol" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                  </select>
-                </div>
-                <div v-if="form.sede_id && salasDeLaSede.length > 0" class="uv__field uv__field--full">
-                  <label class="uv__label">Sala inicial <span class="uv__opt">(opcional)</span></label>
-                  <select class="uv__input" v-model="form.sala_id">
-                    <option value="">Sin sala asignada</option>
-                    <option v-for="sala in salasDeLaSede" :key="sala.id" :value="sala.id">{{ sala.nombre }}</option>
-                  </select>
-                  <span class="uv__hint">Podés cambiarla o agregar más desde el perfil del usuario.</span>
-                </div>
-              
-    <!-- Credenciales del alta: en pantalla hasta que el admin las haya pasado. -->
-    <CredencialesNuevas :datos="credencialesNuevas" @cerrar="credencialesNuevas = null" />
-</template>
-
-            </div>
-          </div>
-
-          <!-- ── MODO EDICIÓN: formulario simple ── -->
-          <div v-else class="uv__modal-body">
+          <!-- Editar los datos (el alta la hace la plataforma: «Pedir un usuario») -->
+          <div class="uv__modal-body">
             <div class="uv__form-grid">
               <div class="uv__field">
                 <label class="uv__label">Nombre <span class="uv__req">*</span></label>
@@ -555,26 +386,15 @@ async function removeOne(u) {
 
           <!-- Footer -->
           <div class="uv__modal-footer">
-            <button class="uv__btn-ghost" @click="!editing && wizardStep === 2 ? prevStep() : closeModal()">
-              <i v-if="!editing && wizardStep === 2" class="bi bi-arrow-left"></i>
-              {{ !editing && wizardStep === 2 ? 'Volver' : 'Cancelar' }}
-            </button>
-
-            <!-- Paso 1: Continuar -->
-            <button v-if="!editing && wizardStep === 1" class="uv__btn-primary" @click="nextStep">
-              Continuar <i class="bi bi-arrow-right"></i>
-            </button>
-
-            <!-- Paso 2 o edición: Guardar -->
+            <button class="uv__btn-ghost" @click="closeModal()">Cancelar</button>
             <button
-              v-else
               class="uv__btn-primary"
-              :disabled="store.saving || (editing ? (!form.first_name.trim() || !form.last_name.trim() || !form.email.trim()) : !formValidStep2)"
+              :disabled="store.saving || !form.first_name.trim() || !form.last_name.trim() || !form.email.trim()"
               @click="save"
             >
               <DsSpinner v-if="store.saving" :size="15" />
-              <i v-else :class="editing ? 'bi bi-check-lg' : 'bi bi-person-plus'"></i>
-              {{ editing ? 'Guardar cambios' : 'Crear usuario' }}
+              <i v-else class="bi bi-check-lg"></i>
+              Guardar cambios
             </button>
           </div>
 
@@ -677,6 +497,13 @@ td.uv__col-hoy, td.uv__col-pend { min-width: 160px; font-size: .8rem; }
 
 /* ── Modal ─────────────────────────────────────────────────────────────── */
 .uv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
+.uv__modal--pedido { max-width: 520px; }
+.uv__modal--pedido .uv__modal-body { display: flex; flex-direction: column; gap: .9rem; }
+.uv__pedido-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 520px) { .uv__pedido-grid { grid-template-columns: 1fr; } }
+.uv__hint--intro { margin: 0; }
+.uv__opt { font-weight: 400; color: var(--c-slate-500); }
+.uv__pedido-cupo { margin: 0; padding: .6rem .8rem; border-radius: 9px; background: var(--c-amber-100); color: var(--c-gold-500); font-size: .82rem; }
 .uv__modal { background: #fff; border-radius: 20px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 32px 80px rgba(0,0,0,.18); display: flex; flex-direction: column; }
 
 .uv__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.5rem 1.1rem; border-bottom: 1px solid var(--c-slate-100); position: sticky; top: 0; background: #fff; z-index: 1; }

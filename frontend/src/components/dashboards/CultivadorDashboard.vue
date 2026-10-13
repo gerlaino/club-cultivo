@@ -96,6 +96,9 @@
       </div>
     </div>
 
+    <!-- Autocultivo: lo último que se hizo (12-oct-2026) -->
+    <UltimasAcciones v-if="esPersonal" class="cvd__ultimas" />
+
     <!-- Semana de trabajo -->
     <div class="cvd__section">
       <button class="cvd__section-toggle" @click="tareasExpanded = !tareasExpanded">
@@ -374,9 +377,13 @@
       </div>
     </div>
   </Teleport>
+  <ModalCompletarTarea :show="!!tareaRiego" :tarea="tareaRiego" @completada="riegoCompletado" @cerrar="tareaRiego = null" />
 </template>
 
 <script setup>
+import ModalCompletarTarea from '../ModalCompletarTarea.vue'
+import UltimasAcciones from '../personal/UltimasAcciones.vue'
+import { useCompletarRiego } from '../../composables/useCompletarRiego.js'
 import { ESTADO_META } from '../../lib/loteHelpers.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { tareaCerrada } from '../../lib/tareaEstado.js'
@@ -629,6 +636,8 @@ function urgencyBg(dias) {
 }
 
 function abrirTarea(t) { tareaDetalle.value = t }
+const { tareaRiego, pideRegistro } = useCompletarRiego()
+async function riegoCompletado() { tareaRiego.value = null; await cargarSemana() }
 
 const { marcarNoSeHizo } = useNoSeHizo()
 async function noSeHizoDetalle() {
@@ -644,6 +653,8 @@ async function noSeHizoDetalle() {
 
 async function finalizarTarea() {
   if (!tareaDetalle.value) return
+  // La de riego que dice cómo regar: «Completar» ofrece registrar el riego con eso cargado.
+  if (pideRegistro(tareaDetalle.value)) { tareaDetalle.value = null; return }
   guardandoAccion.value = true
   try {
     if (!await tareasStore.completar(tareaDetalle.value.id, null, '')) return
@@ -908,4 +919,5 @@ onMounted(async () => {
 .cvd__sc-plantas { font-size: .75rem; color: #60725d; }
 .cvd__sc-registrar { display: flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 600; color: #15803d; background: #f0fdf4; border: 1px solid #c8e6c9; border-radius: 6px; padding: .25rem .6rem; cursor: pointer; transition: all .12s; }
 .cvd__sc-registrar:hover { background: #dcfce7; border-color: #86efac; }
+.cvd__ultimas { margin-bottom: 1.25rem; }
 </style>

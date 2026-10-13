@@ -460,6 +460,9 @@ const guardandoMov     = ref(false)
 const errorGuardadoMov = ref('')
 const flujoInicial     = ref('')
 const depositoInicial  = ref(null)
+// Lo que ya se sabe de la compra cuando viene del Depósito con un producto nuevo («Producto
+// nuevo» → «Sí, lo compré»): nombre, unidad y categoría, para no pedirlos dos veces.
+const prefillInicial   = ref(null)
 const showEditarCuotas = ref(false)
 const compraEditar     = ref(null)
 
@@ -468,11 +471,12 @@ async function onCompraCuotasEditada() {
   else await store.fetch()
 }
 
-async function openCreate({ flujo = '', deposito = null } = {}) {
+async function openCreate({ flujo = '', deposito = null, prefill = null } = {}) {
   editingMovimiento.value = null
   errorGuardadoMov.value  = ''
   flujoInicial.value      = flujo
   depositoInicial.value   = deposito
+  prefillInicial.value    = prefill
   showModal.value = true
   // El catálogo se relee SIEMPRE al abrir. Se cargaba una sola vez al montar la pantalla, así
   // que si creabas una categoría en la solapa Categorías y venías acá, no estaba: había que
@@ -507,6 +511,7 @@ async function openEdit(m) {
   errorGuardadoMov.value  = ''
   flujoInicial.value      = ''
   depositoInicial.value   = null
+  prefillInicial.value    = null
   showModal.value = true
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ limite: 500 })
@@ -706,11 +711,13 @@ onMounted(async () => {
   if (route.query.vista === 'deudores') irADeudores()
 
   if (route.query.nuevo) {
-    const { nuevo, deposito, ...resto } = route.query
+    const { nuevo, deposito, nombre, unidad, categoria, ...resto } = route.query
     router.replace({ query: resto })
     openCreate({
       flujo: typeof nuevo === 'string' && nuevo !== '1' ? nuevo : '',
       deposito: deposito || null,
+      prefill: nombre ? { descripcion: String(nombre), unidad: unidad ? String(unidad) : null,
+                          categoria_contable_id: categoria ? Number(categoria) : null } : null,
     })
   }
 })
@@ -1104,6 +1111,7 @@ onMounted(async () => {
       :movimiento-editar="editingMovimiento"
       :flujo-inicial="flujoInicial"
       :deposito-inicial="depositoInicial"
+      :prefill-inicial="prefillInicial"
       :guardando="guardandoMov"
       :error-guardado="errorGuardadoMov"
       @guardado="onMovimientoGuardado"

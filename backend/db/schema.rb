@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_13_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "ajustes_plataforma", force: :cascade do |t|
+    t.string "clave", null: false
+    t.jsonb "valor", default: {}, null: false
+    t.bigint "actualizado_por_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actualizado_por_id"], name: "index_ajustes_plataforma_on_actualizado_por_id"
+    t.index ["clave"], name: "index_ajustes_plataforma_on_clave", unique: true
   end
 
   create_table "alertas", force: :cascade do |t|
@@ -2508,6 +2518,40 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
     t.index ["sede_id"], name: "index_stocks_on_sede_id"
   end
 
+  create_table "suscripcion_cobros", force: :cascade do |t|
+    t.bigint "suscripcion_id", null: false
+    t.string "mp_id", null: false
+    t.string "estado", null: false
+    t.decimal "monto_ars", precision: 12, scale: 2
+    t.datetime "cobrado_at"
+    t.date "extiende_hasta"
+    t.jsonb "mp_datos", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mp_id"], name: "index_suscripcion_cobros_on_mp_id", unique: true
+    t.index ["suscripcion_id"], name: "index_suscripcion_cobros_on_suscripcion_id"
+  end
+
+  create_table "suscripciones", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "mp_preapproval_id"
+    t.string "estado", default: "pendiente", null: false
+    t.string "origen", null: false
+    t.decimal "monto_ars", precision: 12, scale: 2, null: false
+    t.string "payer_email", null: false
+    t.string "motivo", null: false
+    t.string "link"
+    t.bigint "creada_por_id"
+    t.datetime "ultimo_cobro_at"
+    t.jsonb "mp_datos", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "estado"], name: "index_suscripciones_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_suscripciones_on_club_id"
+    t.index ["creada_por_id"], name: "index_suscripciones_on_creada_por_id"
+    t.index ["mp_preapproval_id"], name: "index_suscripciones_on_mp_preapproval_id", unique: true
+  end
+
   create_table "tareas", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "asignada_a_id"
@@ -2542,6 +2586,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
     t.bigint "deleted_by_id"
     t.string "recordatorio"
     t.datetime "recordatorio_enviado_at"
+    t.bigint "receta_id"
+    t.decimal "riego_litros", precision: 8, scale: 2
+    t.decimal "riego_ph", precision: 4, scale: 2
+    t.decimal "riego_ec", precision: 5, scale: 2
     t.index ["aplicacion_plan_id"], name: "index_tareas_on_aplicacion_plan_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
@@ -2557,6 +2605,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
     t.index ["parent_tarea_id"], name: "index_tareas_on_parent_tarea_id"
     t.index ["plan_tarea_id"], name: "index_tareas_on_plan_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
+    t.index ["receta_id"], name: "index_tareas_on_receta_id"
     t.index ["recordatorio", "fecha_programada"], name: "index_tareas_recordatorios_pendientes", where: "((recordatorio IS NOT NULL) AND (recordatorio_enviado_at IS NULL))"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
@@ -2731,6 +2780,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "ajustes_plataforma", "users", column: "actualizado_por_id"
   add_foreign_key "alertas", "lecturas_ambientales", column: "lectura_id"
   add_foreign_key "alertas", "reglas_ambientales", column: "regla_id"
   add_foreign_key "alertas", "salas"
@@ -3116,11 +3166,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_200000) do
   add_foreign_key "stocks", "sedes"
   add_foreign_key "stocks", "stocks", column: "producido_desde_stock_id"
   add_foreign_key "stocks", "users", column: "deleted_by_id"
+  add_foreign_key "suscripcion_cobros", "suscripciones", column: "suscripcion_id"
+  add_foreign_key "suscripciones", "clubs"
+  add_foreign_key "suscripciones", "users", column: "creada_por_id"
   add_foreign_key "tareas", "aplicacion_planes", column: "aplicacion_plan_id"
   add_foreign_key "tareas", "clubs"
   add_foreign_key "tareas", "lotes"
   add_foreign_key "tareas", "plan_tareas"
   add_foreign_key "tareas", "plan_trabajos", column: "origen_plan_id"
+  add_foreign_key "tareas", "recetas"
   add_foreign_key "tareas", "salas"
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"

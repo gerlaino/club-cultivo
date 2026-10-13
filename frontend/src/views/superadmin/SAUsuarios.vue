@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser, resetSuperAdminUserPassword } from '../../lib/api.js'
+import { listSuperAdminUsers, listSuperAdminClubs, deleteSuperAdminUser, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { altaConCupo } from '../../lib/altaEquipo.js'
 import { useToast } from '../../composables/useToast.js'
 import { ROLES as ALL_ROLES, roleMeta } from '../../constants/roles.js'
 
@@ -97,7 +98,8 @@ async function handleCreate() {
   saving.value = true
   createError.value = null
   try {
-    const { data } = await createSuperAdminUser(form.value)
+    const data = await altaConCupo(form.value, confirm)
+    if (!data) return // pasaba el cupo y no se confirmó
     users.value.unshift(data)
     passwordCreada.value = { email: data.email, password_inicial: data.password_inicial }
     showCreate.value = false

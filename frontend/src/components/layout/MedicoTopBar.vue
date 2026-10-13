@@ -11,6 +11,7 @@
     </div>
 
     <div class="mdc-right">
+      <BuscadorGlobal class="mdc-icon-btn" />
       <!-- Bell -->
       <button class="mdc-icon-btn" :class="{ 'mdc-icon-btn--alert': count > 0 }" @click="bellOpen = !bellOpen">
         <Bell :size="17" :stroke-width="1.75" />
@@ -62,6 +63,7 @@
 </template>
 
 <script setup>
+import BuscadorGlobal from './BuscadorGlobal.vue'
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Menu, Bell, ChevronDown, UserCircle, LogOut } from 'lucide-vue-next'

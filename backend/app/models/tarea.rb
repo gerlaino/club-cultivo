@@ -10,6 +10,9 @@ class Tarea < ApplicationRecord
   belongs_to :sala,  optional: true
   belongs_to :lote,  optional: true
   belongs_to :plant, optional: true
+  # Cómo regar (sólo tareas de riego, 12-oct-2026): receta, litros, pH y EC. Al completarla, el
+  # registro de riego del lote se abre con esto precargado.
+  belongs_to :receta, optional: true
   belongs_to :parent_tarea, class_name: 'Tarea', optional: true
   has_many   :tareas_hijas, class_name: 'Tarea', foreign_key: :parent_tarea_id, dependent: :nullify
   belongs_to :origen_plan,    class_name: 'PlanTrabajo',   optional: true
@@ -68,6 +71,17 @@ class Tarea < ApplicationRecord
   validates :estado,    inclusion: { in: ESTADOS }
   validates :prioridad, inclusion: { in: PRIORIDADES }
   validates :frecuencia, inclusion: { in: FRECUENCIAS }, allow_nil: true
+
+  validates :riego_litros, numericality: { greater_than: 0, less_than: 100_000 }, allow_nil: true
+  validates :riego_ph,     numericality: { greater_than: 0, less_than: 14 }, allow_nil: true
+  validates :riego_ec,     numericality: { greater_than_or_equal_to: 0, less_than: 20 }, allow_nil: true
+  validate  :receta_de_la_organizacion
+  # Los parámetros de riego sólo tienen sentido en una tarea de riego: si cambia el tipo, se van.
+  before_validation :limpiar_riego_si_no_es_riego
+
+  def parametros_riego?
+    tipo == 'riego' && (receta_id || riego_litros || riego_ph || riego_ec).present?
+  end
 
   # «Recordarme»: un push a quien está asignada, ese día o el día antes, a las 8 (hora de la
   # app). Reemplaza al resumen genérico de las 8:00: es preciso y lo pide quien crea la tarea.
@@ -252,6 +266,10 @@ class Tarea < ApplicationRecord
         sala_id:          sala_id,
         lote_id:          lote_id,
         horas_estimadas:  horas_estimadas,
+        receta_id:        receta_id,
+        riego_litros:     riego_litros,
+        riego_ph:         riego_ph,
+        riego_ec:         riego_ec,
         fecha_programada: siguiente,
         estado:           'pendiente',
         recurrente:       false,
@@ -262,6 +280,19 @@ class Tarea < ApplicationRecord
   end
 
   private
+
+  def limpiar_riego_si_no_es_riego
+    return if tipo == 'riego'
+
+    self.receta_id = nil
+    self.riego_litros = self.riego_ph = self.riego_ec = nil
+  end
+
+  def receta_de_la_organizacion
+    return if receta_id.nil? || Receta.unscoped.where(id: receta_id, club_id: club_id).exists?
+
+    errors.add(:receta, 'no es de esta organización')
+  end
 
   # Cambió la fecha o el recordatorio: vuelve a contar como no enviado. Un tilde vacío es nil.
   def normalizar_recordatorio

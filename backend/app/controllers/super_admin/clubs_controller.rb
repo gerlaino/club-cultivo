@@ -603,6 +603,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       timezone:       c.timezone,
       usuarios:       c.users.map { |u| { id: u.id, email: u.email, email_personal: u.email_personal, role: u.role,
                                            nombre: u.nombre_completo, visto_at: u.visto_at } },
+      # Los que se dieron de alta por encima del cupo del plan, por rol: se cobran aparte (12-oct-2026).
+      usuarios_excedentes: PlanEnforcer.new(c).excedentes_de_usuarios.map { |rol, n|
+        { rol: rol, label: Club::ROLES_META.dig(rol, :label) || rol, excedente: n } },
       vista_paciente_activa:      c.vista_paciente_activa,
       smtp_configured: c.smtp_configured?,
       smtp_host:       c.smtp_host,

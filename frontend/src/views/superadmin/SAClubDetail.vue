@@ -4,8 +4,10 @@ import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { formatPrecio } from '../../lib/formatters.js'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword, deleteSuperAdminUser } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword, deleteSuperAdminUser } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { altaConCupo } from '../../lib/altaEquipo.js'
+import SACobroMercadoPago from '../../components/superadmin/SACobroMercadoPago.vue'
 import { useToast } from '../../composables/useToast.js'
 import SAModulos from './SAModulos.vue'
 import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History, KeyRound, MoreHorizontal, Copy, Archive, ArchiveRestore, StickyNote, ListChecks } from 'lucide-vue-next'
@@ -385,14 +387,15 @@ async function crearUsuario() {
   saving.value = true
   userError.value = null
   try {
-    const { data } = await createSuperAdminUser({ ...userForm.value, club_id: id })
+    const data = await altaConCupo({ ...userForm.value, club_id: id }, confirm)
+    if (!data) return // pasaba el cupo y no se confirmó
     await cargar()
     showUserModal.value = false
     // La contraseña va al CARTEL, no a un toast: se muestra una sola vez y nadie más la sabe,
     // así que no puede vivir en algo que se cierra solo a los segundos y no se puede copiar.
     passwordNueva.value = { ...data, motivo: 'alta' }
     passwordCopiada.value = false
-    toast.success('Usuario creado. Anotá la contraseña antes de cerrar el cartel.')
+    toast.success(data.excede_cupo ? 'Usuario creado por encima del plan. Anotá la contraseña antes de cerrar el cartel.' : 'Usuario creado. Anotá la contraseña antes de cerrar el cartel.')
   } catch (e) {
     userError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear el usuario'
   } finally {
@@ -874,6 +877,13 @@ onMounted(async () => {
           <button class="scd__pass-x" aria-label="Cerrar" @click="passwordNueva = null">✕</button>
         </div>
 
+        <!-- Por encima del plan: se dieron de alta pasando el cupo, para cobrarlos aparte. -->
+        <p v-if="club.usuarios_excedentes?.length" class="scd__excedente" data-testid="usuarios-excedentes">
+          Por encima del plan:
+          <template v-for="(e, i) in club.usuarios_excedentes" :key="e.rol">{{ i ? ' · ' : ' ' }}{{ e.excedente }} {{ e.label }}</template>
+          — se cobran aparte.
+        </p>
+
         <div v-if="!club.usuarios?.length" class="scd__empty">Sin usuarios creados</div>
         <div v-else class="scd__users">
           <div v-for="u in club.usuarios" :key="u.id" class="scd__user-row">
@@ -911,6 +921,9 @@ onMounted(async () => {
            La sección vive en su propio componente y cada interruptor se guarda solo: acá había
            un "Guardar" arriba de todo que se perdía de vista al bajar, así que se tildaban tres
            módulos, se cambiaba de pestaña y no se había guardado ninguno. -->
+      <div v-if="solapa === 'modulos'" class="scd__card">
+        <SACobroMercadoPago :club-id="club.id" />
+      </div>
       <div v-if="solapa === 'modulos'" class="scd__card">
         <SAModulos :club="club" @actualizado="onModulosActualizados" />
       </div>
@@ -1355,6 +1368,7 @@ onMounted(async () => {
 .scd__user-baja:hover:not(:disabled) { background: var(--c-rust-100); color: var(--c-rust-600); border-color: var(--c-rust-100); }
 
 /* La contraseña nueva. Se muestra una vez y hay que anotarla. */
+.scd__excedente { margin: 0 0 .75rem; padding: .55rem .8rem; border-radius: 9px; background: var(--c-amber-100); color: var(--c-gold-500); font-size: .82rem; font-weight: 600; }
 .scd__pass {
   display: flex; align-items: flex-start; gap: .6rem;
   margin: .75rem 1.1rem; padding: .75rem .9rem;

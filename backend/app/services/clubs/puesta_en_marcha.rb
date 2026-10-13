@@ -51,7 +51,7 @@ module Clubs
       unless @club.personal?
         pasos << paso('equipo', 'Que entre alguien más que el admin',
                       @club.users.del_equipo.where.not(role: 'admin').where.not(visto_at: nil).exists?,
-                      'Un cultivador, un dispensador: la app se prueba operando.', '/usuarios')
+                      'Un cultivador, un dispensador: la app se prueba operando. Pedilos desde Equipo y los damos de alta.', '/usuarios')
       end
 
       hechos = pasos.count { |p| p[:hecho] }

@@ -173,6 +173,8 @@ const props = defineProps({
   sala:       { type: Object,  default: null },
   // Abrir ya en el formulario de UNA acción («ambiental»): lo usa el «+» del teléfono.
   accionInicial: { type: String, default: null },
+  // Cómo regar, cuando se registra el riego de una TAREA que lo dice ({ receta_id, litros, ph, ec }).
+  riegoInicial: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -254,7 +256,19 @@ watch(() => props.modelValue, (open) => {
     seleccionadas.value = [props.accionInicial]
     paso.value = 2
   }
+  aplicarRiegoInicial()
 }, { immediate: true })  // puede montarse ya abierto (ver RegistroLoteModal)
+
+// La tarea de riego dice cómo regar: el formulario arranca con eso. Se puede cambiar: lo que queda
+// registrado es lo que se hizo.
+function aplicarRiegoInicial() {
+  const r = props.riegoInicial
+  if (!r) return
+  Object.assign(formData.value.riego, {
+    volumen: r.litros ?? null, ph: r.ph ?? null, ec: r.ec ?? null,
+    ...(r.receta_id ? { fertilizo: true, modo_nutricion: 'receta', receta_id: r.receta_id } : {}),
+  })
+}
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 
