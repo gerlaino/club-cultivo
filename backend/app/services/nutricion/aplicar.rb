@@ -78,6 +78,9 @@ module Nutricion
           'receta_id' => @receta&.id, 'receta_nombre' => @receta&.nombre, 'uso' => @receta&.uso,
           'ph_objetivo' => @receta&.ph_objetivo&.to_f, 'ec_objetivo' => @receta&.ec_objetivo&.to_f,
           'litros' => @litros.to_f, 'base' => @base.to_f, 'base_unidad' => base_unidad,
+          # Los registros de ESTE riego (uno por lote si se regó la sala): editar después tiene que
+          # deshacer y rehacer el riego entero, no la parte de un lote (`Nutricion::Editar`).
+          'registro_ids' => @registros.map(&:id),
           'items' => aplicados,
           'costo_ars' => aplicados.sum { |a| a['costo_ars'] }.round(2),
           # A quién se le cargó la plata (lote → pesos), para que la ficha lo diga.

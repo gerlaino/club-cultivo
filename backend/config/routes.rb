@@ -191,7 +191,13 @@ Rails.application.routes.draw do
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update] do
         post :recalcular   # recalcula insumos/energía/mano de obra desde el libro contable
       end
-      resources :registros_ambientales, only: [:index, :create, :destroy]
+      resources :registros_ambientales, only: [:index, :create, :destroy] do
+        # Corregir los nutrientes de un riego ya guardado (`Nutricion::Editar`).
+        member do
+          get   :nutricion
+          patch :nutricion, action: :actualizar_nutricion
+        end
+      end
       resources :lote_eventos,          only: [:index, :create, :update, :destroy]
       resources :fotos, only: [:index, :create, :update, :destroy], controller: 'fotos_lote' do
         member { patch :portada }

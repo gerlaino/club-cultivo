@@ -68,6 +68,10 @@
                   <span class="lhm__row-titulo">{{ it.titulo }}<span v-if="metaDetalle(it)" class="lhm__row-detalle"> · {{ metaDetalle(it) }}</span></span>
                   <div class="lhm__row-right">
                     <span class="lhm__row-fecha">{{ formatDateTime(it.fecha) }}</span>
+                    <!-- Corregir los nutrientes de un riego: lo puede quien lo registró o un admin
+                         (lo decide el backend en `nutricion_editable`). -->
+                    <button v-if="it.nutricion_editable" class="lhm__icon lhm__icon--edit" title="Corregir nutrientes"
+                            :aria-label="`Corregir los nutrientes de ${it.titulo}`" @click="corrigiendo = it"><i class="bi bi-droplet-half"></i></button>
                     <template v-if="canAdmin">
                       <button v-if="it.editable" class="lhm__icon lhm__icon--edit" title="Editar" @click="empezarEdicion(it)"><i class="bi bi-pencil"></i></button>
                       <button v-if="it.deletable" class="lhm__icon lhm__icon--del" title="Borrar" @click="$emit('delete', it)"><i class="bi bi-trash"></i></button>
@@ -88,6 +92,8 @@
       </div>
     </div>
   </Teleport>
+  <EditarNutricionRiego v-if="corrigiendo && lote" :lote-id="lote.id" :registro-id="corrigiendo.id"
+                        @cerrar="corrigiendo = null" @guardado="corrigiendo = null; emit('actualizado')" />
 </template>
 
 <script setup>
@@ -97,6 +103,7 @@ import { ref, computed, watch } from 'vue'
 import { formatDateTime } from '../../lib/loteHelpers.js'
 import { KINDS, dotColor, metaDetalle } from '../../lib/historialHelpers.js'
 import RegistrarActividadForm from './RegistrarActividadForm.vue'
+import EditarNutricionRiego from '../riegos/EditarNutricionRiego.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -105,7 +112,9 @@ const props = defineProps({
   // Para que el trasplante traiga marcado el medio en que queda.
   lote:       { type: Object,  default: null },
 })
-const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante', 'riego'])
+const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante', 'riego', 'actualizado'])
+// El riego al que se le están corrigiendo los nutrientes (`EditarNutricionRiego`).
+const corrigiendo = ref(null)
 
 const formAbierto = ref(false)
 const busqueda   = ref('')

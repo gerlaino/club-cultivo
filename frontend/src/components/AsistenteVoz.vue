@@ -176,6 +176,24 @@
                       </label>
                     </div>
 
+                    <!-- LO QUE SE DESCUENTA DEL DEPÓSITO (13-oct-2026). El dictado nombró nutrientes o
+                         una receta y el backend ya hizo la cuenta (`Nutricion::DesdeDictado`): va a la
+                         vista y se corrige acá, antes de guardar, porque mueve stock. -->
+                    <div v-if="accion.datos?.nutricion" class="av__nutri" data-testid="accion-nutricion">
+                      <div class="av__cerrar-label">
+                        <i class="bi bi-droplet-half"></i>
+                        Se descuenta {{ esPersonal ? 'de tus nutrientes' : 'del depósito' }}
+                      </div>
+                      <ul v-if="accion.datos.nutricion.avisos?.length" class="av__nutri-avisos">
+                        <li v-for="(a, k) in accion.datos.nutricion.avisos" :key="k">{{ a }}</li>
+                      </ul>
+                      <p v-if="detallesNutricion(accion).length" class="av__nutri-cuenta">
+                        <span v-for="(d, k) in detallesNutricion(accion)" :key="k">{{ d }}</span>
+                      </p>
+                      <InsumosAplicados v-model="accion.datos.nutricion" uso="riego"
+                                        :base-default="accion.datos.volumen_l || null" />
+                    </div>
+
                     <!-- Editor inline -->
                     <div v-if="accion._expandido" class="av__editor">
                       <template v-if="accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala'">
@@ -375,6 +393,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+import InsumosAplicados from './camas/InsumosAplicados.vue'
 
 const { esPersonal } = useUsoPersonal()
 const auth = useAuthStore()
@@ -658,6 +677,13 @@ function hablar(texto) {
   window.speechSynthesis.speak(utt)
 }
 
+// «Vege: 1 pulso × 6 plantas (etiqueta)»: de dónde salió cada número, para poder corregirlo.
+function detallesNutricion (accion) {
+  const items = accion.datos?.nutricion?.items || []
+  return items.filter(i => i.detalle && Number(i.cantidad) === Number(i.calculada)).map(i =>
+    `${i.nombre}: ${i.detalle}${i.origen === 'etiqueta' ? ' (dosis de la etiqueta)' : ''}`)
+}
+
 function labelTipo(tipo) {
   return {
     registro_ambiental:      'Registro ambiental',
@@ -902,4 +928,7 @@ function metaAccion(accion) {
 
 .av-modal-enter-active,.av-modal-leave-active { transition:all .25s ease; }
 .av-modal-enter-from,.av-modal-leave-to { opacity:0; transform:scale(.97) translateY(6px); }
+.av__nutri { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--c-slate-200); border-radius: 10px; background: var(--c-paper); display: flex; flex-direction: column; gap: 8px; }
+.av__nutri-avisos { margin: 0; padding-left: 18px; font-size: var(--fs-12); color: var(--c-amber-500); }
+.av__nutri-cuenta { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--c-ink-500); }
 </style>

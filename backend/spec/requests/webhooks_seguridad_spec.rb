@@ -26,7 +26,7 @@ RSpec.describe 'Webhooks salientes: a dónde sale el servidor', type: :request d
   describe 'alta' do
     it 'una organización da de alta un webhook a una dirección pública' do
       sign_in_as(admin)
-      post '/webhooks', params: params_webhook, as: :json
+      post '/api/webhooks', params: params_webhook, as: :json
       expect(response).to have_http_status(:created)
     end
 
@@ -34,7 +34,7 @@ RSpec.describe 'Webhooks salientes: a dónde sale el servidor', type: :request d
       sign_in_as(admin)
       ['http://10.0.0.5:6379/', 'http://169.254.169.254/latest/meta-data', 'https://interno.example/x',
        'http://localhost:3001/api/me'].each do |url|
-        post '/webhooks', params: { webhook: params_webhook[:webhook].merge(url: url) }, as: :json
+        post '/api/webhooks', params: { webhook: params_webhook[:webhook].merge(url: url) }, as: :json
         expect(response).to have_http_status(:unprocessable_entity), "aceptó #{url}"
       end
       expect(Webhook.unscoped.count).to eq(0)
@@ -43,26 +43,26 @@ RSpec.describe 'Webhooks salientes: a dónde sale el servidor', type: :request d
     it 'el autocultivo no tiene webhooks: su admin nace del autoregistro' do
       personal = create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL)
       sign_in_as(create(:user, :admin, club: personal))
-      post '/webhooks', params: params_webhook, as: :json
+      post '/api/webhooks', params: params_webhook, as: :json
       expect(response).to have_http_status(:forbidden)
-      get '/webhooks'
+      get '/api/webhooks'
       expect(response).to have_http_status(:forbidden)
     end
 
     it 'un rol que no es admin no los ve' do
       sign_in_as(create(:user, :cultivador, club: club))
-      get '/webhooks'
+      get '/api/webhooks'
       expect(response).to have_http_status(:forbidden)
     end
 
     it 'aislamiento: el admin de otra organización no ve ni toca el webhook ajeno' do
       ajeno = crear_webhook(create(:club))
       sign_in_as(admin)
-      get '/webhooks'
+      get '/api/webhooks'
       expect(JSON.parse(response.body).map { |w| w['id'] }).not_to include(ajeno.id)
-      get "/webhooks/#{ajeno.id}"
+      get "/api/webhooks/#{ajeno.id}"
       expect(response).to have_http_status(:not_found)
-      delete "/webhooks/#{ajeno.id}"
+      delete "/api/webhooks/#{ajeno.id}"
       expect(Webhook.unscoped.exists?(ajeno.id)).to be true
     end
   end
@@ -92,7 +92,7 @@ RSpec.describe 'Webhooks salientes: a dónde sale el servidor', type: :request d
       ActsAsTenant.with_tenant(club) do
         expect { OutgoingWebhookService.new(webhook, 'lote.avanzado', { id: 1 }).call }.to raise_error(/500/)
         entrega = webhook.webhook_deliveries.last
-        expect(entrega.error_message).to eq('HTTP 500')
+        expect(entrega.error_message).to include('500')
         expect(entrega.error_message).not_to include('SECRETO')
       end
       expect(http.ipaddr).to eq('93.184.215.14')

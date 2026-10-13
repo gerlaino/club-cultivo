@@ -23,6 +23,7 @@ import { useConfirm }   from '../composables/useConfirm.js'
 import { useUltimaPlanta } from '../composables/useUltimaPlanta.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import EditarNutricionRiego from '../components/riegos/EditarNutricionRiego.vue'
 
 
 const route  = useRoute()
@@ -202,6 +203,8 @@ const macetaActual = computed(() => {
 })
 
 // ── Acciones ──────────────────────────────────────────────
+// El riego al que se le corrigen los nutrientes (`EditarNutricionRiego`).
+const corrigiendoRiego = ref(null)
 async function loadActivities() {
   loadingActs.value = true
   try {
@@ -821,6 +824,10 @@ onMounted(async () => {
                         <!-- Qué se aplicó (receta y productos), no sólo que hubo «Nutrición». -->
                         <div v-if="a.metadata?.aplicado" class="pd__act-aplicado"><strong>Aplicado:</strong> {{ a.metadata.aplicado }}</div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
+                        <!-- Si el dictado se equivocó de producto o de cantidad, se corrige acá. -->
+                        <button v-if="a.nutricion_editable" type="button" class="pd__corregir" @click="corrigiendoRiego = a">
+                          <i class="bi bi-droplet-half" aria-hidden="true"></i> Corregir nutrientes
+                        </button>
                       </template>
 
                       <template v-else-if="a.activity_type === 'lote_fase'">
@@ -1307,6 +1314,8 @@ onMounted(async () => {
       :registros-hoy="registrosHoyPlanta"
       @saved="loadActivities"
     />
+    <EditarNutricionRiego v-if="corrigiendoRiego" :lote-id="corrigiendoRiego.lote_id" :registro-id="corrigiendoRiego.registro_id"
+                          @cerrar="corrigiendoRiego = null" @guardado="corrigiendoRiego = null; loadActivities()" />
     <RegistroLoteModal
       v-if="planta?.lote"
       v-model="showRiegoLote"
@@ -1512,6 +1521,7 @@ onMounted(async () => {
 
 /* Actividades / historial */
 .pd__act-aplicado { margin-top: .35rem; font-size: .82rem; color: var(--c-leaf-700); }
+.pd__corregir { margin-top: .4rem; padding: .25rem .6rem; border: 1px solid var(--c-slate-200); border-radius: 8px; background: #fff; font: inherit; font-size: .8rem; font-weight: 600; color: var(--c-ink-700); cursor: pointer; }
 .pd__actividades { display: flex; flex-direction: column; }
 .pd__actividad   { display: flex; gap: .75rem; padding: .9rem 1.1rem; border-bottom: 1px solid #f0fdf4; }
 .pd__actividad:last-child { border-bottom: none; }

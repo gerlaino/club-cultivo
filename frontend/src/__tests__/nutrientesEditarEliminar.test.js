@@ -60,7 +60,41 @@ describe('Mis nutrientes: editar, corregir, eliminar', () => {
     await w.findAll('.rc__modal-foot .rc__btn-primary').at(-1).trigger('click')
     await flushPromises()
 
-    expect(api.updateInsumo).toHaveBeenCalledWith(3, { nombre: 'Base A (Canna)', stock_minimo: 0 })
+    const [, payload] = api.updateInsumo.mock.calls[0]
+    expect(payload).toMatchObject({ nombre: 'Base A (Canna)', stock_minimo: 0 })
+    expect(payload).not.toHaveProperty('unidad_medida')
+  })
+
+  // AC (Germán, 13-oct-2026): «al crear el nutriente, cargar sus datos: la aplicación sugerida»,
+  // para que el dictado calcule sin pedir cantidades. Y «un pulso» es una medida casera.
+  it('editar guarda la medida casera y la dosis de la etiqueta por fase', async () => {
+    api.updateInsumo.mockResolvedValue({ data: {} })
+    const w = await montar({ ...BASE_A, nombre: 'Vege' })
+    await boton(w, 'Editar').trigger('click')
+
+    // Se busca cada vez: el modal se vuelve a dibujar con cada cambio.
+    await w.find('.de input[placeholder="pulso, tapita, cucharita"]').setValue('pulso')
+    await w.find('.de input[placeholder="1"]').setValue('2')
+    await w.find('.de select').setValue('medida_planta')
+    await w.find('.de input[aria-label="Dosis en Vegetativo"]').setValue('1')
+
+    await w.findAll('.rc__modal-foot .rc__btn-primary').at(-1).trigger('click')
+    await flushPromises()
+
+    expect(api.updateInsumo.mock.calls[0][1]).toMatchObject({
+      medida_casera: 'pulso', medida_casera_cantidad: 2, dosis_unidad: 'medida_planta', dosis_vegetativo: 1,
+    })
+  })
+
+  it('la unidad de la dosis sigue a la del producto, y la medida casera sólo aparece si tiene nombre', async () => {
+    const w = await montar()
+    await boton(w, 'Editar').trigger('click')
+    const opciones = () => w.find('.de select').findAll('option').map(o => o.text())
+
+    expect(opciones()).toContain('ml por litro de agua')
+    expect(opciones().some(t => t.includes('pulsos'))).toBe(false)
+    await w.find('.de input[placeholder="pulso, tapita, cucharita"]').setValue('pulso')
+    expect(opciones()).toContain('pulsos por planta')
   })
 
   it('corregir la cantidad por derrame no deja subir', async () => {

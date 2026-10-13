@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_13_000000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_13_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1320,6 +1320,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_13_000000) do
     t.bigint "sede_id"
     t.string "tipo", default: "cultivo", null: false
     t.bigint "deposito_id"
+    t.string "medida_casera"
+    t.decimal "medida_casera_cantidad", precision: 10, scale: 3
+    t.string "dosis_unidad"
+    t.decimal "dosis_enraizado", precision: 10, scale: 3
+    t.decimal "dosis_vegetativo", precision: 10, scale: 3
+    t.decimal "dosis_floracion", precision: 10, scale: 3
     t.index ["categoria_contable_id"], name: "index_insumos_on_categoria_contable_id"
     t.index ["club_id", "nombre"], name: "index_insumos_on_club_id_and_nombre"
     t.index ["club_id", "sede_id", "nombre"], name: "index_insumos_on_club_id_and_sede_id_and_nombre"

@@ -1010,7 +1010,7 @@ class LotesController < ApplicationController
     end
 
     nutri = Lotes::Nutricion.new(@lote)
-    @lote.registros_ambientales.includes(:user, riego_plantas: :plant).find_each do |r|
+    @lote.registros_ambientales.includes(:user, :lote, riego_plantas: :plant).find_each do |r|
       chips = []
       chips << "#{r.temperatura}°C" if r.temperatura
       chips << "#{r.humedad}%"      if r.humedad
@@ -1032,6 +1032,9 @@ class LotesController < ApplicationController
         detalle: [chips.join(' · '), r.observaciones].reject(&:blank?).join(' — ').presence,
         categoria: nil, metadata: {}, usuario: r.user&.nombre_completo,
         editable: false, deletable: true,
+        # Se pueden corregir los nutrientes de un riego (`Nutricion::Editar`); el detalle de por
+        # qué no (otro lote del mismo riego ya cosechado) lo dice el modal al abrir.
+        nutricion_editable: riego_corregible?(r),
       }
     end
 
@@ -1097,6 +1100,14 @@ class LotesController < ApplicationController
   end
 
   private
+
+  # ¿Este registro es un riego que esta persona puede corregir? La misma regla que
+  # `Nutricion::Editar.bloqueo` para lo que se sabe sin abrirlo: quién y si el lote sigue en cultivo.
+  def riego_corregible?(r)
+    riego = r.nutricion.present? || (Array(r.tareas_realizadas) & %w[riego nutricion]).any?
+    riego && Lote::CULTIVO_ESTADOS.include?(r.lote&.estado) &&
+      (current_user.admin? || current_user.super_admin? || r.user_id == current_user.id)
+  end
 
   def fase_label(estado) = FASE_LABELS[estado] || estado
 

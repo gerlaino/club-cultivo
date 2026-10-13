@@ -541,6 +541,9 @@ export const deleteUnidadNegocio       = (id)          => api.delete(`/unidades_
 // ── Finanzas · insumos (depósito + compra/consumo) ─────────────────────────────
 export const listInsumos     = (params = {}) => api.get('/insumos', { params })
 export const getInsumo       = (id)          => api.get(`/insumos/${id}`)
+// Corregir los nutrientes de un riego ya guardado (`Nutricion::Editar`).
+export const getNutricionRiego    = (loteId, registroId)            => api.get(`/lotes/${loteId}/registros_ambientales/${registroId}/nutricion`)
+export const updateNutricionRiego = (loteId, registroId, nutricion) => api.patch(`/lotes/${loteId}/registros_ambientales/${registroId}/nutricion`, { nutricion })
 export const createInsumo    = (payload)     => api.post('/insumos', { insumo: payload })
 export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insumo: payload })
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)

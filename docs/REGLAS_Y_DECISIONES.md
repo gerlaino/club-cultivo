@@ -1756,6 +1756,14 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
   agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
   repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
+- **Lo dictado de nutrientes se descuenta, pero la cuenta NO la hace la IA** (13-oct-2026,
+  Germán): la IA dice qué se nombró y lo que se dijo de cantidad; `Nutricion::Dosis` hace la
+  cuenta; la persona la ve y la corrige antes de guardar. Lo que no se puede calcular (litros,
+  plantas, cuánto es una medida) se pregunta, no se adivina. La dosis de etiqueta la carga la
+  persona copiada de SU producto: la app sigue sin recomendar marcas ni ml (`Nutricion::Guia`).
+- **Corregir un riego es deshacerlo entero y volver a aplicarlo** (`Nutricion::Editar`), nunca
+  pisar números: lo descontado vuelve al depósito y queda el rastro. No se corrige lo de un lote
+  ya cosechado.
 - **Una rendición que nadie recibe se REASIGNA, no se recibe en nombre de otro** (13-oct-2026,
   Germán): sólo administración, sólo a quien puede recibir (`Rendir::RECIBEN`), y la cuenta el
   nuevo receptor. Toda alerta del panel con «Ver …» lleva a una pantalla donde eso se VE y se

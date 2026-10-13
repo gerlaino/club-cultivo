@@ -47,6 +47,31 @@ class RegistrosAmbientalesController < ApplicationController
     render json: { error: 'Registro no encontrado' }, status: :not_found
   end
 
+  # GET /lotes/:lote_id/registros_ambientales/:id/nutricion — lo aplicado en ese riego, para
+  # corregirlo. Dice si se puede y, si no, por qué (la pantalla no ofrece lo que se va a rechazar).
+  def nutricion
+    registro = @lote.registros_ambientales.find(params[:id])
+    render json: { registro_id: registro.id, sala_id: @lote.sala_id,
+                   nutricion: Nutricion::Editar.para_editar(registro),
+                   lotes: Nutricion::Editar.grupo_de(registro).map { |r| r.lote&.codigo }.compact,
+                   bloqueo: Nutricion::Editar.bloqueo(registro, current_user) }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Registro no encontrado' }, status: :not_found
+  end
+
+  # PATCH /lotes/:lote_id/registros_ambientales/:id/nutricion { nutricion: { modo, receta_id, base, items } }
+  # Deshace lo aplicado en el riego entero y lo vuelve a aplicar con lo nuevo.
+  def actualizar_nutricion
+    registro = @lote.registros_ambientales.find(params[:id])
+    n = params[:nutricion].respond_to?(:to_unsafe_h) ? params[:nutricion].to_unsafe_h : {}
+    res = Nutricion::Editar.call(registro: registro, usuario: current_user, nutricion: n)
+    render json: { nutricion: res.nutricion, faltantes: res.faltantes, registros: res.registros.size }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Registro no encontrado' }, status: :not_found
+  rescue Nutricion::Editar::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   private
 
   # `nutricion: { receta_id, litros, items: [{ insumo_id, cantidad, modo_faltante }] }`.

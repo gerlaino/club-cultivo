@@ -52,6 +52,19 @@ class AsistenteController < BaseController
       carencia o "no cosechar por X días", va en `carencia_dias`.
     - "Riegué" sin nutrientes → tareas_realizadas: ["riego"], fertilizacion: false
       "Fertilicé / puse base A+B / bloom" → tareas_realizadas: ["riego","nutricion"], fertilizacion: true
+    - NUTRIENTES Y RECETAS (se descuentan del depósito: no inventes nada):
+      · Si nombra nutrientes, poné en datos `nutrientes`: una entrada por producto, con el `nombre`
+        EXACTO como figura en NUTRIENTES del mapa. Si no figura, ponelo como lo dijo.
+      · `cantidad`, `medida` y `por` SÓLO si dijo cuánto. `medida`: "medida" para la medida casera
+        (pulso, tapita, cucharita, chorrito, bombeo), "ml" o "g". `por`: "planta" («a cada
+        planta», «por planta»), "litro" («por litro») o "total" (lo que puso en todo el riego).
+        «un pulso de vege a cada planta» → { "nombre": "Vege", "cantidad": 1, "medida": "medida", "por": "planta" }.
+        «le puse vege» (sin cuánto) → { "nombre": "Vege" }: el sistema usa la dosis de su etiqueta.
+      · Si dice que aplicó una receta («la receta Floración»), poné `receta_nombre` EXACTO como
+        figura en RECETAS.
+      · `volumen_l`: los litros de agua del riego, sólo si los dice («regué con 3 litros» = 3).
+      · Nunca hagas la cuenta de los ml: poné lo que se dijo. La cuenta la hace el sistema.
+      · Además, `notas_fertilizacion` con lo que dijo, como texto.
     - El "resumen" dice QUÉ ENTENDISTE, nada más. No opines sobre los valores: nada de "pH fuera
       de rango" ni "temperatura inusual". Juzgás con una sola lectura y sin historia —no sabés el
       setpoint de esa sala ni cómo viene ese lote— y el aviso se lee como si el sistema hubiera
@@ -102,6 +115,8 @@ class AsistenteController < BaseController
             "tareas_realizadas": ["riego", "nutricion"],
             "fertilizacion": true,
             "notas_fertilizacion": "base A + base B + bloom",
+            "nutrientes": [{ "nombre": "Base A", "cantidad": 2, "medida": "ml", "por": "litro" }],
+            "receta_nombre": "Floración", "volumen_l": 3,
             "temperatura": 24.5, "humedad": 60, "ph": 6.2, "ec": 1.8,
             "co2": 900, "ppfd": 600, "horas_luz": 18,
             "temperatura_sustrato": 22, "ph_runoff": 6.4,
@@ -209,6 +224,7 @@ class AsistenteController < BaseController
     else
       anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
       anotar_repetidas!(resultado['acciones'], contexto)
+      proponer_nutricion!(resultado['acciones'], contexto)
       resultado['correccion_id'] = registrar_propuesta(texto, resultado['acciones'])
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
@@ -493,7 +509,7 @@ class AsistenteController < BaseController
   # nombrar un lote de otro.
   def construir_prompt(contexto, es_cultivador)
     hoy      = Time.zone.today
-    variable = "\nHOY: #{DIAS_SEMANA[hoy.wday]} #{hoy.strftime('%d/%m/%Y')}\n" + mapa_del_cultivo + contexto_rico(contexto)
+    variable = "\nHOY: #{DIAS_SEMANA[hoy.wday]} #{hoy.strftime('%d/%m/%Y')}\n" + mapa_del_cultivo + nutrientes_y_recetas + contexto_rico(contexto)
     [PROMPT_BASE + permisos_rol(es_cultivador) + (current_user.club&.personal? ? PROMPT_AUTOCULTIVO : ''), variable]
   end
 
@@ -529,6 +545,78 @@ class AsistenteController < BaseController
       ctx += "GENÉTICAS: #{gens.any? ? gens.join(', ') : '(ninguna cargada)'}\n"
     end
     ctx + "═════════════════════════════════════\n"
+  end
+
+  # Los nombres EXACTOS de los nutrientes y recetas de riego, para que el dictado los nombre como
+  # figuran y el sistema los encuentre (`Nutricion::DesdeDictado`). Con su medida casera, que es
+  # como la persona dice cuánto («un pulso»). Con tope, como el mapa: se pagan por token.
+  NUTRIENTES_MAX = 60
+
+  def nutrientes_y_recetas
+    club = current_user.club
+    nut = club.insumos.activos.por_tipo('cultivo').order(:nombre).limit(NUTRIENTES_MAX).map do |i|
+      i.medida_casera.present? ? "#{i.nombre} (se mide en #{i.medida_casera})" : i.nombre
+    end.uniq
+    rec = club.recetas.where(activa: true, uso: 'riego').order(:nombre).limit(NUTRIENTES_MAX).pluck(:nombre)
+    return '' if nut.empty? && rec.empty?
+
+    "NUTRIENTES: #{nut.any? ? nut.join(', ') : '(ninguno cargado)'}\n" \
+      "RECETAS: #{rec.any? ? rec.join(', ') : '(ninguna)'}\n"
+  end
+
+  # Lo dictado de nutrientes, convertido en una PROPUESTA con cantidades (`Nutricion::DesdeDictado`)
+  # que la pantalla muestra y deja corregir antes de guardar. Va en `datos.nutricion`.
+  def proponer_nutricion!(acciones, contexto)
+    club = current_user.club
+    Array(acciones).each do |a|
+      datos = a['datos']
+      next unless datos.is_a?(Hash) && (datos['nutrientes'].present? || datos['receta_nombre'].present?)
+
+      lotes, sala = case a['tipo']
+                    when 'registro_ambiental'
+                      lote = lotes_visibles(club).find_by(codigo: a['lote_codigo'])
+                      [Array(lote), lote&.sala]
+                    when 'registro_ambiental_sala'
+                      s = sala_de(a, datos, club, contexto)
+                      [s ? s.lotes.where(estado: Lote::CULTIVO_ESTADOS).to_a : [], s]
+                    else
+                      next
+                    end
+      next if lotes.empty?
+
+      propuesta = Nutricion::DesdeDictado.call(club: club, lotes: lotes, sala: sala, datos: datos)
+      next unless propuesta
+
+      datos['nutricion'] = propuesta
+      datos['fertilizacion'] = true
+      datos['tareas_realizadas'] = (Array(datos['tareas_realizadas']) | %w[riego nutricion])
+    end
+  rescue StandardError => e
+    # La propuesta es una ayuda: si falla, el dictado sigue y la nutrición se carga a mano.
+    Rails.logger.warn("[asistente] proponer_nutricion: #{e.class}: #{e.message}")
+  end
+
+  # Lo que la persona CONFIRMÓ de nutrientes: se descuenta del depósito y se imputa al lote, igual
+  # que el riego cargado a mano (`Nutricion::Aplicar`). Sin nada confirmado, no se toca el depósito.
+  def aplicar_nutricion_dictada!(registros, datos, club, sala:)
+    plan = Nutricion::DesdeDictado.para_aplicar(club: club, nutricion: datos['nutricion'], sala: sala)
+    return nil unless plan
+
+    Nutricion::Aplicar.new(club: club, usuario: current_user, registros: registros, litros: plan[:litros],
+                           receta: plan[:receta], items: plan[:items], sala: sala).call
+  end
+
+  # «Vege 6 ml, Base A 12 ml» y lo que faltó: el mensaje dice qué salió del depósito.
+  def texto_nutricion(res)
+    return '' unless res&.nutricion
+
+    uni = { 'mililitro' => 'ml', 'gramo' => 'g', 'litro' => 'L', 'kilogramo' => 'kg' }
+    hecho = Array(res.nutricion['items']).map do |i|
+      "#{i['nombre']} #{i['descontado'].to_d.round(3).to_s('F').sub(/\.0\z/, '').sub('.', ',')} #{uni[i['unidad']] || i['unidad']}"
+    end
+    txt = " · Se descontó del depósito: #{hecho.join(', ')}"
+    txt += " (faltó stock de #{res.faltantes.map { |f| f[:nombre] }.join(', ')})" if res.faltantes.any?
+    txt
   end
 
   def linea_lote(l)
@@ -856,6 +944,7 @@ class AsistenteController < BaseController
       fitosanitario_motivo: datos['fitosanitario_motivo'],
       carencia_dias:        datos['carencia_dias'],
       observaciones:        datos['observaciones'],
+      volumen_l:            datos['volumen_l'].presence,
       fuente:               'asistente_voz',
       user:                 current_user,
       club:                 club,
@@ -863,9 +952,16 @@ class AsistenteController < BaseController
     }.compact
 
     registro = lote.registros_ambientales.build(campos)
-    if registro.save
+    nutri = nil
+    guardado = ActiveRecord::Base.transaction do
+      raise ActiveRecord::Rollback unless registro.save
+
+      nutri = aplicar_nutricion_dictada!([registro], datos, club, sala: lote.sala)
+      true
+    end
+    if guardado
       tareas_cerradas = cerrar_tareas_por_registro(datos)
-      msg = "Registro guardado en #{nombre_de_lote(lote, club)}"
+      msg = "Registro guardado en #{nombre_de_lote(lote, club)}#{texto_nutricion(nutri)}"
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }
     else
@@ -979,15 +1075,29 @@ class AsistenteController < BaseController
 
     creados      = 0
     fallidos     = []
-    lotes.each do |lote|
-      r = lote.registros_ambientales.build(campos_base)
-      r.save ? creados += 1 : fallidos << lote.codigo
+    registros    = []
+    nutri        = nil
+    ActiveRecord::Base.transaction do
+      lotes.each do |lote|
+        r = lote.registros_ambientales.build(campos_base)
+        if r.save
+          creados += 1
+          registros << r
+        else
+          fallidos << lote.codigo
+        end
+      end
+      # El agua es del riego entero: a cada lote, su parte. Los nutrientes se descuentan UNA vez y
+      # el costo se reparte entre los lotes (como el riego de sala cargado a mano).
+      RegistroAmbiental.repartir_volumen!(registros, datos['volumen_l']) if registros.any? && datos['volumen_l'].present?
+      nutri = aplicar_nutricion_dictada!(registros, datos, club, sala: sala) if registros.any?
     end
 
     if creados > 0
       tareas_cerradas = cerrar_tareas_por_registro(datos)
       msg = club.personal? ? "Registro guardado en las plantas de #{sala.nombre}" \
                            : "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
+      msg += texto_nutricion(nutri)
       msg += " (falló: #{fallidos.join(', ')})" if fallidos.any?
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }

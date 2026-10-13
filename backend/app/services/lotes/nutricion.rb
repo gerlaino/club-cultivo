@@ -75,7 +75,10 @@ module Lotes
     def texto_de_copia(n, lote_id, personal: false)
       parte = parte_de_copia(n, lote_id)
       prods = productos_de_copia(n, lote_id).map { |p| self.class.linea_producto(p) }
-      cabeza = "#{n['receta_nombre'] || 'productos sueltos'} · #{self.class.num(n['litros'].to_f * parte)} L" \
+      # Sin litros (un dictado de «un pulso a cada planta», productos sueltos) no se dice «0 L»: no
+      # es un dato, es que no se cargó.
+      litros = n['litros'].to_f * parte
+      cabeza = "#{n['receta_nombre'] || 'productos sueltos'}#{litros.positive? ? " · #{self.class.num(litros)} L" : ''}" \
                "#{parte < 1 ? (personal ? ' (su parte del espacio)' : ' (su parte de la sala)') : ''}" \
                "#{@con_costo && n['costo_ars'].to_f.positive? ? " · $#{(n['costo_ars'].to_f * parte).round(0)}" : ''}"
       [cabeza, prods.join(', ').presence].compact.join(': ')

@@ -1,5 +1,32 @@
 # Changelog
 
+## Octubre 2026 (fg) — El dictado descuenta los nutrientes; dosis de etiqueta; corregir un riego (13-oct)
+
+Germán dictó «le puse vege, un pulso a cada planta» y no se descontó nada: el dictado guardaba los
+nutrientes como TEXTO (`notas_fertilizacion`) y nunca tocaba el depósito.
+
+- **El dictado entiende nutrientes y recetas** por su nombre exacto (la IA recibe la lista
+  NUTRIENTES/RECETAS con la medida casera) y lo que se dijo de cantidad («un pulso a cada planta»,
+  «2 ml por litro», «la receta Floración con 3 litros»). La IA no hace la cuenta: la hace
+  `Nutricion::Dosis` (qué × por cada qué → unidad del insumo) desde `Nutricion::DesdeDictado`.
+  La propuesta se ve en la confirmación («Se descuenta de tus nutrientes», con la cuenta y los
+  avisos) y se corrige ahí con el mismo editor del riego (`InsumosAplicados`). Al guardar, lo
+  confirmado sale del depósito como un riego a mano (`Nutricion::Aplicar`); los litros dictados
+  quedan en el riego. Nombres sin tildes también matchean («floracion» → «Floración»).
+- **Etiqueta y medida casera del nutriente** (migración `AgregarDosisAInsumos`): cuánto es «un
+  pulso» (en ml o g) y la dosis de SU etiqueta por fase (enraizado, vegetativo, floración) en una
+  unidad (`ml_litro`, `g_litro`, `medida_litro`, `ml_planta`, `g_planta`, `medida_planta`). Si no se
+  dijo cuánto, el dictado usa la de la fase de las plantas; si tampoco hay, lo pide. Se carga en
+  Nutrientes y recetas (autocultivo) y en el depósito de cultivo (organizaciones).
+- **Corregir los nutrientes de un riego guardado** (`Nutricion::Editar`, `GET/PATCH
+  /lotes/:id/registros_ambientales/:id/nutricion`): deshace el riego ENTERO (vuelve al depósito,
+  el costo sale de los lotes) y lo vuelve a aplicar. Un riego de sala se corrige desde cualquiera
+  de sus lotes (`registro_ids` en la copia). Lo corrige quien lo registró o un admin; no se corrige
+  si un lote ya se cosechó. Botón «Corregir nutrientes» en el historial del lote y en la ficha de
+  la planta (compu y teléfono), un solo modal (`EditarNutricionRiego`).
+- Specs de (fe) y (ff) corregidos (rutas `/api/webhooks`, GET sin `as: :json`): no se habían
+  podido correr localmente.
+
 ## Octubre 2026 (ff) — Rendiciones: la pendiente se ve y se reasigna (13-oct)
 
 Germán: el panel avisaba «Rendición entregada sin recibir» (Delivery Test → Pablo Ezquer, 17/09) y

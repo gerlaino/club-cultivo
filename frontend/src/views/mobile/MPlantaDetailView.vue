@@ -132,6 +132,10 @@
             <div class="mpd__hist-fecha">{{ formatFecha(a.occurred_at || a.created_at) }}</div>
           </div>
           <div v-if="detalleAct(a)" class="mpd__hist-desc">{{ detalleAct(a) }}</div>
+          <!-- Lo del día va en el teléfono: si el dictado se equivocó, se corrige acá. -->
+          <button v-if="a.nutricion_editable" type="button" class="mpd__hist-corregir" @click="corrigiendoRiego = a">
+            <i class="bi bi-droplet-half" aria-hidden="true"></i> Corregir nutrientes
+          </button>
         </div>
       </div>
       <button v-if="activities.length > 8" type="button" class="mpd__hist-mas" @click="verTodo = !verTodo">
@@ -208,6 +212,9 @@
       @saved="versionNutricion++"
     />
 
+    <EditarNutricionRiego v-if="corrigiendoRiego" :lote-id="corrigiendoRiego.lote_id" :registro-id="corrigiendoRiego.registro_id"
+                          @cerrar="corrigiendoRiego = null" @guardado="corrigiendoRiego = null; versionNutricion++; cargar()" />
+
     <input ref="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
 </template>
@@ -228,6 +235,7 @@ import SheetBottom           from '../../components/cultivador/SheetBottom.vue'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 import RegistroLoteModal     from '../../components/lotes/registro/RegistroLoteModal.vue'
 import LoteNutricionSection  from '../../components/lotes/LoteNutricionSection.vue'
+import EditarNutricionRiego  from '../../components/riegos/EditarNutricionRiego.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -291,6 +299,9 @@ function diasDesde(fecha) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
   return Math.max(0, Math.round((hoy - desde) / 86400000))
 }
+
+// El riego al que se le corrigen los nutrientes (`EditarNutricionRiego`).
+const corrigiendoRiego = ref(null)
 
 async function cargar() {
   try {
@@ -471,6 +482,7 @@ async function cosechar(conEtiqueta) {
 .mpd__hist-fecha { font-size: .74rem; color: var(--c-ink-500); }
 .mpd__hist-mas { margin-top: 10px; background: none; border: 0; padding: 0; font-size: .84rem; font-weight: 600; color: var(--c-leaf-700); cursor: pointer; }
 .mpd__hist-desc { grid-column: 2; font-size: .84rem; color: var(--c-ink-700); }
+.mpd__hist-corregir { grid-column: 2; justify-self: start; min-height: 36px; padding: 0 12px; border: 1px solid var(--c-slate-200); border-radius: 10px; background: #fff; font: inherit; font-size: .82rem; font-weight: 600; color: var(--c-ink-700); }
 
 .mpd__cosechar { margin: 16px 16px 0; width: calc(100% - 32px); min-height: 52px; border-radius: 14px; border: 2px solid var(--c-leaf-700); background: var(--c-slate-50); color: var(--c-leaf-800); font: inherit; font-weight: 700; }
 

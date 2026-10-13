@@ -23,7 +23,7 @@ RSpec.describe 'Historial de rendiciones y reasignación', type: :request do
   end
 
   def listar(mes)
-    get '/rendiciones', params: { mes: mes }, as: :json
+    get '/rendiciones', params: { mes: mes }
     JSON.parse(response.body)['rendiciones']
   end
 
@@ -50,7 +50,7 @@ RSpec.describe 'Historial de rendiciones y reasignación', type: :request do
     it 'trae quién, cuándo y a quién se le puede reasignar' do
       rendicion!(delivery: juan, receptor: pablo)
       sign_in_as(admin)
-      get '/rendiciones', params: { mes: Time.zone.today.strftime('%Y-%m') }, as: :json
+      get '/rendiciones', params: { mes: Time.zone.today.strftime('%Y-%m') }
       body = JSON.parse(response.body)
       fila = body['rendiciones'].first
 

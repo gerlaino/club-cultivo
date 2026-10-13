@@ -25,6 +25,9 @@ RSpec.describe Preprod::Anonimizador do
   end
 
   before do
+    # El webhook valida que su servidor sea una dirección pública (`Seguridad::DestinoPublico`):
+    # el spec no depende del DNS de la máquina que lo corre.
+    allow(Seguridad::DestinoPublico).to receive(:direcciones).and_return(%w[93.184.215.14])
     ActsAsTenant.with_tenant(club) do
       create(:indicacion_medica, paciente: paciente, user: medico,
                                  patologia: 'Epilepsia refractaria', dosificacion: '5 gotas',

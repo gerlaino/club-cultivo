@@ -271,7 +271,10 @@ class InsumosController < ApplicationController
   end
 
   def insumo_params
-    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id, :tipo, :deposito_id)
+    params.require(:insumo).permit(:nombre, :unidad_medida, :stock_minimo, :activo, :categoria_contable_id, :sede_id, :tipo, :deposito_id,
+                                   # La etiqueta y la medida casera (13-oct-2026, `Nutricion::Dosis`).
+                                   :medida_casera, :medida_casera_cantidad, :dosis_unidad,
+                                   :dosis_enraizado, :dosis_vegetativo, :dosis_floracion)
   end
 
   def serialize(i)
@@ -298,6 +301,13 @@ class InsumosController < ApplicationController
       deposito_id:        i.deposito_id,
       deposito_nombre:    i.deposito&.nombre,
       deposito_clave:     i.deposito&.clave_sistema,
+      # Cuánto es «un pulso» y la dosis de SU etiqueta por fase: con esto el dictado calcula solo.
+      medida_casera:          i.medida_casera,
+      medida_casera_cantidad: i.medida_casera_cantidad&.to_f,
+      dosis_unidad:           i.dosis_unidad,
+      dosis_enraizado:        i.dosis_enraizado&.to_f,
+      dosis_vegetativo:       i.dosis_vegetativo&.to_f,
+      dosis_floracion:        i.dosis_floracion&.to_f,
     }
   end
 

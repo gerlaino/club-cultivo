@@ -29,6 +29,23 @@ class Insumo < ApplicationRecord
   # como 1000 g, y el costo promedio y las dosis de las recetas quedan contra otra medida.
   validate :unidad_fija_con_movimientos, on: :update
 
+  # LA DOSIS DE LA ETIQUETA Y LA MEDIDA CASERA (13-oct-2026). Con esto el dictado calcula cuánto
+  # se usó sin preguntar (`Nutricion::DesdeDictado`): «un pulso de vege a cada planta» son tantos
+  # ml por planta. La cuenta vive en `Nutricion::Dosis`; acá sólo qué se puede guardar.
+  # La unidad es «qué» por «cada qué»: ml, g o la medida casera, por litro de agua o por planta.
+  DOSIS_UNIDADES = %w[ml_litro g_litro medida_litro ml_planta g_planta medida_planta].freeze
+  FASES_DOSIS    = %w[enraizado vegetativo floracion].freeze
+
+  validates :dosis_unidad, inclusion: { in: DOSIS_UNIDADES }, allow_blank: true
+  validates :medida_casera_cantidad, :dosis_enraizado, :dosis_vegetativo, :dosis_floracion,
+            numericality: { greater_than: 0 }, allow_nil: true
+  validate :dosis_coherente
+  # Del formulario llegan vacíos como "": que se guarden como «sin cargar».
+  before_validation { self.medida_casera = medida_casera.to_s.strip.downcase.presence; self.dosis_unidad = dosis_unidad.presence }
+
+  def dosis_de(fase) = (self["dosis_#{fase}"] if FASES_DOSIS.include?(fase.to_s))
+  def con_dosis? = dosis_unidad.present? && FASES_DOSIS.any? { |f| dosis_de(f).present? }
+
   def con_movimientos?
     insumo_compras.exists? || insumo_consumos.exists?
   end
@@ -360,6 +377,21 @@ class Insumo < ApplicationRecord
   end
 
   private
+
+  def dosis_coherente
+    if medida_casera_cantidad.present? && medida_casera.blank?
+      errors.add(:medida_casera, 'decí cómo se llama la medida (pulso, tapita, cucharita…)')
+    end
+    if medida_casera.present? && medida_casera_cantidad.blank?
+      errors.add(:medida_casera_cantidad, "decí cuánto es 1 #{medida_casera}")
+    end
+    if FASES_DOSIS.any? { |f| dosis_de(f).present? } && dosis_unidad.blank?
+      errors.add(:dosis_unidad, 'falta la unidad de la dosis')
+    end
+    if dosis_unidad.to_s.start_with?('medida_') && medida_casera_cantidad.blank?
+      errors.add(:dosis_unidad, "para dosificar en medidas caseras, cargá cuánto es 1 #{medida_casera.presence || 'medida'}")
+    end
+  end
 
   def unidad_fija_con_movimientos
     return unless will_save_change_to_unidad_medida? && con_movimientos?

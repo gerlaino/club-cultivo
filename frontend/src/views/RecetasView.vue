@@ -277,6 +277,7 @@
                 <span class="rc__label">Avisame cuando queden menos de <span class="rc__opt">opcional</span></span>
                 <input v-model.number="nutForm.stock_minimo" type="number" min="0" class="rc__input" placeholder="100" />
               </label>
+              <DosisEtiqueta v-model="nutForm.dosis" :unidad-medida="nutForm.unidad_medida" :nombre="nutForm.nombre" />
             </template>
             <div class="rc__row">
               <label class="rc__field">
@@ -327,6 +328,7 @@
               <span class="rc__label">Avisame cuando queden menos de <span class="rc__opt">opcional</span></span>
               <input v-model.number="nutEdit.stock_minimo" type="number" min="0" class="rc__input" placeholder="100" />
             </label>
+            <DosisEtiqueta v-model="nutEdit.dosis" :unidad-medida="nutEdit.unidad_medida" :nombre="nutEdit.nombre" />
           </div>
           <div class="rc__modal-foot">
             <button class="rc__btn-ghost" @click="nutEdit = null">Cancelar</button>
@@ -380,6 +382,7 @@
 // y la deja como gasto.
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import DosisEtiqueta from '../components/nutrientes/DosisEtiqueta.vue'
 import { useToast } from '../composables/useToast.js'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
@@ -502,7 +505,10 @@ async function verUso(r) { try { uso.value = (await getReceta(r.id)).data } catc
 
 // ── Nutrientes (uso personal) ──
 const nutForm = ref(null)
-function nuevoNutriente() { formError.value = null; nutForm.value = { id: null, nombre: '', unidad_medida: 'mililitro', stock_minimo: null, cantidad: null, costo: null } }
+// La etiqueta y la medida casera (`DosisEtiqueta`): viajan tal cual al insumo.
+const CAMPOS_DOSIS = ['medida_casera', 'medida_casera_cantidad', 'dosis_unidad', 'dosis_enraizado', 'dosis_vegetativo', 'dosis_floracion']
+const dosisDe = (i = {}) => Object.fromEntries(CAMPOS_DOSIS.map(k => [k, i[k] ?? null]))
+function nuevoNutriente() { formError.value = null; nutForm.value = { id: null, nombre: '', unidad_medida: 'mililitro', stock_minimo: null, cantidad: null, costo: null, dosis: dosisDe() } }
 function reponer(i) { formError.value = null; nutForm.value = { id: i.id, nombre: i.nombre, unidad_medida: i.unidad_medida, cantidad: null, costo: null } }
 async function guardarNutriente() {
   formError.value = null
@@ -511,7 +517,8 @@ async function guardarNutriente() {
     let id = nutForm.value.id
     if (!id) {
       if (!nutForm.value.nombre) { formError.value = 'Ponele un nombre'; return }
-      const { data } = await createInsumo({ nombre: nutForm.value.nombre, unidad_medida: nutForm.value.unidad_medida, tipo: 'cultivo', stock_minimo: nutForm.value.stock_minimo || 0 })
+      const { data } = await createInsumo({ nombre: nutForm.value.nombre, unidad_medida: nutForm.value.unidad_medida, tipo: 'cultivo',
+                                            stock_minimo: nutForm.value.stock_minimo || 0, ...(nutForm.value.dosis || {}) })
       id = data.id ?? data.insumo?.id
     }
     if (nutForm.value.cantidad > 0) {
@@ -524,19 +531,19 @@ async function guardarNutriente() {
   } catch (e) { formError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo guardar' }
   finally { guardando.value = false }
 }
-// Editar: nombre, unidad (sólo sin movimientos) y el aviso de «queda poco».
+// Editar: nombre, unidad (sólo sin movimientos), el aviso de «queda poco» y la etiqueta (dosis y medida casera).
 const nutEdit = ref(null)
 function editarNutriente(i) {
   formError.value = null
   nutEdit.value = { id: i.id, nombreOriginal: i.nombre, nombre: i.nombre, unidad_medida: i.unidad_medida,
-                    stock_minimo: i.stock_minimo || null, con_movimientos: i.con_movimientos }
+                    stock_minimo: i.stock_minimo || null, con_movimientos: i.con_movimientos, dosis: dosisDe(i) }
 }
 async function guardarEdicionNutriente() {
   formError.value = null
   if (!nutEdit.value.nombre) { formError.value = 'Ponele un nombre'; return }
   guardando.value = true
   try {
-    const payload = { nombre: nutEdit.value.nombre, stock_minimo: nutEdit.value.stock_minimo || 0 }
+    const payload = { nombre: nutEdit.value.nombre, stock_minimo: nutEdit.value.stock_minimo || 0, ...nutEdit.value.dosis }
     if (!nutEdit.value.con_movimientos) payload.unidad_medida = nutEdit.value.unidad_medida
     await updateInsumo(nutEdit.value.id, payload)
     toast.success('Nutriente guardado')

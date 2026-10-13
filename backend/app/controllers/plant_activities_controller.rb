@@ -11,7 +11,7 @@ class PlantActivitiesController < ApplicationController
     # (ej. "Planta X descartada"): eso es de otras plantas y se ve en la vista del lote.
     activities = @plant.activities.order(occurred_at: :desc).limit(50)
     registros  = @plant.lote.registros_ambientales
-                       .includes(:riego_plantas)
+                       .includes(:riego_plantas, :lote)
                        .order(registrado_en: :desc)
                        .limit(50)
     # Excluimos el trasplante a nivel lote: cada planta ya tiene su propio PlantActivity de
@@ -121,8 +121,16 @@ class PlantActivitiesController < ApplicationController
     }.compact
     return nil if no_regada && tareas.empty? && meta.except(:tareas_realizadas, :fuente).empty?
 
+    lote = r.lote
+    corregible = !no_regada && (r.nutricion.present? || (tareas & RIEGO_TAREAS).any?) &&
+                 Lote::CULTIVO_ESTADOS.include?(lote&.estado) &&
+                 (current_user.admin? || current_user.super_admin? || r.user_id == current_user.id)
     {
       id:            "ra_#{r.id}",
+      # Para corregir los nutrientes del riego (`Nutricion::Editar`), desde la ficha de la planta.
+      registro_id:   r.id,
+      lote_id:       r.lote_id,
+      nutricion_editable: corregible,
       activity_type: 'registro_ambiental_lote',
       description:   no_regada ? nil : r.observaciones,
       metadata:      meta,

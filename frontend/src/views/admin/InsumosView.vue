@@ -11,6 +11,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoDispensacion from './DepositoDispensacion.vue'
 import DepositoSalon from './DepositoSalon.vue'
+import DosisEtiqueta from '../../components/nutrientes/DosisEtiqueta.vue'
 import { hoyISO } from '../../utils/dates.js'
 import { useRouter } from 'vue-router'
 
@@ -367,6 +368,9 @@ function editarInsumo(i) {
     id: i.id, nombre: i.nombre,
     categoria_contable_id: i.categoria_contable_id ?? null,
     unidad_medida: i.unidad_medida, stock_minimo: i.stock_minimo ?? 0,
+    // La etiqueta y la medida casera: con esto el dictado calcula cuánto se usó (`Nutricion::Dosis`).
+    dosis: Object.fromEntries(['medida_casera', 'medida_casera_cantidad', 'dosis_unidad', 'dosis_enraizado',
+                               'dosis_vegetativo', 'dosis_floracion'].map(k => [k, i[k] ?? null])),
   }
 }
 async function guardarEdit() {
@@ -376,6 +380,7 @@ async function guardarEdit() {
     await store.actualizar(f.id, {
       nombre: f.nombre.trim(), categoria_contable_id: f.categoria_contable_id,
       unidad_medida: f.unidad_medida, stock_minimo: f.stock_minimo,
+      ...(esCultivo.value ? f.dosis : {}),
     })
     toast.success('Insumo actualizado'); editForm.value = null
     await recargar()
@@ -748,6 +753,8 @@ async function revertirCompra(compra) {
           <label class="fld">Unidad de medida<select v-model="editForm.unidad_medida" class="inp"><option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option></select></label>
           <label class="fld">Stock mínimo<input v-model.number="editForm.stock_minimo" type="number" min="0" step="any" class="inp" /></label>
         </div>
+        <!-- Sólo en el depósito de cultivo: son nutrientes que se aplican al regar. -->
+        <DosisEtiqueta v-if="esCultivo" v-model="editForm.dosis" :unidad-medida="editForm.unidad_medida" :nombre="editForm.nombre" />
         <div class="modal__actions"><button class="btn" @click="editForm = null">Cancelar</button><button class="btn btn--primary" :disabled="store.saving" @click="guardarEdit">Guardar</button></div>
       </div>
     </div>

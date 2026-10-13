@@ -801,6 +801,7 @@ onUnmounted(() => {
       @riego="verHistorialOpen = false; riegoDesdeHistorial = true; showRegistroModalNew = true"
       @editar="onEditarEvento"
       @delete="onDeleteEvento"
+      @actualizado="loadHistorial(); graficosKey++"
     />
 
     <!-- ══ Suelo vivo: plantar en la cama, alimentarla, regarla ══ -->
