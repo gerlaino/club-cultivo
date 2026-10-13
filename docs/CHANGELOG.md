@@ -1,5 +1,20 @@
 # Changelog
 
+## Octubre 2026 (fh) — Dispensaciones: «cuenta corriente» es lo que le deben a la organización (13-oct)
+
+Germán: «A cuenta corriente $521.500» al lado del chip «Cta. cte.: 6 ($558.000)». No faltaba plata:
+la tarjeta sumaba lo que quedó debiendo y el chip el PRECIO ENTERO de las dispensas etiquetadas
+«cuenta corriente», aunque se hubieran pagado en parte (la diferencia, $36.500, estaba en «Cobrado»).
+
+- Los números de arriba del historial los calcula el backend (`Dispensaciones::Resumen`,
+  `GET /dispensaciones?resumen=true`), contando por COBRO: cada peso en su medio (efectivo,
+  transferencia, saldo a favor, cuenta corriente). «Mixto» deja de ser una categoría; el saldo a
+  favor va aparte de lo cobrado; el contra entrega sin cobrar se ve como tal.
+- La tarjeta ámbar dice **«Deben a la organización · N pacientes»**: la deuda real de hoy, la misma
+  cuenta que el panel de inicio (`Contabilidad::Posicion#por_cobrar_ars`). Sólo administración.
+  El chip pasa a «Fiado en el período». «Dispensaciones» cuenta las vigentes (contaba las anuladas).
+- `rake e2e:seed` andaba roto (`created_by` en `Genetica`): arreglado.
+
 ## Octubre 2026 (fg) — El dictado descuenta los nutrientes; dosis de etiqueta; corregir un riego (13-oct)
 
 Germán dictó «le puse vege, un pulso a cada planta» y no se descontó nada: el dictado guardaba los

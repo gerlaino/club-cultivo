@@ -77,6 +77,12 @@ class DispensacionesController < ApplicationController
 
     payload = { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
     payload[:meta] = @meta if @meta
+    # Los números de arriba del historial, contados por cobro y en un solo lugar
+    # (`Dispensaciones::Resumen`): la pantalla los muestra, no los calcula.
+    if params[:resumen] == 'true'
+      payload[:resumen] = Dispensaciones::Resumen.new(@dispensaciones, club: current_user.club,
+                                                      con_deuda_total: current_user.admin? || current_user.supervisor?).call
+    end
     render json: payload
   rescue ArgumentError
     render json: { error: 'Fecha inválida' }, status: :unprocessable_entity

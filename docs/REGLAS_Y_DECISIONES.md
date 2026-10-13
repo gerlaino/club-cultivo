@@ -1756,6 +1756,9 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
   agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
   repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
+- **«Cuenta corriente» en una tarjeta es lo que los pacientes le DEBEN a la organización hoy**
+  (13-oct-2026, Germán), la misma cuenta que el panel. Lo fiado en un período se llama «Fiado».
+  La plata de las dispensas se cuenta por cobro, nunca por la etiqueta `medio_pago`.
 - **Lo dictado de nutrientes se descuenta, pero la cuenta NO la hace la IA** (13-oct-2026,
   Germán): la IA dice qué se nombró y lo que se dijo de cantidad; `Nutricion::Dosis` hace la
   cuenta; la persona la ve y la corrige antes de guardar. Lo que no se puede calcular (litros,

@@ -208,29 +208,19 @@ const dispensaciones = computed(() => allDisps.value)
 // Las anuladas se VEN en la lista (con su motivo) pero no SUMAN: 10 g devueltos no son 10 g
 // entregados, y $10.000 devueltos no son $10.000 cobrados.
 const vigentes = computed(() => allDisps.value.filter(d => !d.anulada))
-// LA PLATA de una anulada con CAMBIO sí quedó: la venta existe y cubre la dispensa de cambio, que
-// por eso cobra $0. Para contar lo cobrado se mira esa y no la de cambio.
-const cobradas = computed(() => allDisps.value.filter(d => !d.anulada || d.anulacion?.resolucion === 'cambio'))
 
-// Cobrado = lo que efectivamente entró (efectivo/transfer). A crédito = lo que quedó en cuenta
-// corriente (el paciente dispensó sin pagar). No mezclarlos: el "cobrado" no incluye el fiado.
-const totalCobrado   = computed(() => cobradas.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
-const totalCredito   = computed(() => cobradas.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
-const totalRecaudado = computed(() => totalCobrado.value + totalCredito.value) // aporte total (informativo)
-const totalGramos    = computed(() => vigentes.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
+// LOS NÚMEROS DE ARRIBA LOS MANDA EL BACKEND (`Dispensaciones::Resumen`, 13-oct-2026). Se
+// calculaban acá con dos reglas: la tarjeta «A cuenta corriente» sumaba lo que quedó debiendo y el
+// chip «Cta. cte.» el precio ENTERO de las dispensas con esa etiqueta, aunque se hubieran pagado en
+// parte ($521.500 contra $558.000). Ahora la plata se cuenta por cobro, cada peso en su medio.
+const resumen = ref(null)
+const totalGramos = computed(() => resumen.value?.gramos ?? vigentes.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
 const totalConEnvio  = computed(() => vigentes.value.filter(d => d.con_envio).length)
-
-const resumenPago = computed(() => {
-  const map = {}
-  for (const d of cobradas.value) {
-    const k = d.medio_pago || 'otro'
-    if (!map[k]) map[k] = { count: 0, total: 0 }
-    map[k].count++
-    // Un cambio no cobra: lo que vale lo pagó la anulada que reemplaza, y ésa ya está sumada.
-    map[k].total += d.medio_pago === 'cambio' ? 0 : (d.aporte_socio_ars ?? 0)
-  }
-  return Object.entries(map).map(([medio, v]) => ({ medio, ...v })).sort((a, b) => b.total - a.total)
-})
+// El chip de cuenta corriente dice lo que se FIÓ en el período; lo que deben hoy es la tarjeta.
+const MEDIO_RESUMEN = { efectivo: 'Efectivo', transferencia: 'Transf.', saldo_a_favor: 'Saldo a favor', cuenta_corriente: 'Fiado en el período', sin_detalle: 'Sin detalle' }
+const resumenPago = computed(() => (resumen.value?.por_medio || [])
+  .map(r => ({ medio: r.medio, label: MEDIO_RESUMEN[r.medio] || r.medio, count: r.dispensas, total: r.monto_ars }))
+  .sort((a, b) => b.total - a.total))
 
 function buildParams() {
   const p = {}
@@ -251,9 +241,10 @@ async function cargar() {
   if (!desde.value && !hasta.value) return
   loading.value = true
   try {
-    const { data } = await listDispensacionesFecha(buildParams())
+    const { data } = await listDispensacionesFecha({ ...buildParams(), resumen: 'true' })
     allDisps.value = data.dispensaciones ?? []
-  } catch { allDisps.value = [] }
+    resumen.value  = data.resumen ?? null
+  } catch { allDisps.value = []; resumen.value = null }
   finally { loading.value = false }
 }
 
@@ -507,20 +498,27 @@ const FORMAS = [
       <!-- KPIs -->
       <div class="hd__kpis">
         <div class="hd__kpi">
-          <span class="hd__kpi-val">{{ allDisps.length }}</span>
+          <span class="hd__kpi-val">{{ resumen?.dispensas ?? vigentes.length }}</span>
           <span class="hd__kpi-lbl">Dispensaciones</span>
         </div>
         <div class="hd__kpi">
           <span class="hd__kpi-val">{{ totalGramos.toFixed(1) }}<span class="hd__kpi-unit">g</span></span>
           <span class="hd__kpi-lbl">Total gramos</span>
         </div>
-        <div class="hd__kpi hd__kpi--green">
-          <span class="hd__kpi-val">{{ formatARS(totalCobrado) }}</span>
+        <div v-if="resumen" class="hd__kpi hd__kpi--green" data-testid="kpi-cobrado">
+          <span class="hd__kpi-val">{{ formatARS(resumen.cobrado_ars) }}</span>
           <span class="hd__kpi-lbl">Cobrado</span>
         </div>
-        <div v-if="totalCredito > 0" class="hd__kpi hd__kpi--amber">
-          <span class="hd__kpi-val">{{ formatARS(totalCredito) }}</span>
-          <span class="hd__kpi-lbl">A cuenta corriente</span>
+        <!-- «Cuenta corriente» es LO QUE LE DEBEN a la organización, hoy (Germán, 13-oct-2026):
+             la misma cuenta que el panel de inicio. Sólo administración; quien atiende ve lo que
+             se fió en el período, en el chip «Fiado en el período». -->
+        <div v-if="resumen?.deuda_total_ars != null" class="hd__kpi hd__kpi--amber" data-testid="kpi-deuda-total">
+          <span class="hd__kpi-val">{{ formatARS(resumen.deuda_total_ars) }}</span>
+          <span class="hd__kpi-lbl">Deben a la organización · {{ resumen.deudores }} paciente{{ resumen.deudores === 1 ? '' : 's' }}</span>
+        </div>
+        <div v-if="resumen?.pendiente_ars > 0" class="hd__kpi hd__kpi--amber" data-testid="kpi-pendiente">
+          <span class="hd__kpi-val">{{ formatARS(resumen.pendiente_ars) }}</span>
+          <span class="hd__kpi-lbl">Contra entrega sin cobrar</span>
         </div>
         <div v-if="totalConEnvio" class="hd__kpi hd__kpi--blue">
           <span class="hd__kpi-val">{{ totalConEnvio }}</span>
@@ -535,9 +533,10 @@ const FORMAS = [
           :key="r.medio"
           class="hd__pago-chip"
         >
-          {{ medioPagoLabel(r.medio) }}: <strong>{{ r.count }}</strong>
+          {{ r.label }}: <strong>{{ r.count }}</strong>
           <span class="hd__pago-monto">({{ formatARS(r.total) }})</span>
         </span>
+        <span v-if="resumen?.regalos" class="hd__pago-chip">Regalo: <strong>{{ resumen.regalos }}</strong></span>
       </div>
 
       <!-- Tabla -->
@@ -642,8 +641,8 @@ const FORMAS = [
         <div class="hd__summary">
           <span class="hd__summary-count">{{ vigentes.length }} dispensaciones<template v-if="dispensaciones.length - vigentes.length"> · {{ dispensaciones.length - vigentes.length }} anuladas</template> · {{ formatG(totalGramos, 1) }}</span>
           <span class="hd__summary-total">
-            Cobrado <strong>{{ formatARS(totalCobrado) }}</strong>
-            <span v-if="totalCredito > 0" class="hd__summary-credito"> · a cuenta corriente {{ formatARS(totalCredito) }}</span>
+            Cobrado <strong>{{ formatARS(resumen?.cobrado_ars ?? 0) }}</strong>
+            <span v-if="resumen?.cuenta_corriente_ars > 0" class="hd__summary-credito"> · fiado {{ formatARS(resumen.cuenta_corriente_ars) }}</span>
           </span>
         </div>
       </div>
