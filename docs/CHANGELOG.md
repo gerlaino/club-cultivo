@@ -1,5 +1,30 @@
 # Changelog
 
+## Octubre 2026 (fe) — Barrido de seguridad (13-oct)
+
+Brakeman, `npm audit` y lectura a mano de lo nuevo, lo público y el aislamiento entre organizaciones.
+
+- **SSRF por webhooks salientes (alta)**: el autoregistro crea la cuenta con rol admin, y un admin
+  podía apuntar un webhook a un servicio interno de Render y leer la respuesta (se guardaban 500
+  caracteres del cuerpo en la entrega). Ahora `Seguridad::DestinoPublico` exige que el host
+  resuelva SÓLO a direcciones públicas, al guardar y al enviar; el envío se conecta a la IP ya
+  validada (`Net::HTTP#ipaddr`); la entrega guarda sólo el código HTTP; el autocultivo no tiene
+  webhooks (ni alta ni disparo).
+- **Preferencias sin rol (alta, apareció en el barrido)**: `PUT /preferences`, `upload_logo`,
+  `test_smtp` y `test_twilio` no pedían admin: cualquier rol podía cambiar el nombre, prender el
+  portal o mandar pruebas. Ahora leer es de todos y cambiar es del admin. El SMTP salió del PUT
+  general: se carga sólo por `conectar_email`.
+- **SMTP propio**: servidor público y puerto de correo (25/465/587/2525); los errores de conexión
+  ya no muestran el mensaje crudo (servía para escanear puertos).
+- **XSS guardado en el mostrador**: `hechosDelCierre.js` pintaba la etiqueta del producto (texto
+  libre) con `v-html` sin escapar. Ahora escapa.
+- CORS: los `localhost` sólo fuera de producción. URL de webhook validada con `\z`.
+- `vue` 3.5.43 (aviso del renderizador SSR) y `npm audit fix`: producción con 0 avisos. Quedan los
+  de `vitest` (herramienta de tests, pide salto de versión mayor).
+- Borrada `frontend/undefined/t_nueva2.png` (captura de Playwright que se coló en (fd)).
+- **Pendiente**: Rails 7.2 y Ruby 3.2 sin parches de seguridad desde ago/mar-2026 — subir a Rails 8
+  y Ruby 3.4 es un bloque propio.
+
 ## Octubre 2026 (fd) — Las 8 cositas de Germán: usuarios por la plataforma, Mercado Pago, buscador, producto sin compra, tarea de riego (12-oct)
 
 Germán revisó la app y anotó ocho ideas; las aprobó todas («lo mejor que quede»). Después sumó tres

@@ -12,9 +12,10 @@ class Webhook < ApplicationRecord
   ].freeze
 
   validates :nombre, presence: true
-  validates :url,    presence: true, format: { with: /\Ahttps?:\/\/.+/, message: 'debe ser una URL válida' }
+  validates :url,    presence: true, format: { with: %r{\Ahttps?://[^\s/?#]+[^\s]*\z}, message: 'debe ser una URL válida' }
   validates :secret, presence: true
   validate  :events_validos
+  validate  :destino_publico, if: -> { url.present? && will_save_change_to_url? }
 
   scope :activos, -> { where(active: true) }
 
@@ -33,6 +34,17 @@ class Webhook < ApplicationRecord
   end
 
   private
+
+  # El aviso al guardar; la barrera de verdad está al enviar (`OutgoingWebhookService`), porque
+  # lo que resuelve un dominio puede cambiar después de guardarlo.
+  def destino_publico
+    host = URI.parse(url).host
+    Seguridad::DestinoPublico.ip!(host)
+  rescue URI::InvalidURIError
+    errors.add(:url, 'debe ser una URL válida')
+  rescue Seguridad::DestinoPublico::Rechazado => e
+    errors.add(:url, e.message)
+  end
 
   def events_validos
     arr = events_array

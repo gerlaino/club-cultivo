@@ -5,6 +5,9 @@
 // día del calendario (`MostradorTurnos`)— y la misma oración escrita dos veces es cómo un día
 // dicen distinto del mismo cierre.
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
+// La etiqueta del producto SÍ es texto libre (`Stock#etiqueta` usa la descripción que se tipea):
+// sin escapar, un nombre con HTML corría como código en la pantalla de quien mira el cierre.
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
 // Los motivos que no son la mercadería van como oración: un chip con «+2 más» esconde justo lo
 // que hay que leer.
@@ -14,23 +17,23 @@ export const MOTIVO_FRASE = {
 }
 
 // Devuelve [{ tono: 'warn' | 'ok' | '', texto: <html> }]. El texto lleva <b> y <small>: se
-// renderiza con v-html, y viene de números y etiquetas del backend, nunca de texto libre.
+// renderiza con v-html: todo lo que no es número va por `esc`.
 export function hechosDelCierre (t) {
   const out = []
   const n = fmt
 
   for (const f of (t.faltaron?.items || [])) {
     out.push({ tono: 'warn', texto:
-      `Faltan <b>${n(f.cantidad)} ${f.unidad}</b> de <b>${f.etiqueta}</b>. ` +
-      `<small>Sobre la mesa tenía que haber ${n(f.esperado)} ${f.unidad} y al contar aparecieron ` +
-      `${n(f.contado)}. Producir esos ${n(f.cantidad)} ${f.unidad} costó $${n(f.ars)}.</small>` })
+      `Faltan <b>${n(f.cantidad)} ${esc(f.unidad)}</b> de <b>${esc(f.etiqueta)}</b>. ` +
+      `<small>Sobre la mesa tenía que haber ${n(f.esperado)} ${esc(f.unidad)} y al contar aparecieron ` +
+      `${n(f.contado)}. Producir esos ${n(f.cantidad)} ${esc(f.unidad)} costó $${n(f.ars)}.</small>` })
   }
   const restanF = (t.faltaron?.total || 0) - (t.faltaron?.items?.length || 0)
   if (restanF > 0) out.push({ tono: 'warn', texto: `Y en ${restanF} producto${restanF === 1 ? '' : 's'} más.` })
 
   for (const f of (t.sobraron?.items || [])) {
     out.push({ tono: 'warn', texto:
-      `Contó <b>${n(f.cantidad)} ${f.unidad}</b> de más de <b>${f.etiqueta}</b>. ` +
+      `Contó <b>${n(f.cantidad)} ${esc(f.unidad)}</b> de más de <b>${esc(f.etiqueta)}</b>. ` +
       '<small>No se sumaron al inventario: el mostrador descuenta producto, nunca lo carga. Si de ' +
       'verdad hay de más, los sube administración desde el depósito.</small>' })
   }

@@ -7,6 +7,10 @@ class PreferencesController < ApplicationController
   # generales: sin el add-on no hay dónde configurar nada.
   before_action -> { require_feature!(:mailer) },
                 only: [:test_smtp, :conectar_email, :desconectar_email]
+  # Leer lo lee todo el equipo (el nombre, el plan, lo que la pantalla necesita); cambiar la
+  # configuración de la organización es del admin. Antes cualquier rol podía hacer PUT y cambiar
+  # el nombre, prender el portal o redirigir el correo (barrido de seguridad, 13-oct-2026).
+  before_action :require_admin_de_la_organizacion!, except: [:show, :puesta_en_marcha]
 
   def show
     render json: serialize(@club)
@@ -144,7 +148,8 @@ class PreferencesController < ApplicationController
 
     render json: { ok: true, enviado_a: dest }
   rescue => e
-    render json: { error: "Error de conexión SMTP: #{e.message}" }, status: :unprocessable_entity
+    Rails.logger.warn("[test_smtp] club #{@club.id}: #{e.class}: #{e.message}")
+    render json: { error: 'No se pudo enviar el correo de prueba. Revisá la conexión de la casilla.' }, status: :unprocessable_entity
   end
 
   # PATCH /preferences/conectar_email — la organización conecta su propia casilla. Solo carga email +
@@ -165,6 +170,16 @@ class PreferencesController < ApplicationController
     if host.blank?
       return render json: { error: 'No reconocemos ese proveedor. Si no es Gmail/Outlook/Yahoo, indicá el servidor SMTP.' }, status: :unprocessable_entity
     end
+    # El servidor se conecta adonde diga `host`: que sea una dirección pública y un puerto de
+    # correo, para que no sirva para tocar la red interna (`Seguridad::DestinoPublico`).
+    unless PUERTOS_SMTP.include?(port)
+      return render json: { error: "El puerto tiene que ser uno de correo (#{PUERTOS_SMTP.join(', ')})." }, status: :unprocessable_entity
+    end
+    begin
+      Seguridad::DestinoPublico.ip!(host)
+    rescue Seguridad::DestinoPublico::Rechazado => e
+      return render json: { error: "Servidor SMTP: #{e.message}" }, status: :unprocessable_entity
+    end
 
     settings = { address: host, port: port, user_name: email, password: password,
                  authentication: :plain, enable_starttls_auto: true }
@@ -180,7 +195,10 @@ class PreferencesController < ApplicationController
         delivery_method metodo, opts_envio
       end
     rescue => e
-      return render json: { error: "No se pudo conectar: #{e.message}. Revisá el email y la contraseña de aplicación." }, status: :unprocessable_entity
+      # El detalle va al log y no a la pantalla: el mensaje crudo de la conexión decía qué había
+      # del otro lado («connection refused», «timeout», el saludo del servidor).
+      Rails.logger.warn("[conectar_email] club #{@club.id} #{host}:#{port}: #{e.class}: #{e.message}")
+      return render json: { error: 'No se pudo conectar. Revisá el email, la contraseña de aplicación y el servidor.' }, status: :unprocessable_entity
     end
 
     @club.update!(smtp_host: host, smtp_port: port, smtp_user: email, smtp_pass: password,
@@ -208,6 +226,14 @@ class PreferencesController < ApplicationController
 
   private
 
+  PUERTOS_SMTP = [25, 465, 587, 2525].freeze
+
+  def require_admin_de_la_organizacion!
+    return if current_user.admin? || current_user.super_admin?
+
+    render json: { error: 'Sin permiso' }, status: :forbidden
+  end
+
   def require_club_user!
     return head :no_content if current_user.super_admin?
   end
@@ -227,8 +253,8 @@ class PreferencesController < ApplicationController
       :descripcion_web, :whatsapp, :instagram_url,
       :facebook_url, :horarios_atencion, :vista_paciente_activa,
       :benchmark_opt_in,
-      :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
-      :smtp_from, :smtp_from_name,
+      # El SMTP NO va acá: se carga sólo por `conectar_email`, que prueba la casilla y valida
+      # el servidor. Por el PUT general entraba cualquier host sin chequear.
       :umbral_stock_g
     )
   end

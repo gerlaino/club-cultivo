@@ -331,3 +331,22 @@ describe('La ficha del que atiende', () => {
     expect(w.text()).toContain('Critical Kush L-26-017')
   })
 })
+
+// Barrido de seguridad, 13-oct-2026: la etiqueta del producto es texto libre (la descripción del
+// stock) y las oraciones se pintan con v-html. Un nombre con HTML corría como código.
+describe('Las oraciones del cierre no ejecutan lo que se tipeó en el nombre del producto', () => {
+  it('escapa la etiqueta y la unidad, y deja las negritas propias', async () => {
+    const { hechosDelCierre } = await import('../lib/hechosDelCierre.js')
+    const malicioso = '<img src=x onerror="alert(1)">'
+    const [falta, sobra] = hechosDelCierre({
+      faltaron: { total: 1, items: [{ cantidad: 2, unidad: 'g', etiqueta: malicioso, esperado: 5, contado: 3, ars: 100 }] },
+      sobraron: { total: 1, items: [{ cantidad: 1, unidad: '<b>x</b>', etiqueta: malicioso }] },
+    })
+    for (const h of [falta, sobra]) {
+      expect(h.texto).not.toContain('<img')
+      expect(h.texto).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;')
+    }
+    expect(sobra.texto).toContain('&lt;b&gt;x&lt;/b&gt;')
+    expect(falta.texto).toContain('<b>2 g</b>')
+  })
+})

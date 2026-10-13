@@ -3,11 +3,11 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
   # MISMA lista que usa el handshake de ActionCable, y estaba escrita dos veces. Se configuran por
   # ENV con FRONTEND_URL (dominio propio) y EXTRA_CORS_ORIGINS (lista separada por comas, para la
   # transición de dominio).
-  app_origins = [
-    'http://localhost:5173',   # dev local
-    'http://localhost:5174',   # dev local (puerto alternativo)
-    *App.origenes_permitidos,
-  ].uniq
+  # Los localhost sólo fuera de producción: con `credentials: true`, aceptarlos en producción
+  # dejaba que cualquier cosa corriendo en el 5173 de la máquina de un usuario hablara con la API
+  # con su sesión (barrido de seguridad, 13-oct-2026).
+  locales = Rails.env.production? ? [] : ['http://localhost:5173', 'http://localhost:5174']
+  app_origins = [*locales, *App.origenes_permitidos].uniq
 
   allow do
     origins(*app_origins)

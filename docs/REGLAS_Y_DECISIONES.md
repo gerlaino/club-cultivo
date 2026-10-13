@@ -1756,6 +1756,14 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   `Stock.flor_seca_disponible` (flor seca, en inventario, menos eventos y reservas). Los informes
   agrupan por PRODUCTO y unidad, nunca sólo por unidad: «g» no es un producto. Cada número
   repetido lleva un spec en `informe_vs_pantalla_spec.rb` que lo pide en los dos lados.
+- **Si el servidor se conecta a un destino que escribió un usuario, pasa por
+  `Seguridad::DestinoPublico`** (13-oct-2026, barrido de seguridad): webhooks, SMTP propio y
+  todo lo que venga. Sólo direcciones públicas, conectándose a la IP validada; nunca se guarda ni
+  se muestra lo que contestó el otro lado. Admin NO es «de confianza»: el autoregistro nace admin.
+  Toda acción que CAMBIA la configuración de la organización pide admin en el backend
+  (`PreferencesController#require_admin_de_la_organizacion!`); leerla es de todos.
+- **Lo que va por `v-html` escapa todo lo que no es número** (13-oct-2026): la etiqueta de un
+  producto es texto libre aunque venga «del backend».
 - **Los usuarios del equipo los da de alta la plataforma** (12-oct-2026, Germán): el admin los
   PIDE (Equipo → «Pedir un usuario», cae en Consultas de super admin, `Equipo::PedirUsuario`);
   `POST /usuarios` responde 403. El alta tiene una sola puerta, `Equipo::DarDeAlta` (super admin):

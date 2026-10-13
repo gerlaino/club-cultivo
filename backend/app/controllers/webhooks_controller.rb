@@ -54,8 +54,12 @@ class WebhooksController < ApplicationController
     p
   end
 
+  # El autocultivo no tiene integraciones: su cuenta nace admin por autoregistro, y un webhook
+  # es que el servidor salga a pedirle algo a la dirección que escribió un desconocido.
   def require_admin
-    render json: { error: 'No autorizado' }, status: :forbidden unless current_user.admin?
+    return if current_user.admin? && !current_user.club&.personal?
+
+    render json: { error: 'No autorizado' }, status: :forbidden
   end
 
   def serialize(w)

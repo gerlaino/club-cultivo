@@ -22,7 +22,11 @@ class OutgoingWebhookService
     delivery.update!(attempts: 1, last_attempted_at: t0)
 
     uri      = URI.parse(@webhook.url)
+    # Se conecta a la IP ya validada (`Seguridad::DestinoPublico`), no a la que resuelva
+    # Net::HTTP: el host sigue yendo en el Host y en el SNI del TLS.
+    ip       = Seguridad::DestinoPublico.ip!(uri.host)
     http     = Net::HTTP.new(uri.host, uri.port)
+    http.ipaddr         = ip
     http.use_ssl        = uri.scheme == 'https'
     http.open_timeout   = TIMEOUT
     http.read_timeout   = TIMEOUT
@@ -44,11 +48,18 @@ class OutgoingWebhookService
         status:        'failed',
         http_code:     response.code.to_i,
         duration_ms:   duration,
-        error_message: "HTTP #{response.code}: #{response.body.to_s.truncate(500)}"
+        # Sólo el código: el cuerpo de la respuesta no se guarda ni se muestra. Guardarlo
+        # convertía al webhook en una forma de LEER lo que contesta cualquier servidor.
+        error_message: "HTTP #{response.code}"
       )
       raise "Webhook responded with #{response.code}"
     end
 
+  rescue Seguridad::DestinoPublico::Rechazado => e
+    # No se reintenta: el destino no va a dejar de ser privado.
+    delivery&.update!(status: 'failed', error_message: e.message,
+                      duration_ms: ((Time.current - t0) * 1000).to_i)
+    nil
   rescue => e
     delivery&.update!(
       status:        'failed',
