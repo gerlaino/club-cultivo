@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
+import { useClubStore } from '../stores/club'
 
 // AC (Germán, 13-oct-2026): «hice un registro por voz: le puse vege, un pulso a cada planta… no me
 // tomó el vege del depósito, no hizo el cálculo para descontar lo usado». El backend hace la
@@ -35,12 +36,13 @@ function riego (nutricion) {
   } }
 }
 
-async function revisar (acciones) {
+async function revisar (acciones, { personal = false, descartado = [] } = {}) {
   setActivePinia(createPinia())
+  useClubStore().data = { personal }
   listInsumos.mockResolvedValue({ data: [VEGE] })
   listRecetas.mockResolvedValue({ data: [] })
   post.mockImplementation((url) => (url === '/asistente/parsear'
-    ? Promise.resolve({ data: { resumen: 'Riego con vege', acciones, correccion_id: 1 } })
+    ? Promise.resolve({ data: { resumen: 'Riego con vege', acciones, descartado, correccion_id: 1 } })
     : Promise.resolve({ data: { resultados: [], errores_detalle: [] } })))
   const V = (await import('../components/AsistenteVoz.vue')).default
   const w = mount(V, { global: { stubs: { teleport: true, transition: false }, directives: { modal: {} } } })
@@ -70,10 +72,67 @@ describe('Dictado: los nutrientes se descuentan', () => {
     expect(bloque.find('input[aria-label="Cantidad de Vege"]').element.value).toBe('6')
   })
 
-  it('lo que no se pudo calcular lo dice', async () => {
-    const w = await revisar([riego({ ...PROPUESTA, items: [{ ...PROPUESTA.items[0], cantidad: null, calculada: null, detalle: null }],
-      avisos: ['Vege: no dijiste cuánto y no tiene cargada la dosis de la etiqueta. Poné la cantidad.'] })])
-    expect(w.find('[data-testid="accion-nutricion"]').text()).toContain('no tiene cargada la dosis de la etiqueta')
+  // AC (Germán, 14-oct-2026): «pongo que regué con vege y me pide ingresar a mano todo eso… la
+  // idea es que si no menciono nada de eso directamente cargue con lo que dije».
+  const SIN_CUENTA = { ...PROPUESTA, items: [{ ...PROPUESTA.items[0], cantidad: null, calculada: null, detalle: null }],
+    avisos: ['Vege no se descuenta: falta cargar cuánto es 1 pulso (en Nutrientes).'] }
+
+  it('lo que no se pudo calcular lo dice en una línea, sin abrir el formulario', async () => {
+    const w = await revisar([riego(SIN_CUENTA)])
+    const bloque = w.find('[data-testid="accion-nutricion"]')
+    expect(bloque.text()).toContain('No se descuenta')
+    expect(bloque.text()).toContain('falta cargar cuánto es 1 pulso')
+    expect(bloque.text()).not.toContain('Se descuenta')
+    expect(bloque.find('input').exists()).toBe(false)
+    expect(bloque.text()).not.toContain('Con receta')
+  })
+
+  it('se guarda directo con lo dicho, sin cantidades', async () => {
+    const w = await revisar([riego(SIN_CUENTA)])
+    await w.find('.av__btn-ejecutar').trigger('click')
+    await flushPromises()
+
+    const [, body] = post.mock.calls.find(([url]) => url === '/asistente/ejecutar')
+    expect(body.acciones[0].datos.notas_fertilizacion).toBe('vege, un pulso a cada planta')
+    expect(body.acciones[0].datos.fertilizacion).toBe(true)
+  })
+
+  it('«Poner cantidad» abre el editor para cargarla a mano', async () => {
+    const w = await revisar([riego(SIN_CUENTA)])
+    await w.find('[data-testid="nutri-poner"]').trigger('click')
+    await flushPromises()
+    expect(w.find('input[aria-label="Cantidad de Vege"]').exists()).toBe(true)
+  })
+
+  it('si una línea sí se calcula, el editor se ve como siempre', async () => {
+    const w = await revisar([riego({ ...PROPUESTA, items: [...PROPUESTA.items, { ...SIN_CUENTA.items[0], insumo_id: 8, nombre: 'Bloom' }] })])
+    expect(w.find('[data-testid="accion-nutricion"]').text()).toContain('Se descuenta')
+    expect(w.find('input[aria-label="Cantidad de Vege"]').exists()).toBe(true)
+  })
+
+  // AC (Germán, 14-oct-2026): «es autocultivo y dice sala».
+  it('en autocultivo la tarjeta habla del espacio, no de la sala', async () => {
+    const w = await revisar([riego(PROPUESTA)], { personal: true })
+    const tipo = w.find('.av__accion-tipo').text()
+    expect(tipo).toBe('Riego · todo el espacio')
+    expect(w.text()).not.toMatch(/sala/i)
+  })
+
+  it('en una organización sigue diciendo sala', async () => {
+    const w = await revisar([riego(PROPUESTA)])
+    expect(w.find('.av__accion-tipo').text()).toBe('Registro ambiental · toda la sala')
+  })
+
+  // AC (Germán, 14-oct-2026): lo que se coló y no es del cultivo no se registra, y se ve que se dejó afuera.
+  it('lo que la IA descartó por no ser del cultivo se muestra aparte', async () => {
+    const w = await revisar([riego(PROPUESTA)], { descartado: ['sonaba un reggaetón'] })
+    expect(w.find('[data-testid="descartado"]').text()).toContain('«sonaba un reggaetón»')
+    expect(w.find('.av__accion').text()).not.toContain('reggaetón')
+  })
+
+  it('sin nada descartado no aparece la línea', async () => {
+    const w = await revisar([riego(PROPUESTA)])
+    expect(w.find('[data-testid="descartado"]').exists()).toBe(false)
   })
 
   it('se guarda lo confirmado: si cambio la cantidad, viaja la nueva y la cuenta vieja deja de mostrarse', async () => {

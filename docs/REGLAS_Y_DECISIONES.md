@@ -1762,8 +1762,16 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 - **Lo dictado de nutrientes se descuenta, pero la cuenta NO la hace la IA** (13-oct-2026,
   Germán): la IA dice qué se nombró y lo que se dijo de cantidad; `Nutricion::Dosis` hace la
   cuenta; la persona la ve y la corrige antes de guardar. Lo que no se puede calcular (litros,
-  plantas, cuánto es una medida) se pregunta, no se adivina. La dosis de etiqueta la carga la
-  persona copiada de SU producto: la app sigue sin recomendar marcas ni ml (`Nutricion::Guia`).
+  plantas, cuánto es una medida) no se adivina: **el riego se guarda igual con lo dicho y no se
+  descuenta nada** (14-oct-2026, Germán: «si no menciono nada de eso, que cargue con lo que
+  dije»). La pantalla lo avisa en una línea («Vege no se descuenta: falta…») y el editor queda
+  detrás de «Poner cantidad»; nunca un formulario que parezca obligatorio. La dosis de etiqueta la
+  carga la persona copiada de SU producto: la app sigue sin recomendar marcas ni ml (`Nutricion::Guia`).
+- **En un registro sólo entra lo del cultivo** (14-oct-2026, Germán: «puso reggaetón cuando jamás
+  usé esa palabra»). El dictado es un micrófono abierto: música, charla de fondo y palabras mal
+  transcriptas son ruido y no van a ningún campo. La IA los devuelve en `descartado` y la pantalla
+  los muestra («No registré, porque no es del cultivo: …») para que se vea si tiró algo que sí iba.
+  Los textos se escriben como en un cuaderno: nada de «según lo mencionado por el cultivador».
 - **Corregir un riego es deshacerlo entero y volver a aplicarlo** (`Nutricion::Editar`), nunca
   pisar números: lo descontado vuelve al depósito y queda el rastro. No se corrige lo de un lote
   ya cosechado.

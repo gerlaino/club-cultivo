@@ -105,6 +105,55 @@ RSpec.describe 'Asistente: los nutrientes dictados se descuentan', type: :reques
     expect(ActsAsTenant.without_tenant { ajeno.reload.stock_actual.to_f }).to eq(100.0)
   end
 
+  # AC (Germán, 14-oct-2026): «pongo que regué con vege y me pide ingresar a mano todo eso… la
+  # idea es que si no menciono nada de eso directamente cargue con lo que dije».
+  describe 'un nutriente que no se puede calcular' do
+    before { vege.update!(medida_casera: nil, medida_casera_cantidad: nil) }
+
+    let(:sin_notas) do
+      d = dictado.deep_dup
+      d['acciones'].first['datos'].delete('notas_fertilizacion')
+      d['acciones'].first['datos']['nutrientes'].first['medida_nombre'] = 'pulso'
+      d
+    end
+
+    it 'el riego se guarda con lo dicho y el depósito no se toca' do
+      body, = parsear_con(sin_notas)
+      datos = body['acciones'].first['datos']
+      expect(datos['notas_fertilizacion']).to eq('Vege: 1 pulso por planta')
+      expect(datos['nutricion']['avisos']).to eq(['Vege no se descuenta: falta cargar cuánto es 1 pulso (en Nutrientes).'])
+
+      r = ejecutar(body['acciones'])
+
+      expect(r['ejecutadas']).to eq(1), r.inspect
+      reg = lote.registros_ambientales.last
+      expect(reg.fertilizacion).to be true
+      expect(reg.notas_fertilizacion).to eq('Vege: 1 pulso por planta')
+      expect(vege.reload.stock_actual.to_f).to eq(500.0)
+    end
+  end
+
+  # AC (Germán, 14-oct-2026): «puso reggaetón cuando jamás usé esa palabra… si alguien dijo algo
+  # y se coló, no debería ser parte del registro».
+  describe 'lo que no es del cultivo' do
+    it 'la IA tiene la regla de descartar el ruido y no escribir «según lo mencionado»' do
+      _, enviado = parsear_con({ 'resumen' => 'ok', 'acciones' => [] })
+      sistema = enviado['system'].map { |b| b['text'] }.join
+      expect(sistema).to include('SÓLO EL CULTIVO', '`descartado`', 'Nunca «según lo mencionado»')
+    end
+
+    it 'lo descartado vuelve aparte, para mostrarlo, y no entra en el registro' do
+      d = dictado.deep_dup
+      d['descartado'] = ['sonaba un reggaetón', '  ', 42]
+      body, = parsear_con(d)
+      expect(body['descartado']).to eq(['sonaba un reggaetón', '42'])
+
+      ejecutar(body['acciones'])
+      reg = lote.registros_ambientales.last
+      expect(reg.attributes.values.join(' ')).not_to include('reggaetón')
+    end
+  end
+
   it 'un riego dictado sin nutrientes no toca el depósito' do
     ejecutar([{ 'tipo' => 'registro_ambiental_sala', 'sala_nombre' => 'Carpa', 'datos' => { 'tareas_realizadas' => ['riego'] } }])
     expect(vege.reload.stock_actual.to_f).to eq(500.0)

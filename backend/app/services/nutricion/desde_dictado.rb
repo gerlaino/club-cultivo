@@ -13,10 +13,29 @@ module Nutricion
   #
   # datos (del dictado):
   #   receta_nombre: 'Floración'
-  #   nutrientes: [{ nombre: 'Vege', cantidad: 1, medida: 'medida', por: 'planta' }]
+  #   nutrientes: [{ nombre: 'Vege', cantidad: 1, medida: 'medida', medida_nombre: 'pulso', por: 'planta' }]
   #   volumen_l: 3
+  #
+  # Si no se puede calcular, el riego SE GUARDA IGUAL con lo dicho y no se descuenta nada: la
+  # pantalla no lo pide como un formulario, sólo avisa qué no se descontó y por qué (14-oct-2026).
   class DesdeDictado
     def self.call(**kwargs) = new(**kwargs).call
+
+    POR_TEXTO = { 'planta' => 'por planta', 'litro' => 'por litro', 'total' => 'en total' }.freeze
+
+    # «Vege: 1 pulso por planta · receta Floración»: lo dicho, para el registro.
+    def self.texto_dicho(datos)
+      d = datos.to_h.stringify_keys
+      partes = Array(d['nutrientes']).map { |n| n.to_h.stringify_keys }.select { |n| n['nombre'].present? }.map do |n|
+        next n['nombre'].to_s if n['cantidad'].blank?
+
+        medida = n['medida'] == 'medida' ? n['medida_nombre'].presence || 'medida' : n['medida'].presence
+        cant = n['cantidad'].to_s.sub(/\.0\z/, '').sub('.', ',')
+        [n['nombre'].to_s + ':', cant, medida, POR_TEXTO[n['por'].to_s]].compact.join(' ')
+      end
+      partes << "receta #{d['receta_nombre']}" if d['receta_nombre'].present?
+      partes.join(' · ')
+    end
 
     # LO CONFIRMADO, listo para `Nutricion::Aplicar`: { receta:, litros:, items: } o nil.
     #
@@ -108,7 +127,7 @@ module Nutricion
                           'detalle' => res.detalle, 'origen' => origen)
       end
 
-      @avisos << falta_aviso(insumo, res&.falta)
+      @avisos << falta_aviso(insumo, res&.falta, dicho)
       base.merge('cantidad' => nil, 'detalle' => nil, 'origen' => origen)
     end
 
@@ -126,16 +145,20 @@ module Nutricion
                       litros: litros, plantas: plantas), 'etiqueta']
     end
 
-    def falta_aviso(insumo, falta)
+    # Qué no se descontó y por qué. No es un pedido: el riego se guarda igual con lo dicho.
+    def falta_aviso(insumo, falta, dicho = {})
+      no = "#{insumo.nombre} no se descuenta"
       case falta
-      when 'litros'  then "#{insumo.nombre}: se dosifica por litro, decí cuántos litros."
-      when 'plantas' then "#{insumo.nombre}: no encontré plantas en cultivo para calcular por planta."
-      when 'medida'  then "#{insumo.nombre}: falta cargar cuánto es 1 #{insumo.medida_casera.presence || 'medida'} (en Nutrientes)."
+      when 'litros'  then "#{no}: se dosifica por litro y no dijiste cuántos litros."
+      when 'plantas' then "#{no}: no encontré plantas en cultivo para calcular por planta."
+      when 'medida'
+        medida = insumo.medida_casera.presence || dicho['medida_nombre'].presence || 'medida'
+        "#{no}: falta cargar cuánto es 1 #{medida} (en Nutrientes)."
       else
         if fase.nil? && @lotes.map(&:estado).uniq.size > 1
-          "#{insumo.nombre}: las plantas están en fases distintas, poné la cantidad."
+          "#{no}: las plantas están en fases distintas y no dijiste cuánto."
         else
-          "#{insumo.nombre}: no dijiste cuánto y no tiene cargada la dosis de la etiqueta. Poné la cantidad."
+          "#{no}: no dijiste cuánto y no tiene cargada la dosis de la etiqueta."
         end
       end
     end

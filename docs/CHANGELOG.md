@@ -1,5 +1,23 @@
 # Changelog
 
+## Octubre 2026 (fi) — Dictado: lo dicho se guarda, el ruido no entra, el espacio no es «sala» (14-oct)
+
+Germán, desde el autocultivo: la tarjeta decía «Registro ambiental · toda la sala», al dictar
+«un pulso de vege a cada planta» le pedía cargar todo a mano (Vege no tenía cuánto es 1 pulso) y
+en observaciones apareció «Música reggaeton durante el riego, según lo mencionado por el cultivador».
+
+- **Lo que no se puede calcular no frena el registro.** Si ningún nutriente tiene cantidad, la
+  tarjeta dice «No se descuenta de tus nutrientes» con el motivo en una línea y «Poner cantidad»
+  abre el editor; antes se abría entero (Con receta / Productos sueltos / Nada) y parecía
+  obligatorio. Lo dicho queda en `notas_fertilizacion` aunque la IA no lo haya escrito
+  (`Nutricion::DesdeDictado.texto_dicho`: «Vege: 1 pulso por planta»). Los avisos dicen «X no se
+  descuenta: …» en vez de pedir; la medida usa la palabra dicha (`medida_nombre`: «pulso»).
+- **Sólo el cultivo.** El prompt manda descartar lo que no es del cultivo (música, charla de fondo,
+  palabras sin sentido en un cultivo) y no escribir «según lo mencionado». Lo descartado vuelve en
+  `descartado` y se muestra en gris debajo del resumen.
+- **Vocabulario del autocultivo en la tarjeta**: «Riego · todo el espacio», «Nota del espacio».
+  «Avance de ciclo» pasa a «Cambio de fase» (para todos).
+
 ## Octubre 2026 (fh) — Dispensaciones: «cuenta corriente» es lo que le deben a la organización (13-oct)
 
 Germán: «A cuenta corriente $521.500» al lado del chip «Cta. cte.: 6 ($558.000)». No faltaba plata:

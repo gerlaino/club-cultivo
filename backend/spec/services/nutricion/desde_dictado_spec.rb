@@ -41,18 +41,34 @@ RSpec.describe Nutricion::DesdeDictado do
     expect(p['items'].first).to include('insumo_id' => vege.id, 'cantidad' => 6.0, 'origen' => 'etiqueta')
   end
 
-  it 'sin cantidad ni etiqueta, la línea va vacía y lo dice (la pantalla la pide)' do
+  it 'sin cantidad ni etiqueta, la línea va vacía y dice que no se descuenta (no la pide: el riego se guarda igual)' do
     nutriente('Vege')
     p = proponer({ 'nutrientes' => [{ 'nombre' => 'Vege' }] })
 
     expect(p['items'].first['cantidad']).to be_nil
-    expect(p['avisos'].first).to include('no tiene cargada la dosis de la etiqueta')
+    expect(p['avisos'].first).to include('Vege no se descuenta', 'no tiene cargada la dosis de la etiqueta')
   end
 
-  it 'por litro sin litros dichos no adivina: lo pide' do
+  # AC (Germán, 14-oct-2026): «pongo que regué con vege y me pide ingresar a mano todo eso».
+  it '«un pulso» de un nutriente sin la medida casera cargada: no adivina los ml y lo dice con la palabra dicha' do
+    nutriente('Vege')
+    p = proponer({ 'nutrientes' => [{ 'nombre' => 'Vege', 'cantidad' => 1, 'medida' => 'medida', 'medida_nombre' => 'pulso', 'por' => 'planta' }] })
+
+    expect(p['items'].first['cantidad']).to be_nil
+    expect(p['avisos']).to eq(['Vege no se descuenta: falta cargar cuánto es 1 pulso (en Nutrientes).'])
+  end
+
+  it 'el texto de lo dicho, para el registro' do
+    datos = { 'nutrientes' => [{ 'nombre' => 'Vege', 'cantidad' => 1, 'medida' => 'medida', 'medida_nombre' => 'pulso', 'por' => 'planta' },
+                               { 'nombre' => 'Base A', 'cantidad' => 2.5, 'medida' => 'ml', 'por' => 'litro' },
+                               { 'nombre' => 'Enzimas' }] }
+    expect(described_class.texto_dicho(datos)).to eq('Vege: 1 pulso por planta · Base A: 2,5 ml por litro · Enzimas')
+  end
+
+  it 'por litro sin litros dichos no adivina: lo dice' do
     nutriente('Vege', dosis_unidad: 'ml_litro', dosis_vegetativo: 2)
     p = proponer({ 'nutrientes' => [{ 'nombre' => 'Vege' }] })
-    expect(p['avisos'].first).to include('decí cuántos litros')
+    expect(p['avisos'].first).to include('no dijiste cuántos litros')
   end
 
   it '«la receta Floración» usa la receta guardada que coincide' do

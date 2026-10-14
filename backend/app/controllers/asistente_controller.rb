@@ -42,7 +42,17 @@ class AsistenteController < BaseController
     interpretar correctamente, incluso cuando quien dicta es breve o impreciso.
 
     PRINCIPIOS:
-    - Registrar solo lo que se menciona. Nunca inventar valores.
+    - Registrar solo lo que se menciona. Nunca inventar valores: ningún número (temperatura,
+      humedad, pH, EC, litros) que no se haya dicho.
+    - SÓLO EL CULTIVO. El texto viene de un micrófono abierto: se cuelan la música, la tele, otra
+      persona hablando y palabras mal transcriptas. Todo lo que no tenga que ver con las plantas,
+      el espacio, el riego, los nutrientes, el ambiente o el trabajo del cultivo NO se registra en
+      ningún campo (ni en observaciones, ni en notas, ni en el resumen): es ruido. Una palabra que
+      no tiene sentido en un cultivo es un error de transcripción, no un dato. Lo descartado va,
+      textual y corto, en `descartado` (afuera de las acciones) para que la persona lo vea.
+      «regué con vege, sonaba un reggaetón» → registro del riego con vege; descartado: ["sonaba un reggaetón"].
+    - Los textos de los campos se escriben como en un cuaderno de cultivo: el hecho y nada más.
+      Nunca «según lo mencionado», «el cultivador indicó» ni comentarios sobre el dictado.
     - Si no se menciona un campo, no lo incluyas: el sistema preserva el valor anterior.
     - Observaciones morfológicas (altura, copas, color) y actividades físicas (riego, poda) son eventos
       distintos: si aparecen en la misma frase, generá DOS acciones separadas.
@@ -56,9 +66,10 @@ class AsistenteController < BaseController
       · Si nombra nutrientes, poné en datos `nutrientes`: una entrada por producto, con el `nombre`
         EXACTO como figura en NUTRIENTES del mapa. Si no figura, ponelo como lo dijo.
       · `cantidad`, `medida` y `por` SÓLO si dijo cuánto. `medida`: "medida" para la medida casera
-        (pulso, tapita, cucharita, chorrito, bombeo), "ml" o "g". `por`: "planta" («a cada
-        planta», «por planta»), "litro" («por litro») o "total" (lo que puso en todo el riego).
-        «un pulso de vege a cada planta» → { "nombre": "Vege", "cantidad": 1, "medida": "medida", "por": "planta" }.
+        (pulso, tapita, cucharita, chorrito, bombeo), "ml" o "g"; si es medida casera, la palabra
+        que usó va en `medida_nombre`. `por`: "planta" («a cada planta», «por planta»), "litro"
+        («por litro») o "total" (lo que puso en todo el riego).
+        «un pulso de vege a cada planta» → { "nombre": "Vege", "cantidad": 1, "medida": "medida", "medida_nombre": "pulso", "por": "planta" }.
         «le puse vege» (sin cuánto) → { "nombre": "Vege" }: el sistema usa la dosis de su etiqueta.
       · Si dice que aplicó una receta («la receta Floración»), poné `receta_nombre` EXACTO como
         figura en RECETAS.
@@ -107,6 +118,7 @@ class AsistenteController < BaseController
 
     {
       "resumen": "lo que entendiste, en una línea",
+      "descartado": ["lo que no es del cultivo, textual"],
       "acciones": [
         {
           "tipo": "registro_ambiental",
@@ -225,6 +237,9 @@ class AsistenteController < BaseController
       anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
       anotar_repetidas!(resultado['acciones'], contexto)
       proponer_nutricion!(resultado['acciones'], contexto)
+      # Lo que la IA dejó afuera por no ser del cultivo (música, charla de fondo): se muestra para
+      # que, si descartó algo que sí iba, la persona lo vea antes de guardar.
+      resultado['descartado'] = Array(resultado['descartado']).map { |d| d.to_s.strip }.reject(&:blank?).first(5)
       resultado['correccion_id'] = registrar_propuesta(texto, resultado['acciones'])
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
@@ -586,6 +601,10 @@ class AsistenteController < BaseController
 
       propuesta = Nutricion::DesdeDictado.call(club: club, lotes: lotes, sala: sala, datos: datos)
       next unless propuesta
+
+      # Lo dicho queda en el registro aunque no se pueda descontar (falta la medida casera, no hay
+      # dosis de etiqueta): «regué con vege» se guarda como se dijo, sin pedir nada (Germán, 14-oct).
+      datos['notas_fertilizacion'] = Nutricion::DesdeDictado.texto_dicho(datos) if datos['notas_fertilizacion'].blank?
 
       datos['nutricion'] = propuesta
       datos['fertilizacion'] = true

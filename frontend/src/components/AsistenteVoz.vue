@@ -125,6 +125,12 @@
                   {{ acciones.length }} {{ acciones.length === 1 ? 'acción identificada' : 'acciones identificadas' }}
                 </div>
                 <div class="av__resumen-texto">{{ resumen }}</div>
+                <!-- Lo que la IA dejó afuera por no ser del cultivo (música, charla de fondo): a la
+                     vista, para que si descartó algo que sí iba, se vea antes de guardar. -->
+                <div v-if="descartado.length" class="av__descartado" data-testid="descartado">
+                  <i class="bi bi-funnel"></i>
+                  No registré, porque no es del cultivo: {{ descartado.map(d => `«${d}»`).join(', ') }}
+                </div>
               </div>
 
               <div class="av__acciones-lista">
@@ -141,7 +147,7 @@
                     <span v-else>📝</span>
                   </div>
                   <div class="av__accion-body">
-                    <div class="av__accion-tipo">{{ labelTipo(accion.tipo) }}</div>
+                    <div class="av__accion-tipo">{{ labelTipo(accion) }}</div>
                     <div class="av__accion-titulo">
                       <span v-if="!esPersonal && (accion.lote_codigo || accion.datos?.lote_codigo)" class="av__accion-ref">{{ accion.lote_codigo || accion.datos.lote_codigo }}</span>
                       <span v-if="accion.sala_nombre || accion.datos?.sala_nombre" class="av__accion-ref">{{ accion.sala_nombre || accion.datos.sala_nombre }}</span>
@@ -180,18 +186,36 @@
                          una receta y el backend ya hizo la cuenta (`Nutricion::DesdeDictado`): va a la
                          vista y se corrige acá, antes de guardar, porque mueve stock. -->
                     <div v-if="accion.datos?.nutricion" class="av__nutri" data-testid="accion-nutricion">
-                      <div class="av__cerrar-label">
-                        <i class="bi bi-droplet-half"></i>
-                        Se descuenta {{ esPersonal ? 'de tus nutrientes' : 'del depósito' }}
-                      </div>
-                      <ul v-if="accion.datos.nutricion.avisos?.length" class="av__nutri-avisos">
-                        <li v-for="(a, k) in accion.datos.nutricion.avisos" :key="k">{{ a }}</li>
-                      </ul>
-                      <p v-if="detallesNutricion(accion).length" class="av__nutri-cuenta">
-                        <span v-for="(d, k) in detallesNutricion(accion)" :key="k">{{ d }}</span>
-                      </p>
-                      <InsumosAplicados v-model="accion.datos.nutricion" uso="riego"
-                                        :base-default="accion.datos.volumen_l || null" />
+                      <!-- Nada se pudo calcular (falta la medida casera, no hay dosis de etiqueta): el
+                           riego se guarda con lo dicho y no se descuenta nada. Se avisa en una línea y
+                           el editor queda detrás de «Poner cantidad»: antes se abría entero y parecía
+                           un formulario obligatorio (Germán, 14-oct-2026). -->
+                      <template v-if="nutriSinCuenta(accion) && !accion._nutriEditar">
+                        <div class="av__cerrar-label">
+                          <i class="bi bi-droplet-half"></i>
+                          No se descuenta {{ esPersonal ? 'de tus nutrientes' : 'del depósito' }}
+                        </div>
+                        <ul v-if="accion.datos.nutricion.avisos?.length" class="av__nutri-avisos av__nutri-avisos--suave">
+                          <li v-for="(a, k) in accion.datos.nutricion.avisos" :key="k">{{ a }}</li>
+                        </ul>
+                        <button type="button" class="av__nutri-poner" data-testid="nutri-poner" @click="accion._nutriEditar = true">
+                          Poner cantidad
+                        </button>
+                      </template>
+                      <template v-else>
+                        <div class="av__cerrar-label">
+                          <i class="bi bi-droplet-half"></i>
+                          Se descuenta {{ esPersonal ? 'de tus nutrientes' : 'del depósito' }}
+                        </div>
+                        <ul v-if="accion.datos.nutricion.avisos?.length" class="av__nutri-avisos">
+                          <li v-for="(a, k) in accion.datos.nutricion.avisos" :key="k">{{ a }}</li>
+                        </ul>
+                        <p v-if="detallesNutricion(accion).length" class="av__nutri-cuenta">
+                          <span v-for="(d, k) in detallesNutricion(accion)" :key="k">{{ d }}</span>
+                        </p>
+                        <InsumosAplicados v-model="accion.datos.nutricion" uso="riego"
+                                          :base-default="accion.datos.volumen_l || null" />
+                      </template>
                     </div>
 
                     <!-- Editor inline -->
@@ -434,6 +458,7 @@ const transcripcion         = ref('')
 const editandoTranscripcion = ref(false)
 const { confirm } = useConfirm()
 const resumen               = ref('')
+const descartado            = ref([])
 const acciones              = ref([])
 // Ata el dictado con lo que se guarda, para poder medir después cuánto hubo que corregir.
 const correccionId          = ref(null)
@@ -559,7 +584,7 @@ function resetear() {
   voz.cancelar(); voz.limpiar()
   paso.value = 'escuchar'; procesando.value = false
   ejecutando.value = false; transcripcion.value = ''
-  editandoTranscripcion.value = false; resumen.value = ''; acciones.value = []
+  editandoTranscripcion.value = false; resumen.value = ''; descartado.value = []; acciones.value = []
   resultados.value = []; erroresEjecucion.value = []; errorVoz.value = null
 }
 
@@ -590,6 +615,7 @@ async function parsearConIA() {
     if (props.contexto) payload.contexto = props.contexto
     const { data } = await api.post('/asistente/parsear', payload)
     resumen.value  = data.resumen || ''
+    descartado.value = data.descartado || []
     // Las tareas vienen tildadas DESDE EL BACKEND (`tareas_cerrar_ids`): el caso normal es que
     // el registro efectivamente las completa, y así lo que se mide como "propuesta" es lo mismo
     // que se ejecuta si nadie toca nada. Acá sólo se muestran y se dejan destildar.
@@ -684,7 +710,22 @@ function detallesNutricion (accion) {
     `${i.nombre}: ${i.detalle}${i.origen === 'etiqueta' ? ' (dosis de la etiqueta)' : ''}`)
 }
 
-function labelTipo(tipo) {
+// Ninguna línea propuesta tiene cantidad y no es una receta: no se va a descontar nada.
+function nutriSinCuenta (accion) {
+  const n = accion.datos?.nutricion
+  if (!n || n.modo === 'receta') return false
+  return !(n.items || []).some(i => Number(i.cantidad) > 0)
+}
+
+// En autocultivo no hay salas ni lotes: hay espacios y plantas (el aviso de abajo ya lo decía).
+function labelTipo (accion) {
+  const tipo = accion.tipo
+  if (esPersonal.value && (tipo === 'registro_ambiental' || tipo === 'registro_ambiental_sala')) {
+    const que = (accion.datos?.tareas_realizadas || []).includes('riego') ? 'Riego' : 'Registro'
+    return tipo === 'registro_ambiental_sala' ? `${que} · todo el espacio` : que
+  }
+  if (esPersonal.value && tipo === 'nota_sala') return 'Nota del espacio'
+  if (esPersonal.value && tipo === 'nota_lote') return 'Nota'
   return {
     registro_ambiental:      'Registro ambiental',
     registro_ambiental_sala: 'Registro ambiental · toda la sala',
@@ -692,7 +733,7 @@ function labelTipo(tipo) {
     tarea:                   'Nueva tarea',
     nota_sala:               'Nota de sala',
     nota_lote:               'Nota de lote',
-    avance_ciclo:            'Avance de ciclo',
+    avance_ciclo:            'Cambio de fase',
     nueva_planta:            'Nueva planta',
   }[tipo] || tipo
 }
@@ -930,5 +971,9 @@ function metaAccion(accion) {
 .av-modal-enter-from,.av-modal-leave-to { opacity:0; transform:scale(.97) translateY(6px); }
 .av__nutri { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--c-slate-200); border-radius: 10px; background: var(--c-paper); display: flex; flex-direction: column; gap: 8px; }
 .av__nutri-avisos { margin: 0; padding-left: 18px; font-size: var(--fs-12); color: var(--c-amber-500); }
+.av__nutri-avisos--suave { color: var(--c-slate-600); }
+.av__nutri-poner { margin-top: 6px; background: none; border: 0; padding: 0; font-size: var(--fs-12); color: var(--c-leaf-700); text-decoration: underline; cursor: pointer; }
+.av__descartado { margin-top: 6px; font-size: var(--fs-12); color: var(--c-slate-500); }
+.av__descartado .bi { margin-right: 4px; }
 .av__nutri-cuenta { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--c-ink-500); }
 </style>
