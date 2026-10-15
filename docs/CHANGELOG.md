@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (fl) — Stock: el historial muestra los eliminados y los cerrados (15-oct)
+
+Germán: «quiero poder ver los eliminados en historial y los agotados y poder diferenciar» — el
+informe no cerraba por 145,7 g y no había cómo saber si un stock se había borrado.
+
+- El historial trae también los stocks ELIMINADOS (`Stock.with_deleted`) y cada uno dice su
+  situación: asignado, por asignar, agotado, **cerrado** (a mano, con su motivo: el movimiento
+  «[FINALIZADO]») o **eliminado** (cuándo, por quién y qué tenía). Filtros «Cerrados» y «Eliminados».
+- La ficha de un stock eliminado se puede abrir (datos y movimientos, sólo lectura: `show`,
+  `movimientos` y `trazabilidad` lo buscan con los borrados; todo lo demás sigue dando 404).
+- `EliminarStockService` guarda quién eliminó (`deleted_by_id`): antes no quedaba.
+- Pendiente de confirmar con datos de prod: eliminar un DERIVADO devuelve los gramos al origen sin
+  movimiento y borra el de producción del origen — candidato a los stocks que «no cierran».
+
 ## Octubre 2026 (fk) — Entrar a la app: contraseñas, links y el médico sin altas (15-oct)
 
 Lo que salió de la prueba con Javi.

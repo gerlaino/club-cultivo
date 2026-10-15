@@ -22,7 +22,8 @@
             <h1 class="sd__hero-forma">{{ formaLabel(stock.forma_producto) }}</h1>
             <div class="sd__hero-lote">{{ stock.numero_lote_producto }}</div>
             <div class="sd__hero-chips">
-              <span class="sd__badge" :class="`sd__badge--${stock.estado}`">{{ estadoLabel(stock.estado) }}</span>
+              <span v-if="eliminado" class="sd__badge sd__badge--eliminado">Eliminado</span>
+              <span v-else class="sd__badge" :class="`sd__badge--${stock.estado}`">{{ estadoLabel(stock.estado) }}</span>
               <span v-if="stock.lote?.genetica" class="sd__chip sd__chip--gen">{{ stock.lote.genetica.nombre }}</span>
               <span v-else-if="stock.genetica" class="sd__chip sd__chip--gen">{{ stock.genetica.nombre }}</span>
               <span v-if="stock.origen === 'compra_externa'" class="sd__chip sd__chip--ext">Externo</span>
@@ -70,8 +71,14 @@
         </div>
       </div>
 
+      <!-- Eliminado (15-oct-2026): se puede mirar —datos y movimientos— pero no tocar. -->
+      <div v-if="eliminado" class="sd__finalizado sd__finalizado--elim" data-testid="stock-eliminado">
+        <i class="bi bi-trash3"></i>
+        <span>Stock eliminado el {{ formatDate(stock.eliminado_at) }}{{ stock.eliminado_por ? ` por ${stock.eliminado_por}` : '' }}.
+        Ya no está en el inventario ni en los informes; se muestra para saber qué tenía y qué movimientos hubo.</span>
+      </div>
       <!-- Stock finalizado: cerrado, ya no hay nada que hacer con él -->
-      <div v-if="stock.agotado" class="sd__finalizado">
+      <div v-else-if="stock.agotado" class="sd__finalizado">
         <i class="bi bi-flag-fill"></i>
         <span>Stock finalizado — cerrado. Lo que quedaba salió del inventario con su motivo, y ya no
         aparece en el disponible.</span>
@@ -87,7 +94,7 @@
           <div class="sd__card">
             <div class="sd__card-hd">
               <h2 class="sd__card-title">Datos del stock</h2>
-              <button v-if="!editando" class="sd__btn-ghost sd__btn-sm" @click="startEdit">
+              <button v-if="!editando && !eliminado" class="sd__btn-ghost sd__btn-sm" @click="startEdit">
                 <i class="bi bi-pencil"></i> Editar
               </button>
             </div>
@@ -281,7 +288,7 @@
         <aside class="sd__aside">
 
           <!-- Acciones -->
-          <div class="sd__card sd__card--acciones">
+          <div v-if="!eliminado" class="sd__card sd__card--acciones">
             <h2 class="sd__card-title">Acciones</h2>
             <div class="sd__actions">
               <!-- A un externo agotado le puede llegar mercadería: ahí el botón sigue andando. -->
@@ -871,6 +878,7 @@ const { generatePNG, generateSVG, downloadPNG, downloadSVG } = useQRCode()
 // ── Data ───────────────────────────────────────────────────────────────────────
 const loading    = ref(true)
 const stock      = ref(null)
+const eliminado  = computed(() => stock.value?.situacion === 'eliminado')
 // Unidad real del stock (g/ml/un) — no asumir gramos para derivados (preroll, cápsulas…).
 const unidad     = computed(() => stock.value?.unidad || 'g')
 const qrDataUrl  = ref(null)
@@ -1409,6 +1417,8 @@ function badgeVencLabel(s) {
 .sd__chip--ext { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .sd__chip--disp { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
 .sd__finalizado { display: flex; align-items: center; gap: .6rem; background: var(--c-slate-100); border: 1px solid var(--c-slate-200); border-radius: 12px; padding: .8rem 1rem; margin-bottom: 1.25rem; color: var(--c-slate-600); font-size: .88rem; }
+.sd__badge--eliminado { background: var(--c-rust-100); color: var(--c-rust-600); }
+.sd__finalizado--elim { background: var(--c-rust-100); border-color: var(--c-rust-100); color: var(--c-rust-600); }
 .sd__finalizado i { color: var(--c-slate-500); }
 .sd__chip--reg { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 

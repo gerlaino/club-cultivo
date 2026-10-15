@@ -206,7 +206,7 @@
             </div>
             <RouterLink v-for="s in historialFiltrado" :key="s.id" :to="`/admin/stock/${s.id}`" class="stk__hist-row" data-testid="hist-fila">
               <div class="stk__hist-col stk__hist-col--estado">
-                <span class="stk__badge" :class="`stk__badge--${s.estado}`">{{ estadoLabel(s.estado) }}</span>
+                <span class="stk__badge" :class="`stk__badge--${s.situacion || s.estado}`">{{ estadoLabel(s.situacion || s.estado) }}</span>
               </div>
               <div class="stk__hist-col stk__hist-col--producto">
                 <span class="stk__hist-forma"><span class="stk__hist-codigo">{{ s.numero_lote_producto || `#${s.id}` }}</span> · {{ formaLabel(s.forma_producto) }}</span>
@@ -217,6 +217,13 @@
                   </span>
                   <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext stk__chip--xs">Ext.</span>
                 </div>
+                <!-- Qué le pasó: quién y cuándo lo eliminó, o con qué motivo se cerró. -->
+                <span v-if="s.situacion === 'eliminado'" class="stk__hist-que stk__hist-que--elim" data-testid="hist-que">
+                  Eliminado el {{ formatDate(s.eliminado_at) }}{{ s.eliminado_por ? ` por ${s.eliminado_por}` : '' }} · tenía {{ s.cantidad }} g
+                </span>
+                <span v-else-if="s.situacion === 'cerrado'" class="stk__hist-que" data-testid="hist-que">
+                  Cerrado el {{ formatDate(s.cierre_fecha) }} · {{ s.cierre_motivo }}{{ s.cierre_gramos ? ` · ${s.cierre_gramos} g` : '' }}
+                </span>
               </div>
               <div v-if="!esPersonal" class="stk__hist-col stk__hist-col--sede">
                 <span v-if="s.sede" class="stk__hist-sede-nm">{{ s.sede.nombre }}</span>
@@ -921,13 +928,15 @@ const FILTROS_ESTADO = [
   { value: 'asignado',             label: 'Asignados' },
   { value: 'pendiente_asignacion', label: 'Por asignar' },
   { value: 'agotado',              label: 'Agotados' },
+  { value: 'cerrado',              label: 'Cerrados' },
+  { value: 'eliminado',            label: 'Eliminados' },
 ]
 const busquedaHistorial = ref('')
 const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 const historialFiltrado = computed(() => {
   const q = sinTildes(busquedaHistorial.value)
   return historial.value
-    .filter(s => filtroEstado.value === 'todos' || s.estado === filtroEstado.value)
+    .filter(s => filtroEstado.value === 'todos' || (s.situacion || s.estado) === filtroEstado.value)
     .filter(s => !q || [s.numero_lote_producto, `#${s.id}`, s.lote?.codigo, s.lote_codigo, s.lote?.genetica?.nombre, s.genetica?.nombre, s.genetica_nombre]
       .some(v => sinTildes(v).includes(q)))
 })
@@ -1383,7 +1392,7 @@ watch(() => crearForm.value.disponibilidad, () => {
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 
 function estadoLabel(e) {
-  return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }[e] || e
+  return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado', cerrado: 'Cerrado', eliminado: 'Eliminado' }[e] || e
 }
 function timeAgo(dateStr) {
   const d = Math.floor((Date.now() - new Date(dateStr)) / 86400000)
@@ -1651,6 +1660,10 @@ a.stk__hist-row:hover { background: var(--c-slate-50); }
 .stk__badge--pendiente_asignacion { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .stk__badge--asignado             { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
 .stk__badge--agotado              { background: var(--c-slate-100); color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
+.stk__badge--cerrado              { background: var(--c-slate-100); color: var(--c-slate-700); border: 1px solid var(--c-slate-300); }
+.stk__badge--eliminado            { background: var(--c-rust-100); color: var(--c-rust-600); border: 1px solid var(--c-rust-100); }
+.stk__hist-que { display: block; font-size: var(--fs-12, .75rem); color: var(--c-slate-500); margin-top: 2px; }
+.stk__hist-que--elim { color: var(--c-rust-600); }
 
 /* ── Modal ──────────────────────────────────────────────────────────────────── */
 .stk__overlay {

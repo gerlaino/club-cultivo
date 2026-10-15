@@ -33,6 +33,9 @@ class EliminarStockService
     stock.reservas_que_lo_incluyen.find_each(&:destroy!)
     stock.dispensaciones.find_each(&:destroy!) # las canceladas que hayan quedado
     devolver_gramos_al_origen(stock)
+    # Quién lo borró: el historial lo muestra (15-oct-2026). No se guardaba y un stock eliminado
+    # quedaba sin rastro de quién ni por qué.
+    stock.update_column(:deleted_by_id, @usuario&.id)
     stock.reload.destroy! # stock_movimientos se borran en cascada
   end
 

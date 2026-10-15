@@ -32,12 +32,16 @@ class StocksController < ApplicationController
       return render json: serializar_lista(stocks.order(updated_at: :desc))
     end
 
+    # EL HISTORIAL INCLUYE LOS ELIMINADOS (15-oct-2026, Germán: «quiero poder ver los eliminados en
+    # historial y los agotados y poder diferenciar»): un stock borrado desaparecía de todos lados y
+    # no había cómo saber qué pasó con lo que tenía. Cada uno dice su situación (`situaciones`).
     if params[:historial].present?
-      stocks = Stock.where(club_id: current_user.club_id)
+      stocks = Stock.with_deleted.where(club_id: current_user.club_id)
                     .includes(:lote, :genetica, :sede)
                     .order(created_at: :desc)
-                    .limit(500)
-      return render json: serializar_lista(stocks)
+                    .limit(500).to_a
+      extra = situaciones(stocks)
+      return render json: serializar_lista(stocks).map { |h| h.merge(extra[h[:id]]) }
     end
 
     # Contenedores de un lote: usado al confirmar pesajes de manicura para elegir a qué
@@ -216,7 +220,7 @@ class StocksController < ApplicationController
   def show
     cerradas = dispensaciones_en_periodo_cerrado
     render json: {
-      data: serialize_stock(@stock).merge(
+      data: serialize_stock(@stock).merge(situaciones([@stock])[@stock.id]).merge(
         # Si se puede corregir QUÉ ES. La pantalla no tiene que ofrecer un selector que el backend
         # va a rechazar, ni esconderlo sin decir por qué.
         puede_cambiar_forma: cerradas.zero?,
@@ -580,7 +584,8 @@ class StocksController < ApplicationController
 
   # GET /stocks/:id/movimientos
   def movimientos
-    movs = @stock.stock_movimientos
+    # Los de un stock eliminado se borraron con él (borrado lógico): se muestran igual.
+    movs = (@stock.deleted? ? StockMovimiento.with_deleted.where(stock_id: @stock.id) : @stock.stock_movimientos)
                  .includes(:usuario, :sede_origen, :sede_destino, :dispensacion)
                  .order(created_at: :desc)
                  .limit(200)
@@ -841,8 +846,12 @@ class StocksController < ApplicationController
     )
   end
 
+  # Un stock eliminado se puede MIRAR (ficha, movimientos, trazabilidad), nunca tocar.
+  SOLO_LECTURA = %w[show movimientos trazabilidad].freeze
+
   def set_stock
-    @stock = Stock.where(club_id: current_user.club_id).find(params[:id])
+    base = SOLO_LECTURA.include?(action_name) ? Stock.with_deleted : Stock
+    @stock = base.where(club_id: current_user.club_id).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Stock no encontrado' }, status: :not_found
   end
@@ -993,6 +1002,30 @@ class StocksController < ApplicationController
     ).call
     Stock.precargar_apartados(lista)
     Stock.precargar_en_delivery(lista)
+  end
+
+  # Qué pasó con cada stock, para distinguirlos en el historial: eliminado (cuándo y quién), cerrado
+  # a mano con su motivo (el movimiento «[FINALIZADO]» de `descartar`), agotado, o su estado.
+  def situaciones(stocks)
+    ids = stocks.map(&:id)
+    cierres = StockMovimiento.with_deleted.where(stock_id: ids).where("notas LIKE '[FINALIZADO]%'")
+                             .order(:created_at).group_by(&:stock_id)
+    quienes = User.unscoped.where(id: stocks.filter_map(&:deleted_by_id)).index_by(&:id)
+    stocks.to_h do |st|
+      cierre = cierres[st.id]&.last
+      situacion = if st.deleted? then 'eliminado'
+                  elsif st.agotado? && cierre then 'cerrado'
+                  else st.estado
+                  end
+      [st.id, {
+        situacion:      situacion,
+        eliminado_at:   st.deleted_at,
+        eliminado_por:  quienes[st.deleted_by_id]&.nombre_completo,
+        cierre_motivo:  cierre && cierre.notas.to_s.split(' · ')[1],
+        cierre_fecha:   cierre && (cierre.fecha || cierre.created_at.to_date),
+        cierre_gramos:  cierre && -cierre.gramos.to_f,
+      }]
+    end
   end
 
   def serialize_stock(s)
