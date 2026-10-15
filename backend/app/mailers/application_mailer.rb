@@ -6,10 +6,9 @@ class ApplicationMailer < ActionMailer::Base
   # lee `default_url_options`); los templates lo pegaban a mano con un dominio viejo por defecto y
   # un path que no existía.
   helper_method :url_app
+  # Sale de `App.base_url`: eran dos cuentas distintas para la misma dirección.
   def url_app(path)
-    host = ENV['APP_HOST'].presence || 'cultivoespacial.com'
-    host = "https://#{host}" unless host.start_with?('http')
-    "#{host.chomp('/')}#{path}"
+    "#{App.base_url}#{path}"
   end
 
   private

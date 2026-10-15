@@ -181,7 +181,7 @@ export const useAuthStore = defineStore("auth", {
           return;
         }
 
-        const { default: router } = await import("../router");
+        const { default: router, puedeEntrar } = await import("../router");
         const ROLE_HOME = {
           super_admin: '/super-admin',
           auditor:     '/auditor',
@@ -200,10 +200,16 @@ export const useAuthStore = defineStore("auth", {
         // Si veníamos de un deep-link / QR (?redirect=…), volvemos ahí. PERO nunca a la
         // home de OTRO rol (un redirect viejo del usuario anterior no debe ganar): los
         // deep-links normales (QR, fichas, etc.) sí se respetan.
+        // Y tampoco a una página que este rol no puede ver: el ?redirect queda de la sesión ANTERIOR
+        // (cerrar sesión como super admin y entrar como médico), el guard la rechazaba y asomaba
+        // «No tenés acceso a esa sección» un segundo antes del inicio (15-oct-2026).
         const r = redirect ? String(redirect) : null
         const homesDeRol = Object.values(ROLE_HOME)
         const apuntaAOtraHome = r && homesDeRol.some(h => (r === h || r.startsWith(h + '/')) && h !== roleHome)
-        if (r && !apuntaAOtraHome) {
+        const rol = this.user?.role
+        const rutaR = r ? r.split(/[?#]/)[0] : null
+        const ajena = r && (!puedeEntrar(rol, rutaR) || (rutaR.startsWith('/super-admin') && rol !== 'super_admin'))
+        if (r && !apuntaAOtraHome && !ajena) {
           router.push(r);
         } else {
           router.push(roleHome ? { path: roleHome } : { name: "dashboard" });

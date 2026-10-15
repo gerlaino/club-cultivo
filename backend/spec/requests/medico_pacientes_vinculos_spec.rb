@@ -137,12 +137,28 @@ RSpec.describe 'Médico: sólo ve a sus pacientes vinculados', type: :request do
     end
   end
 
-  describe 'el médico que da de alta a un paciente lo atiende' do
-    it 'lo crea y lo sigue viendo' do
+  # AC (Germán y Javi, 15-oct-2026): «el médico ahora puede [crear pacientes], pero quiero que no
+  # pueda, el alta la da admin». Reemplaza la regla del 6-oct (el médico que daba de alta lo atendía).
+  describe 'el alta de un paciente la da administración, no el médico' do
+    let(:datos) { { paciente: { nombre: 'Nueva', apellido: 'Alta', dni: '30111222', fecha_nacimiento: '1990-01-01' } } }
+
+    it 'el médico no puede crear un paciente, y no queda nada creado' do
       sign_in_as(medico)
-      post '/api/pacientes', params: { paciente: { nombre: 'Nueva', apellido: 'Alta', dni: '30111222',
-                                                   fecha_nacimiento: '1990-01-01' } }, as: :json
+      expect {
+        post '/api/pacientes', params: datos, as: :json
+      }.not_to(change { ActsAsTenant.with_tenant(club) { Paciente.count } })
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'administración lo crea, lo vincula, y el médico lo ve' do
+      sign_in_as(admin)
+      post '/api/pacientes', params: datos, as: :json
       expect(response).to have_http_status(:created)
+      nuevo_id = response.parsed_body.dig('data', 'id') || response.parsed_body['id']
+      post "/api/pacientes/#{nuevo_id}/medicos", params: { medico_id: medico.id }, as: :json
+      expect(response).to have_http_status(:success)
+
+      sign_in_as(medico)
       expect(apellidos('/api/medico/pacientes')).to include('Alta')
     end
   end

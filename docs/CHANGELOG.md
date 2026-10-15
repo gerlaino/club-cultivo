@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (fk) — Entrar a la app: contraseñas, links y el médico sin altas (15-oct)
+
+Lo que salió de la prueba con Javi.
+
+- **«Olvidé mi contraseña»**: el link llegaba a `http://localhost:3001` (el worker no tenía
+  `FRONTEND_URL`). `App.base_url` ignora un localhost en producción y cae a
+  `https://cultivoespacial.com`; `url_app` de los mails sale de ahí (eran dos cuentas). Además, a
+  Germán le llegaron tres mails, uno de una organización eliminada: ahora nunca a organizaciones
+  eliminadas, por usuario de ingreso sólo esa cuenta y, por un mail que comparten varias, UN mail con
+  un botón por organización (`AccesoMailer#restablecer_varias`).
+- **Contraseña regenerada que «no loguea»**: se dibujaba en bloques con guion de adorno y al
+  seleccionarla se copiaban espacios; el único «Copiar» copiaba «Usuario: … Contraseña: …». Ahora va
+  de corrido, con «Copiar usuario», «Copiar contraseña» y «Copiar todo para mandar».
+- **«No tenés acceso a esa sección» un segundo al entrar**: el login respetaba el `?redirect` de la
+  sesión anterior. Si el rol nuevo no puede ver esa página (`puedeEntrar`), va a su inicio.
+- **El médico no da altas de pacientes** (`Paciente::ROLES_CREAN`): sin botón ni modal en «Mis
+  pacientes»; las da administración y lo vincula. Sigue aprobando las de sus vinculados.
+- **Stock · Historial: qué stock es cada uno.** Cada fila dice su código (ST-26-0013), hay un
+  buscador por código, genética o lote, y la fila abre el stock. En el informe de stock, el código
+  lleva al stock (sólo administración). Un stock agotado con merma salía en el informe y no se
+  encontraba en la pantalla: no estaba borrado, la lista no decía cuál era.
+- **Autocultivo: «Iniciar cultivo»** en la puesta en marcha (antes «Abrir el primer lote»); ningún
+  paso del autocultivo habla de lotes.
+
 ## Octubre 2026 (fj) — No se podía subir ningún documento de paciente (15-oct)
 
 Producción: «Subir documento» → «Error en el servidor» (`PG::UniqueViolation` en

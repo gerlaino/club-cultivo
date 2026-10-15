@@ -29,11 +29,10 @@ class Users::PasswordsController < ApplicationController
       return render json: { error: 'Escribí tu usuario o tu mail.' }, status: :unprocessable_entity
     end
 
-    cuentas = User.where('LOWER(email) = ? OR LOWER(email_personal) = ?', usuario, usuario)
-                  .where.not(role: 'paciente').to_a
+    cuentas = cuentas_para(usuario)
     con_mail = cuentas.select { |u| u.email_real.present? }
 
-    ActsAsTenant.without_tenant { con_mail.each { |u| Acceso::EnviarRestablecimiento.call(u) } }
+    ActsAsTenant.without_tenant { Acceso::EnviarRestablecimiento.a_varias(con_mail) }
 
     if cuentas.any? && con_mail.empty?
       render json: { enviado: false, sin_mail: true,
@@ -62,5 +61,19 @@ class Users::PasswordsController < ApplicationController
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  private
+
+  # Qué cuentas recuperar (15-oct-2026, Germán: «llegan repetidos», y uno era de una organización
+  # eliminada). Nunca las de una organización eliminada ni las dadas de baja. Si escribió un USUARIO
+  # DE INGRESO, sólo esa cuenta; si escribió un mail de contacto, todas las que lo tienen (y van
+  # juntas en un solo mail, `EnviarRestablecimiento.a_varias`).
+  def cuentas_para(usuario)
+    vigentes = User.left_joins(:club).where(clubs: { deleted_at: nil }).where.not(role: 'paciente')
+    por_login = vigentes.where('LOWER(users.email) = ?', usuario).to_a
+    return por_login if por_login.any?
+
+    vigentes.where('LOWER(users.email_personal) = ?', usuario).to_a
   end
 end

@@ -4,6 +4,8 @@ require 'rails_helper'
 # plataforma. Pide el link por su usuario de ingreso O por su mail personal —el login puede ser
 # `admin@slug.com`, que nadie recuerda—, el mail sale por la casilla de la plataforma, y el link
 # lleva a la pantalla de la SPA para elegir la nueva.
+RSpec::Matchers.define_negated_matcher :not_have_enqueued_mail, :have_enqueued_mail
+
 RSpec.describe 'Olvidé mi contraseña', type: :request do
   let(:club) { create(:club) }
   let!(:admin) do
@@ -100,6 +102,59 @@ RSpec.describe 'Olvidé mi contraseña', type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(json['errors']).to be_present
+    end
+  end
+
+  # AC (Germán, 15-oct-2026): «llegan repetidos» — pidió por su mail y le llegaron tres, uno de una
+  # organización eliminada. Las organizaciones usan logins inventados: el mail va al de contacto que
+  # cargó la organización para ese usuario.
+  describe 'un mail de contacto que comparten varias cuentas' do
+    let(:otra)       { create(:club) }
+    let(:eliminada)  { create(:club) }
+    let!(:en_otra)   { create(:user, :admin, club: otra, email: "admin@#{otra.slug}.com", email_personal: 'juan@gmail.com') }
+    let!(:de_baja)   { create(:user, :admin, club: eliminada, email: "admin@#{eliminada.slug}.com", email_personal: 'juan@gmail.com') }
+
+    before { eliminada.soft_delete! }
+
+    it 'llega UN solo mail, con un botón por cada organización vigente' do
+      expect {
+        post '/api/password', params: { usuario: 'juan@gmail.com' }, as: :json
+      }.to have_enqueued_mail(AccesoMailer, :restablecer_varias).exactly(:once)
+       .and not_have_enqueued_mail(AccesoMailer, :restablecer_contrasena)
+
+      expect(json['enviado']).to be(true)
+      expect(admin.reload.reset_password_token).to be_present
+      expect(en_otra.reload.reset_password_token).to be_present
+    end
+
+    it 'la organización eliminada no recibe link' do
+      post '/api/password', params: { usuario: 'juan@gmail.com' }, as: :json
+      expect(User.unscoped.find(de_baja.id).reset_password_token).to be_nil
+    end
+
+    it 'si sólo UNA de las cuentas está vigente, sale el mail de una sola cuenta' do
+      otra.soft_delete!
+      expect {
+        post '/api/password', params: { usuario: 'juan@gmail.com' }, as: :json
+      }.to have_enqueued_mail(AccesoMailer, :restablecer_contrasena).exactly(:once)
+       .and not_have_enqueued_mail(AccesoMailer, :restablecer_varias)
+    end
+
+    it 'por el usuario de ingreso, sólo esa cuenta aunque comparta el mail' do
+      expect {
+        post '/api/password', params: { usuario: en_otra.email }, as: :json
+      }.to have_enqueued_mail(AccesoMailer, :restablecer_contrasena).exactly(:once)
+      expect(admin.reload.reset_password_token).to be_nil
+    end
+
+    it 'el mail nombra cada organización con su usuario y su link' do
+      mail = AccesoMailer.restablecer_varias(cuentas: [[admin, 'tok-a'], [en_otra, 'tok-b']])
+      texto = mail.text_part.decoded
+
+      expect(mail.to).to eq(['juan@gmail.com'])
+      expect(texto).to include(club.name, admin.email, '/restablecer?token=tok-a')
+      expect(texto).to include(otra.name, en_otra.email, '/restablecer?token=tok-b')
+      expect(mail.html_part.decoded).to include("Elegir contraseña para #{otra.name}")
     end
   end
 

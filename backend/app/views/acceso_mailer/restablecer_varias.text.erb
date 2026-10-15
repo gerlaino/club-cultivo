@@ -1,0 +1,8 @@
+Hola <%= @nombre.presence || '' %>,
+
+Alguien pidió una contraseña nueva en Cultivo Espacial. Este mail es el de contacto de <%= @cuentas.size %> usuarios. Elegí la contraseña del que quieras recuperar (cada link vale por <%= @horas %> horas):
+<% @cuentas.each do |c| %>
+<%= c[:club]&.name || 'Cultivo Espacial' %> — usuario <%= c[:user].email %>
+<%= c[:link] %>
+<% end %>
+Si no pediste nada, ignorá este mail: nadie puede cambiar una contraseña sin abrir el link.

@@ -88,7 +88,36 @@ RSpec.describe 'App.base_url' do
     expect(App.base_url).to eq('https://cultivoespacial.com')
   end
 
-  it 'sin ninguna de las dos cae a local, no a un dominio inventado' do
+  it 'en desarrollo, sin ninguna de las dos, cae a local' do
     expect(App.base_url).to eq('http://localhost:3001')
+  end
+
+  # Producción, 15-oct-2026: el link de «Olvidé mi contraseña» llegó como
+  # `http://localhost:3001/restablecer?token=…` porque el worker no tenía FRONTEND_URL.
+  describe 'en producción' do
+    before { allow(Rails.env).to receive(:production?).and_return(true) }
+
+    it 'sin ninguna de las dos, va a la dirección pública y nunca a localhost' do
+      expect(App.base_url).to eq('https://cultivoespacial.com')
+    end
+
+    it 'un localhost cargado por error se ignora y usa la otra variable' do
+      ENV['FRONTEND_URL'] = 'http://localhost:5173'
+      ENV['APP_HOST'] = 'cultivoespacial.com'
+      expect(App.base_url).to eq('https://cultivoespacial.com')
+    end
+
+    it 'el link del mail de «Olvidé mi contraseña» lleva a la dirección pública' do
+      club = create(:club)
+      user = create(:user, :admin, club: club, email_personal: 'ana@example.com')
+      mail = AccesoMailer.restablecer_contrasena(user: user, token: 'tok')
+      expect(mail.text_part.decoded).to include('https://cultivoespacial.com/restablecer?token=tok')
+      expect(mail.html_part.decoded).not_to include('localhost')
+    end
+  end
+
+  it 'una barra al final no duplica la barra del link' do
+    ENV['FRONTEND_URL'] = 'https://cultivoespacial.com/'
+    expect(App.base_url).to eq('https://cultivoespacial.com')
   end
 end

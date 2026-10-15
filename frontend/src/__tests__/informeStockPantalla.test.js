@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { useAuthStore } from '../stores/auth'
 
 // AC (Germán, 29-sep): el informe de stock muestra los stocks con su información —propio y
 // externo—, qué hay hoy por unidad (nunca sumado entre unidades), el valor, qué vence y qué no se
@@ -35,8 +37,10 @@ vi.mock('../composables/useInformePdf.js', () => ({
 describe('Informe de stock — pantalla', () => {
   let w
   beforeEach(async () => {
+    setActivePinia(createPinia())
+    useAuthStore().user = { id: 1, role: 'auditor' }
     const { default: Vista } = await import('../views/auditor/InformeStockView.vue')
-    w = mount(Vista, { global: { stubs: { SelectorPeriodo: true, FiltrosInforme: true } } })
+    w = mount(Vista, { global: { stubs: { SelectorPeriodo: true, FiltrosInforme: true, RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } } })
     await new Promise(r => setTimeout(r, 0)); await w.vm.$nextTick()
   })
 
@@ -90,5 +94,18 @@ describe('Informe de stock — pantalla', () => {
 
   it('el valor, y cuántos no tienen costo', () => {
     expect(w.text()).toContain('1 sin costo cargado')
+  })
+
+  // AC (Germán, 15-oct-2026): «hay un stock con merma y queremos revisarlo pero no lo encontramos».
+  it('para administración, el código del stock lleva a ese stock', async () => {
+    useAuthStore().user = { id: 1, role: 'admin' }
+    await w.vm.$nextTick()
+    const link = w.findAll('a').find(a => a.text() === 'ST-26-0024')
+    expect(link.attributes('href')).toBe('/admin/stock/2')
+  })
+
+  it('el auditor ve el código sin link (el detalle es de administración)', () => {
+    expect(w.findAll('a').some(a => a.text() === 'ST-26-0024')).toBe(false)
+    expect(w.text()).toContain('ST-26-0024')
   })
 })

@@ -7,9 +7,7 @@
         <h1 class="mpv__title">Mis Pacientes</h1>
         <p class="mpv__sub">Pacientes con seguimiento médico asignado</p>
       </div>
-      <button class="mpv__btn-primary" @click="openNew">
-        <UserPlus :size="15" :stroke-width="1.75" /> Nuevo Paciente
-      </button>
+      <!-- El médico no da altas: las da administración y lo vincula (Germán y Javi, 15-oct-2026). -->
     </div>
 
     <!-- KPI filtros -->
@@ -58,10 +56,7 @@
     <!-- Empty -->
     <div v-else-if="!pacientes.length" class="mpv__empty">
       <Users :size="40" :stroke-width="1" />
-      <p>{{ search ? 'Sin resultados para tu búsqueda' : filtro !== 'todos' ? 'No hay pacientes en este filtro' : 'No tenés pacientes cargados todavía' }}</p>
-      <button v-if="!search && filtro === 'todos'" class="mpv__btn-primary" @click="openNew">
-        <UserPlus :size="15" /> Agregar primer paciente
-      </button>
+      <p>{{ search ? 'Sin resultados para tu búsqueda' : filtro !== 'todos' ? 'No hay pacientes en este filtro' : 'Todavía no tenés pacientes vinculados. Los da de alta y te los vincula administración.' }}</p>
     </div>
 
     <!-- Lista -->
@@ -140,81 +135,14 @@
       </div>
     </div>
 
-    <!-- Modal: Nuevo Paciente -->
-    <Teleport to="body">
-      <div v-modal="() => showModal = false" v-if="showModal" class="mpv__overlay" @click.self="showModal = false">
-        <div class="mpv__modal">
-          <div class="mpv__modal-header">
-            <h2 class="mpv__modal-title">Nuevo Paciente</h2>
-            <button class="mpv__modal-close" @click="showModal = false"><X :size="18" /></button>
-          </div>
-          <div class="mpv__modal-body">
-            <div v-if="formError" class="mpv__form-error">{{ formError }}</div>
-            <div class="mpv__form-grid">
-              <div class="mpv__form-field" :class="{ 'mpv__form-field--error': formErrors.nombre }">
-                <label>Nombre <span class="mpv__req">*</span></label>
-                <input v-model="form.nombre" type="text" placeholder="Juan" />
-                <span v-if="formErrors.nombre" class="mpv__field-err">{{ formErrors.nombre }}</span>
-              </div>
-              <div class="mpv__form-field" :class="{ 'mpv__form-field--error': formErrors.apellido }">
-                <label>Apellido <span class="mpv__req">*</span></label>
-                <input v-model="form.apellido" type="text" placeholder="García" />
-                <span v-if="formErrors.apellido" class="mpv__field-err">{{ formErrors.apellido }}</span>
-              </div>
-              <div class="mpv__form-field" :class="{ 'mpv__form-field--error': formErrors.dni }">
-                <label>DNI <span class="mpv__req">*</span></label>
-                <input v-model="form.dni" type="text" placeholder="12345678" />
-                <span v-if="formErrors.dni" class="mpv__field-err">{{ formErrors.dni }}</span>
-              </div>
-              <div class="mpv__form-field" :class="{ 'mpv__form-field--error': formErrors.fecha_nacimiento }">
-                <label>Fecha de nacimiento <span class="mpv__req">*</span></label>
-                <AppDatePicker v-model="form.fecha_nacimiento" />
-                <span v-if="formErrors.fecha_nacimiento" class="mpv__field-err">{{ formErrors.fecha_nacimiento }}</span>
-              </div>
-              <div class="mpv__form-field">
-                <label>Email</label>
-                <input v-model="form.email" type="email" placeholder="juan@email.com" />
-              </div>
-              <div class="mpv__form-field">
-                <label>Teléfono</label>
-                <input v-model="form.telefono" type="text" placeholder="+54 9 11 ..." />
-              </div>
-              <div class="mpv__form-field">
-                <label>Nº REPROCANN</label>
-                <input v-model="form.reprocann_numero" type="text" placeholder="Número de registro" />
-              </div>
-              <div class="mpv__form-field">
-                <label>Vencimiento REPROCANN</label>
-                <AppDatePicker v-model="form.reprocann_vencimiento" />
-              </div>
-              <div class="mpv__form-field mpv__form-field--full">
-                <label>Estado REPROCANN</label>
-                <select v-model="form.reprocann_estado">
-                  <option value="sin_registro">Sin registro</option>
-                  <option value="pendiente">Pendiente aprobación</option>
-                  <option value="activo">Vigente</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="mpv__modal-footer">
-            <button class="mpv__btn-ghost" @click="showModal = false">Cancelar</button>
-            <button class="mpv__btn-primary" @click="save" :disabled="store.saving">
-              {{ store.saving ? 'Guardando…' : 'Guardar paciente' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
-import { Search, UserPlus, Users, Trash2, X } from 'lucide-vue-next'
+import { Search, Users, Trash2 } from 'lucide-vue-next'
 import { usePacientesStore } from '../../stores/pacientes.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
@@ -238,52 +166,6 @@ const pagina    = ref(1)
 const loading   = ref(false)
 const search    = ref('')
 const filtro    = ref('todos')
-const showModal = ref(false)
-const formError  = ref(null)
-const formErrors = ref({})
-
-function emptyForm() {
-  return {
-    nombre: '', apellido: '', dni: '', fecha_nacimiento: '',
-    email: '', telefono: '', reprocann_numero: '',
-    reprocann_vencimiento: '', reprocann_estado: 'sin_registro',
-    con_seguimiento_medico: true, es_paciente: true,
-  }
-}
-const form = ref(emptyForm())
-
-function openNew() {
-  form.value      = emptyForm()
-  formErrors.value = {}
-  formError.value  = null
-  showModal.value  = true
-}
-
-function validate() {
-  const e = {}
-  if (!form.value.nombre.trim())    e.nombre = 'Obligatorio'
-  if (!form.value.apellido.trim())  e.apellido = 'Obligatorio'
-  if (!form.value.dni.trim())       e.dni = 'Obligatorio'
-  if (!form.value.fecha_nacimiento) e.fecha_nacimiento = 'Obligatorio'
-  formErrors.value = e
-  return !Object.keys(e).length
-}
-
-async function save() {
-  if (!validate()) return
-  formError.value = null
-  const payload = { ...form.value }
-  Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
-  try {
-    await store.create(payload)
-    await cargar({ reset: true })
-    showModal.value = false
-    toastOk('Paciente creado correctamente')
-  } catch {
-    formError.value = store.error || 'Error al guardar. Verificá los datos.'
-  }
-}
-
 async function openDelete(p) {
   const ok = await confirm({
     title: 'Eliminar paciente',
@@ -547,54 +429,6 @@ onMounted(() => cargar({ reset: true }))
 }
 .mpv__action-btn:hover            { background: var(--c-ink-50); color: var(--c-ink-700); }
 .mpv__action-btn--danger:hover    { background: rgba(220,38,38,.1); color: #dc2626; }
-
-/* Modal */
-.mpv__overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000;
-  display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
-}
-.mpv__modal {
-  background: var(--c-paper); border-radius: var(--r-xl); width: 100%; max-width: 560px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2); display: flex; flex-direction: column;
-  max-height: 90vh; overflow: hidden;
-}
-.mpv__modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--sp-5) var(--sp-6); border-bottom: 1px solid var(--c-ink-100);
-}
-.mpv__modal-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin: 0; }
-.mpv__modal-close {
-  background: none; border: none; color: var(--c-ink-400); cursor: pointer;
-  display: flex; align-items: center; padding: var(--sp-1); border-radius: var(--r-sm);
-}
-.mpv__modal-close:hover { background: var(--c-ink-50); color: var(--c-ink-700); }
-.mpv__modal-body { padding: var(--sp-5) var(--sp-6); overflow-y: auto; flex: 1; }
-.mpv__modal-footer {
-  display: flex; justify-content: flex-end; gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-6); border-top: 1px solid var(--c-ink-100);
-}
-
-/* Formulario */
-.mpv__form-error {
-  background: rgba(220,38,38,.08); border: 1px solid rgba(220,38,38,.2);
-  color: #dc2626; border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
-  font-size: var(--fs-13); margin-bottom: var(--sp-4);
-}
-.mpv__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
-.mpv__form-field { display: flex; flex-direction: column; gap: var(--sp-1); }
-.mpv__form-field--full { grid-column: 1 / -1; }
-.mpv__form-field label { font-size: var(--fs-12); font-weight: 600; color: var(--c-ink-600); }
 .mpv__req { color: #dc2626; }
-.mpv__form-field input,
-.mpv__form-field select {
-  padding: var(--sp-2) var(--sp-3); background: var(--c-bg);
-  border: 1px solid var(--c-ink-200); border-radius: var(--r-md);
-  font-size: var(--fs-14); color: var(--c-ink-800); outline: none;
-  transition: border-color .15s;
-}
-.mpv__form-field input:focus,
-.mpv__form-field select:focus { border-color: #2D8A6B; }
-.mpv__form-field--error input,
-.mpv__form-field--error select { border-color: #dc2626; }
 .mpv__field-err { font-size: var(--fs-11); color: #dc2626; }
 </style>

@@ -8,7 +8,7 @@ export const PERMISSIONS = {
   admin: { all: true },
 
   medico: {
-    socios: ['index', 'show', 'create', 'update'],
+    socios: ['index', 'show', 'update'], // sin 'create': el alta la da administración (15-oct-2026)
     socio_notas: ['index', 'create', 'destroy'],
     indicaciones: ['index', 'show', 'create', 'update'],
     dispensaciones: ['index', 'show'],

@@ -4,7 +4,7 @@ require 'rails_helper'
 #
 # El dispensador y el supervisor pueden cargar la ficha de quien llega —no se manda de vuelta a
 # nadie— pero entra como SOLICITUD: no puede recibir dispensaciones ni reservas hasta que admin
-# o médico la aprueben. Admin y médico aprueban en el mismo acto de crear.
+# o médico la aprueben. El admin aprueba en el mismo acto de crear; el médico no da altas (15-oct-2026).
 RSpec.describe 'Aprobación de pacientes', type: :request do
   let(:club)        { create(:club) }
   let(:admin)       { create(:user, :admin, club: club) }
@@ -26,9 +26,11 @@ RSpec.describe 'Aprobación de pacientes', type: :request do
       expect(alta['aprobado_at']).to be_present
     end
 
-    it 'el médico también' do
+    # 15-oct-2026 (Germán y Javi): el médico ya no da altas; las da administración.
+    it 'el médico no da altas' do
       sign_in_as(medico)
-      expect(alta['aprobado_at']).to be_present
+      alta
+      expect(response).to have_http_status(:forbidden)
     end
 
     it 'el dispensador deja una solicitud pendiente' do

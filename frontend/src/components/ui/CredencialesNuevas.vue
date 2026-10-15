@@ -9,15 +9,22 @@
             <p class="cred__sub">Pasale estos datos. La contraseña no se puede volver a ver.</p>
           </div>
         </div>
+        <!-- Cada dato con su propio «Copiar»: la contraseña se dibujaba en bloques con un guion de
+             adorno y, al seleccionarla a mano, se copiaban espacios; el único botón copiaba
+             «Usuario: … Contraseña: …» junto, que no se puede pegar en el login (15-oct-2026). -->
         <div class="cred__row">
           <span class="cred__lbl">Usuario</span>
-          <code class="cred__val">{{ datos.email }}</code>
+          <code class="cred__val" data-testid="cred-usuario">{{ datos.email }}</code>
+          <button type="button" class="cred__copy" :aria-label="'Copiar usuario'" @click="copiar(datos.email, 'Usuario copiado')">
+            <i class="bi bi-clipboard"></i>
+          </button>
         </div>
         <div class="cred__row">
           <span class="cred__lbl">Contraseña</span>
-          <code class="cred__val cred__val--big cred__pw">
-            <span v-for="(bloque, i) in passwordBloques" :key="i" class="cred__pw-bloque">{{ bloque }}</span>
-          </code>
+          <code class="cred__val cred__val--big" data-testid="cred-password">{{ datos.password_inicial }}</code>
+          <button type="button" class="cred__copy" :aria-label="'Copiar contraseña'" @click="copiar(datos.password_inicial, 'Contraseña copiada')">
+            <i class="bi bi-clipboard"></i>
+          </button>
         </div>
         <!-- Al paciente le llega la contraseña; a alguien del equipo, un link para elegir la
              suya. `mail_con_link` lo dice la pantalla que sabe cuál de los dos es. -->
@@ -33,10 +40,9 @@
         <p v-else class="cred__mail cred__mail--off">
           <i class="bi bi-telephone"></i> Se dicta por teléfono sin equívocos: no lleva ceros ni eles.
         </p>
-        <p class="cred__hint">Los guiones son sólo para leerla agrupada: no van al escribirla.</p>
         <div class="cred__acts">
-          <button class="cred__btn" @click="copiar">
-            <i class="bi bi-clipboard"></i> Copiar
+          <button class="cred__btn" data-testid="cred-copiar-todo" @click="copiar(textoParaMandar, 'Copiado para mandar')">
+            <i class="bi bi-whatsapp"></i> Copiar todo para mandar
           </button>
           <button class="cred__btn cred__btn--primary" @click="cerrar">Listo</button>
         </div>
@@ -60,19 +66,18 @@ const props = defineProps({
 const emit = defineEmits(['cerrar'])
 const toast = useToast()
 
-// El guion entre bloques es sólo visual (se dibuja con CSS ::after, no es texto): agrupa de a 4
-// para que se lea/dicte más fácil, pero no forma parte de la contraseña real — ni al copiarla con
-// el botón ni al seleccionarla a mano queda un guion de más.
-const passwordBloques = computed(() => {
-  const pw = props.datos?.password_inicial || ''
-  return pw.match(/.{1,4}/g) || [pw]
-})
+// Para mandar por WhatsApp: los dos datos con su nombre. Para pegar en el login están los botones
+// de cada uno, que copian SÓLO el dato.
+const textoParaMandar = computed(() =>
+  props.datos ? `Usuario: ${props.datos.email}\nContraseña: ${props.datos.password_inicial}` : '')
 
-async function copiar() {
-  await navigator.clipboard.writeText(
-    `Usuario: ${props.datos.email}\nContraseña: ${props.datos.password_inicial}`
-  )
-  toast.success('Copiado')
+async function copiar(texto, aviso) {
+  try {
+    await navigator.clipboard.writeText(texto)
+    toast.success(aviso)
+  } catch {
+    toast.warning('No se pudo copiar: seleccioná el dato y copialo a mano')
+  }
 }
 
 function cerrar() { emit('cerrar') }
@@ -88,9 +93,9 @@ function cerrar() { emit('cerrar') }
 .cred__row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
 .cred__lbl { font-size: .7rem; color: var(--c-slate-500); width: 82px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 .cred__val { font-family: monospace; font-size: .9rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .65rem; color: var(--c-slate-900); user-select: all; flex: 1; }
-.cred__val--big { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
-.cred__pw { display: inline-flex; }
-.cred__pw-bloque:not(:last-child)::after { content: '-'; opacity: .45; padding: 0 .05em; font-weight: 400; }
+.cred__val--big { font-size: 1.1rem; font-weight: 700; letter-spacing: .08em; }
+.cred__copy { flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--c-slate-200); background: #fff; color: var(--c-slate-700); cursor: pointer; }
+.cred__copy:hover { background: var(--c-slate-50); }
 .cred__mail { font-size: .78rem; color: #15803d; margin: .9rem 0 0; display: flex; align-items: center; gap: .4rem; }
 .cred__mail--off { color: #92400e; }
 .cred__hint { font-size: .72rem; color: var(--c-slate-500); margin: .5rem 0 0; }

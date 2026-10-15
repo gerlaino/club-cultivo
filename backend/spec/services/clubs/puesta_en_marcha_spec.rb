@@ -53,4 +53,15 @@ RSpec.describe Clubs::PuestaEnMarcha do
     create(:user, :dispensador, club: club, visto_at: Time.current)
     expect(pasos[:pasos].find { |p| p[:clave] == 'equipo' }[:hecho]).to be(true)
   end
+
+  # AC (Germán, 14-oct-2026): «cambiaría el abrir primer lote por iniciar cultivo, ya que el lote se
+  # crea solo con la agrupación de plantas».
+  it 'en autocultivo el paso es «Iniciar cultivo» y ningún texto habla de lotes' do
+    personal = create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL)
+    r = ActsAsTenant.with_tenant(personal) { described_class.de(personal) }
+    paso = r[:pasos].find { |p| p[:clave] == 'lotes' }
+
+    expect(paso).to include(label: 'Iniciar cultivo', ruta: '/mi-cultivo')
+    expect(r[:pasos].map { |p| "#{p[:label]} #{p[:detalle]}" }.join(' ')).not_to match(/lote/i)
+  end
 end

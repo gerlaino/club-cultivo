@@ -52,12 +52,18 @@ module App
   # `https://app.cultivoespacial.com` como respaldo: un SUBDOMINIO, cuando la dirección elegida es
   # la raíz. Es el mail donde el paciente recibe su contraseña, así que ese link tiene que llevar
   # a algún lado.
-  def self.base_url
-    frontend = ENV['FRONTEND_URL'].to_s.strip
-    return frontend unless frontend.empty?
+  #
+  # En producción NUNCA localhost (15-oct-2026): el worker, que es el que arma los mails, no tenía
+  # `FRONTEND_URL` y el link de «Olvidé mi contraseña» llevaba a `http://localhost:3001`. Si falta la
+  # variable, o tiene un localhost cargado por error, va la dirección pública.
+  DIRECCION_PUBLICA = 'https://cultivoespacial.com'.freeze
 
-    host = ENV['APP_HOST'].to_s.strip
-    host.empty? ? 'http://localhost:3001' : "https://#{host}"
+  def self.base_url
+    candidatos = [ENV['FRONTEND_URL'].to_s.strip, ENV['APP_HOST'].to_s.strip].reject(&:empty?).map do |v|
+      (v.start_with?('http') ? v : "https://#{v}").chomp('/')
+    end
+    candidatos.reject! { |u| u.match?(%r{\Ahttps?://(localhost|127\.0\.0\.1)(:|/|\z)}) } if Rails.env.production?
+    candidatos.first || (Rails.env.production? ? DIRECCION_PUBLICA : 'http://localhost:3001')
   end
 
   # ── Cuánto dura una sesión ──────────────────────────────────────────────────

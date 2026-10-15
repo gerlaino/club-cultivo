@@ -110,7 +110,11 @@
           <tbody>
             <template v-for="f in data.stocks" :key="f.id">
             <tr>
-              <td class="mono">{{ f.numero || `#${f.id}` }}</td>
+              <td class="mono">
+                <!-- El código lleva al stock (admin): uno con merma se veía acá y no se encontraba (15-oct-2026). -->
+                <RouterLink v-if="puedeAbrirStock" :to="`/admin/stock/${f.id}`" class="inf__stock-link">{{ f.numero || `#${f.id}` }}</RouterLink>
+                <template v-else>{{ f.numero || `#${f.id}` }}</template>
+              </td>
               <td>{{ nombreProducto(f.producto) }} <span class="inf__dias">({{ f.unidad }})</span></td>
               <td>{{ f.genetica || '—' }}</td>
               <td><span class="inf__badge" :class="{ 'inf__badge--ext': f.origen === 'externo' }">{{ nombreOrigen(f.origen) }}</span> {{ f.de_donde || '—' }}</td>
@@ -173,7 +177,11 @@
           <thead><tr><th>Stock</th><th>Producto</th><th>Genética</th><th class="num">Queda</th><th>Vence</th></tr></thead>
           <tbody>
             <tr v-for="f in data.vencen" :key="f.id">
-              <td class="mono">{{ f.numero || `#${f.id}` }}</td>
+              <td class="mono">
+                <!-- El código lleva al stock (admin): uno con merma se veía acá y no se encontraba (15-oct-2026). -->
+                <RouterLink v-if="puedeAbrirStock" :to="`/admin/stock/${f.id}`" class="inf__stock-link">{{ f.numero || `#${f.id}` }}</RouterLink>
+                <template v-else>{{ f.numero || `#${f.id}` }}</template>
+              </td>
               <td>{{ nombreProducto(f.producto) }}</td>
               <td>{{ f.genetica || '—' }}</td>
               <td class="num">{{ cant(f.queda, f.unidad) }}</td>
@@ -197,7 +205,11 @@
           <thead><tr><th>Stock</th><th>Producto</th><th>Genética</th><th>Sede</th><th class="num">Queda</th><th>Última salida</th><th class="num">Días quieto</th></tr></thead>
           <tbody>
             <tr v-for="f in data.sin_movimiento" :key="f.id">
-              <td class="mono">{{ f.numero || `#${f.id}` }}</td>
+              <td class="mono">
+                <!-- El código lleva al stock (admin): uno con merma se veía acá y no se encontraba (15-oct-2026). -->
+                <RouterLink v-if="puedeAbrirStock" :to="`/admin/stock/${f.id}`" class="inf__stock-link">{{ f.numero || `#${f.id}` }}</RouterLink>
+                <template v-else>{{ f.numero || `#${f.id}` }}</template>
+              </td>
               <td>{{ nombreProducto(f.producto) }}</td>
               <td>{{ f.genetica || '—' }}</td>
               <td>{{ f.sede || '—' }}</td>
@@ -221,9 +233,12 @@ import { useInformePdf } from '../../composables/useInformePdf.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 import { formatFechaCorta } from '../../utils/dates.js'
+import { useAuthStore } from '../../stores/auth'
 
 // Los stocks con su información (Germán, 29-sep-2026). El cálculo vive en `Informes::Inventario`;
 // acá sólo se muestra. Los MISMOS parámetros para la pantalla y la descarga: período + filtros.
+// El detalle del stock es de administración; el auditor ve el informe sin link.
+const puedeAbrirStock = computed(() => useAuthStore().user?.role === 'admin')
 const { exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_stock')
 const periodo = ref({ periodo: 'mes_actual' })
 const filtros = ref({})
@@ -318,4 +333,5 @@ onMounted(cargar)
   .inf__table { display: block; overflow-x: auto; }
   .inf__table th, .inf__table td { white-space: nowrap; }
 }
+.inf__stock-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 </style>

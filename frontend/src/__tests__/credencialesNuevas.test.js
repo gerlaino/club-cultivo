@@ -29,18 +29,57 @@ describe('Credenciales de un alta', () => {
     w.unmount()
   })
 
-  it('copia las dos cosas juntas, no sólo la contraseña', async () => {
+  it('«Copiar todo» lleva las dos cosas juntas, para mandarlas', async () => {
     const escrito = vi.fn().mockResolvedValue()
     Object.assign(navigator, { clipboard: { writeText: escrito } })
     const w = montar({ datos })
 
     // El contenido va en un `<Teleport to="body">`, así que no está en el árbol del wrapper.
-    document.querySelector('.cred__btn').click()
+    document.querySelector('[data-testid="cred-copiar-todo"]').click()
     await Promise.resolve()
 
     expect(escrito).toHaveBeenCalledWith(expect.stringContaining('ana.diaz@mi-organizacion.paciente'))
     expect(escrito).toHaveBeenCalledWith(expect.stringContaining('frut-mesa-4728'))
     w.unmount()
+  })
+
+  // AC (Javi y Germán, 15-oct-2026): «regenerar contraseña desde Equipo no loguea… al copiar se
+  // copian los guiones como si fueran espacios en blanco».
+  describe('la contraseña se puede pegar tal cual en el login', () => {
+    const generada = { nombre: 'Leo', email: 'leo@org.com', password_inicial: 'abcdEFGH2345' }
+
+    it('«Copiar contraseña» copia SÓLO la contraseña, sin espacios ni guiones', async () => {
+      const escrito = vi.fn().mockResolvedValue()
+      Object.assign(navigator, { clipboard: { writeText: escrito } })
+      const w = montar({ datos: generada })
+
+      document.querySelector('[aria-label="Copiar contraseña"]').click()
+      await Promise.resolve()
+
+      expect(escrito).toHaveBeenCalledWith('abcdEFGH2345')
+      w.unmount()
+    })
+
+    it('«Copiar usuario» copia SÓLO el usuario', async () => {
+      const escrito = vi.fn().mockResolvedValue()
+      Object.assign(navigator, { clipboard: { writeText: escrito } })
+      const w = montar({ datos: generada })
+
+      document.querySelector('[aria-label="Copiar usuario"]').click()
+      await Promise.resolve()
+
+      expect(escrito).toHaveBeenCalledWith('leo@org.com')
+      w.unmount()
+    })
+
+    it('se muestra de corrido: seleccionarla a mano no agrega nada', () => {
+      const w = montar({ datos: generada })
+      const pw = document.querySelector('[data-testid="cred-password"]')
+
+      expect(pw.textContent).toBe('abcdEFGH2345')
+      expect(pw.children.length).toBe(0)
+      w.unmount()
+    })
   })
 
   it('avisa cuando el mail no salió, para que el admin sepa que las tiene que pasar él', () => {

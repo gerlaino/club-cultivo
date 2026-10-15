@@ -14,7 +14,7 @@ const clubFetch  = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('../stores/club.js', () => ({ useClubStore: () => ({ fetch: clubFetch }) }))
 vi.mock('../composables/usePlan.js', () => ({ usePlan: () => ({ planData: { value: null } }) }))
-vi.mock('../router', () => ({ default: { push: routerPush } }))
+vi.mock('../router', () => ({ default: { push: routerPush }, puedeEntrar: () => true }))
 
 const { useAuthStore } = await import('../stores/auth')
 

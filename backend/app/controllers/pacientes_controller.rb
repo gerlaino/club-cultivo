@@ -297,11 +297,7 @@ class PacientesController < ApplicationController
     paciente.created_by = current_user
     paciente.updated_by = current_user
 
-    if current_user.dispensador?
-      paciente.con_seguimiento_medico = false
-    elsif current_user.medico?
-      paciente.con_seguimiento_medico = true
-    end
+    paciente.con_seguimiento_medico = false if current_user.dispensador?
 
     # Quien puede aprobar, aprueba en el mismo acto: para admin y médico dar de alta ES admitir,
     # y pedirles un segundo click sobre su propia alta sería burocracia sin sentido. El
@@ -314,8 +310,6 @@ class PacientesController < ApplicationController
     end
 
     if paciente.save
-      # El médico que lo da de alta lo atiende: si no, lo crearía y dejaría de verlo (6-oct-2026).
-      MedicoPaciente.vincular!(medico: current_user, paciente: paciente, por: current_user) if current_user.medico?
       # La «dirección de entrega distinta» del alta es la primera dirección guardada (con su
       # nombre y por defecto). Las columnas `envio_*` de `pacientes` ya no se escriben.
       guardar_direccion_de_entrega!(paciente)

@@ -118,7 +118,9 @@ class Paciente < ApplicationRecord
   # Quiénes pueden CREAR (queda pendiente si no puede aprobar) y quiénes APROBAR.
   # El supervisor puede crear igual que el dispensador: los dos atienden el mostrador, y que uno
   # pudiera y el otro no era una incoherencia, no una regla.
-  ROLES_CREAN   = %w[admin medico supervisor dispensador].freeze
+  # El médico NO da altas (Germán y Javi, 15-oct-2026): las da administración y lo vincula. Sigue
+  # aprobando las altas de sus pacientes vinculados (`ROLES_APRUEBAN`).
+  ROLES_CREAN   = %w[admin supervisor dispensador].freeze
   ROLES_APRUEBAN = %w[admin medico].freeze
 
   # Un alta nace APROBADA salvo que venga del mostrador. La excepción es el mostrador, no la

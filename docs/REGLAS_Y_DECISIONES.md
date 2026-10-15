@@ -576,7 +576,8 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   todo controller que busca un paciente para alguien que puede ser médico usa `pacientes_visibles`
   (nunca `club.pacientes`): lista, ficha, timeline, indicaciones, documentos, notas, turnos,
   check-ins, CSV. Administración vincula y desvincula desde la ficha; **dar un turno vincula
-  directo**; el médico que da de alta a un paciente queda vinculado. El médico sólo aprueba altas
+  directo**. **El médico NO da altas** (15-oct-2026, Germán y Javi; reemplaza «el médico que da de alta
+  queda vinculado»): las da administración y lo vincula. El médico sólo aprueba altas
   de pacientes vinculados a él. La migración vinculó a cada médico con los pacientes con los que ya
   tenía un turno o una indicación.
 - **TURNO DADO POR ADMINISTRACIÓN: AVISO Y «LO VI»** (6-oct-2026, Javi): al darle, moverle o
@@ -1767,6 +1768,14 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
   dije»). La pantalla lo avisa en una línea («Vege no se descuenta: falta…») y el editor queda
   detrás de «Poner cantidad»; nunca un formulario que parezca obligatorio. La dosis de etiqueta la
   carga la persona copiada de SU producto: la app sigue sin recomendar marcas ni ml (`Nutricion::Guia`).
+- **Recuperar la contraseña no manda repetidos ni a organizaciones eliminadas** (15-oct-2026):
+  por el usuario de ingreso, sólo esa cuenta; por un mail de contacto que comparten varias, UN mail
+  con un botón por organización (`Acceso::EnviarRestablecimiento.a_varias`). Los links salen de
+  `App.base_url`, que en producción nunca es localhost.
+- **Una contraseña generada se muestra de corrido y cada dato tiene su «Copiar»**: nada de
+  guiones de adorno (al seleccionarla se copiaban espacios y no entraba).
+- **Al entrar, el destino guardado de la sesión anterior se ignora si el rol nuevo no lo puede ver**
+  (`puedeEntrar` del router): si no, asomaba «No tenés acceso» un segundo.
 - **En un registro sólo entra lo del cultivo** (14-oct-2026, Germán: «puso reggaetón cuando jamás
   usé esa palabra»). El dictado es un micrófono abierto: música, charla de fondo y palabras mal
   transcriptas son ruido y no van a ningún campo. La IA los devuelve en `descartado` y la pantalla

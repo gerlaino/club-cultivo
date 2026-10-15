@@ -27,14 +27,21 @@ module Clubs
       if @club.suite?('cultivo')
         pasos << paso('salas', @club.personal? ? 'Crear un espacio de cultivo' : 'Crear una sala de cultivo',
                       @club.salas.count.positive?,
-                      @club.personal? ? 'Sin espacio no hay dónde poner un lote.' : 'Sin sala no hay dónde poner un lote.', '/salas')
+                      @club.personal? ? 'Sin espacio no hay dónde poner las plantas.' : 'Sin sala no hay dónde poner un lote.', '/salas')
         # Sin una variedad propia y disponible el alta del lote ofrece «Sin genéticas disponibles»
         # y ahí se trababa la puesta en marcha (Germán, 20-sep-2026). Las del catálogo INASE son
         # de consulta: nacen no disponibles y son de todos, no se prenden por organización.
         pasos << paso('geneticas', 'Cargar una variedad', @club.geneticas.activas.disponibles.exists?,
-                      'Con nombre y, si la sabés, su genética. Sin una variedad disponible no se abre un lote.', '/geneticas')
-        pasos << paso('lotes', 'Abrir el primer lote', @club.lotes.count.positive?,
-                      'Con el lote arrancan las tareas, las fases y la trazabilidad.', '/lotes')
+                      "Con nombre y, si la sabés, su genética. Sin una variedad disponible no se #{@club.personal? ? 'planta' : 'abre un lote'}.", '/geneticas')
+        # En autocultivo no se abre un lote: se ponen plantas y el lote se arma solo por debajo
+        # (`Lotes::Plantar`). La palabra no existe para quien cultiva en casa (Germán, 14-oct-2026).
+        pasos << if @club.personal?
+                   paso('lotes', 'Iniciar cultivo', @club.lotes.count.positive?,
+                        'Poné tus primeras plantas: las fases y las tareas arrancan solas.', '/mi-cultivo')
+                 else
+                   paso('lotes', 'Abrir el primer lote', @club.lotes.count.positive?,
+                        'Con el lote arrancan las tareas, las fases y la trazabilidad.', '/lotes')
+                 end
       end
 
       if @club.suite?('produccion_dispensa')

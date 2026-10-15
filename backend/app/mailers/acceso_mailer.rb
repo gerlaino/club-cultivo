@@ -12,6 +12,17 @@ class AccesoMailer < ApplicationMailer
     mail(to: user.email_real, subject: 'Elegí una contraseña nueva — Cultivo Espacial')
   end
 
+  # La misma casilla es el mail de contacto de varias cuentas (una por organización): UN mail con
+  # un botón por cuenta. `cuentas`: [[user, token], …], todas con el mismo `email_real`.
+  def restablecer_varias(cuentas:)
+    @cuentas = cuentas.map do |user, token|
+      { user: user, club: user.club, link: "#{App.base_url}/restablecer?token=#{token}" }
+    end
+    @nombre = cuentas.first.first.first_name
+    @horas  = (Devise.reset_password_within / 1.hour).to_i
+    mail(to: cuentas.first.first.email_real, subject: 'Elegí una contraseña nueva — Cultivo Espacial')
+  end
+
   # Aviso de que la contraseña cambió. Como el perfil ya no pide la actual para cambiarla, esto es
   # lo que le avisa al dueño si no fue él (y le dice cómo recuperarla).
   def contrasena_cambiada(user:)

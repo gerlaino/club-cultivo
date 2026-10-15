@@ -44,16 +44,15 @@ RSpec.describe 'Ola 5 — con_seguimiento_medico', type: :request do
     end
   end
 
-  # ── Médico crea paciente → con_seguimiento_medico=true ──────
+  # ── El médico no da altas (15-oct-2026: las da administración) ──────
   context 'médico POST /pacientes' do
     before { sign_in_as(medico) }
 
-    it 'crea paciente con con_seguimiento_medico=true' do
+    it 'no puede crear un paciente' do
       post '/pacientes',
            params: { paciente: { nombre: 'Mario', apellido: 'Perez', dni: '22111333', fecha_nacimiento: '1985-06-15' } },
            headers: auth_headers, as: :json
-      expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)['data']['con_seguimiento_medico']).to be true
+      expect(response).to have_http_status(:forbidden)
     end
   end
 

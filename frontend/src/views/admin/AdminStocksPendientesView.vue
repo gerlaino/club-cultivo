@@ -187,6 +187,10 @@
               class="stk__chip-btn" :class="{ 'stk__chip-btn--active': filtroEstado === f.value }"
               @click="filtroEstado = f.value"
             >{{ f.label }}</button>
+            <!-- Buscar por código (ST-26-0013), genética o lote: el historial no decía qué stock era
+                 cada fila y uno con merma no se encontraba (15-oct-2026). -->
+            <input v-model.trim="busquedaHistorial" type="search" class="stk__input stk__hist-buscar"
+                   placeholder="Buscar ST-26-…, genética o lote" aria-label="Buscar en el historial" data-testid="hist-buscar" />
           </div>
           <div v-if="!historialFiltrado.length" class="stk__empty">
             <i class="bi bi-archive stk__empty-ico" aria-hidden="true"></i>
@@ -200,12 +204,12 @@
               <span class="stk__hist-col stk__hist-col--cant">Cant.</span>
               <span class="stk__hist-col stk__hist-col--fecha">Fecha</span>
             </div>
-            <div v-for="s in historialFiltrado" :key="s.id" class="stk__hist-row">
+            <RouterLink v-for="s in historialFiltrado" :key="s.id" :to="`/admin/stock/${s.id}`" class="stk__hist-row" data-testid="hist-fila">
               <div class="stk__hist-col stk__hist-col--estado">
                 <span class="stk__badge" :class="`stk__badge--${s.estado}`">{{ estadoLabel(s.estado) }}</span>
               </div>
               <div class="stk__hist-col stk__hist-col--producto">
-                <span class="stk__hist-forma">{{ formaLabel(s.forma_producto) }}</span>
+                <span class="stk__hist-forma"><span class="stk__hist-codigo">{{ s.numero_lote_producto || `#${s.id}` }}</span> · {{ formaLabel(s.forma_producto) }}</span>
                 <div class="stk__hist-chips">
                   <span v-if="s.lote" class="stk__chip stk__chip--lote stk__chip--xs">{{ s.lote.codigo }}</span>
                   <span v-if="s.lote?.genetica || s.genetica" class="stk__chip stk__chip--gen stk__chip--xs">
@@ -224,7 +228,7 @@
               <div class="stk__hist-col stk__hist-col--fecha">
                 <span class="stk__hist-fecha">{{ formatDate(s.created_at) }}</span>
               </div>
-            </div>
+            </RouterLink>
           </div>
         </template>
       </div>
@@ -918,11 +922,15 @@ const FILTROS_ESTADO = [
   { value: 'pendiente_asignacion', label: 'Por asignar' },
   { value: 'agotado',              label: 'Agotados' },
 ]
-const historialFiltrado = computed(() =>
-  filtroEstado.value === 'todos'
-    ? historial.value
-    : historial.value.filter(s => s.estado === filtroEstado.value)
-)
+const busquedaHistorial = ref('')
+const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const historialFiltrado = computed(() => {
+  const q = sinTildes(busquedaHistorial.value)
+  return historial.value
+    .filter(s => filtroEstado.value === 'todos' || s.estado === filtroEstado.value)
+    .filter(s => !q || [s.numero_lote_producto, `#${s.id}`, s.lote?.codigo, s.lote_codigo, s.lote?.genetica?.nombre, s.genetica?.nombre, s.genetica_nombre]
+      .some(v => sinTildes(v).includes(q)))
+})
 
 // ── Load ───────────────────────────────────────────────────────────────────────
 onMounted(async () => {
@@ -1600,6 +1608,10 @@ function formatDate(dateStr) {
   display: flex; align-items: center; gap: .5rem;
   padding: .5rem 1rem; background: var(--c-slate-50); border-bottom: 1px solid var(--c-slate-200);
 }
+.stk__hist-codigo { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 700; color: var(--c-slate-900); }
+.stk__hist-buscar { margin-left: auto; max-width: 260px; }
+a.stk__hist-row { color: inherit; text-decoration: none; cursor: pointer; }
+a.stk__hist-row:hover { background: var(--c-slate-50); }
 .stk__hist-row {
   display: flex; align-items: center; gap: .5rem;
   padding: .65rem 1rem; border-bottom: 1px solid var(--c-slate-100);
