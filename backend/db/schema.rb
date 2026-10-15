@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_13_140000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1827,7 +1827,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_13_140000) do
     t.index ["created_by_id"], name: "index_patient_documents_on_created_by_id"
     t.index ["deleted_at"], name: "index_patient_documents_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_patient_documents_on_deleted_by_id"
-    t.index ["hash_documento"], name: "index_patient_documents_on_hash_documento", unique: true, where: "(hash_documento IS NOT NULL)"
+    t.index ["hash_documento"], name: "index_patient_documents_on_hash_documento"
     t.index ["paciente_id"], name: "index_patient_documents_on_paciente_id"
     t.index ["template_id"], name: "index_patient_documents_on_template_id"
   end

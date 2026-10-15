@@ -62,8 +62,24 @@ class PatientDocument < ApplicationRecord
 
   private
 
+  # La huella de LO QUE ES el documento: el archivo si se subió uno, el texto si se escribió. Sobre
+  # el texto, un archivo daba siempre la huella de «(documento adjunto)» (15-oct-2026).
   def calcular_hash
-    return unless contenido_html.present?
-    self.hash_documento = Digest::SHA256.hexdigest(contenido_html)
+    bytes = archivo_subido_bytes
+    if bytes
+      self.hash_documento = Digest::SHA256.hexdigest(bytes)
+    elsif contenido_html.present?
+      self.hash_documento = Digest::SHA256.hexdigest(contenido_html)
+    end
+  end
+
+  # El archivo recién adjuntado, antes de subirse al almacenamiento (todavía no se puede descargar).
+  def archivo_subido_bytes
+    adjunto = attachment_changes['archivo_pdf']&.attachable
+    io = adjunto.is_a?(Hash) ? adjunto[:io] : adjunto
+    return nil unless io.respond_to?(:read) && io.respond_to?(:rewind)
+
+    io.rewind
+    io.read.tap { io.rewind }
   end
 end

@@ -1,5 +1,20 @@
 # Changelog
 
+## Octubre 2026 (fj) — No se podía subir ningún documento de paciente (15-oct)
+
+Producción: «Subir documento» → «Error en el servidor» (`PG::UniqueViolation` en
+`index_patient_documents_on_hash_documento`). La huella del documento se calculaba sobre el texto y
+todo archivo subido tiene el mismo, «(documento adjunto)»: el primer archivo de la plataforma se
+guardó y todos los siguientes, de cualquier organización y tipo, chocaban con el índice único.
+
+- La huella se calcula sobre el ARCHIVO cuando hay uno (`PatientDocument#calcular_hash`); un
+  documento escrito sigue usando su texto.
+- Migración `HuellaDeDocumentoNoUnica`: el índice deja de ser único (el mismo PDF se sube a dos
+  pacientes, o se vuelve a subir después de borrarlo). La huella prueba que un documento no cambió;
+  no lo identifica.
+- `spec/requests/patient_documents_huella_spec.rb`: varios archivos seguidos, el mismo a dos
+  pacientes, volver a subir después de borrar. Antes ningún spec subía un segundo archivo.
+
 ## Octubre 2026 (fi) — Dictado: lo dicho se guarda, el ruido no entra, el espacio no es «sala» (14-oct)
 
 Germán, desde el autocultivo: la tarjeta decía «Registro ambiental · toda la sala», al dictar
