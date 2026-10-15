@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (fm) — Informe de stock: los 145,7 g que «no cerraban» (15-oct)
+
+Mitocondria: ST-26-0009, 0010 y 0011 (46,5 + 48,5 + 50,7 = 145,7) figuraban «ingresó, no salió,
+quedaba 0». Javi cargó la historia el 1-sep: los stocks con alta ese día y sus dispensas con su
+fecha real, anterior. El informe contaba el ingreso por el alta y lo dispensado por la fecha de la
+dispensa. No faltaba mercadería.
+
+- `Informes::Inventario`: un stock ENTRA el día que empezó a salir si eso fue antes de su alta
+  (`entrada` = la más temprana entre el alta y la primera dispensa). En el período de las
+  dispensas ingresa y sale, y cierra; en el del alta ya no aparece como ingreso sin salida.
+- No se agregó aviso en la dispensa: cargar con fecha anterior al alta es legítimo, y lo que no
+  puede pasar (fecha anterior a la ELABORACIÓN) ya lo rechaza `Dispensacion#fecha_no_anterior_al_producto`.
+- Lo del derivado eliminado sin movimiento (fl) queda como candidato aparte; no era esto.
+
 ## Octubre 2026 (fl) — Stock: el historial muestra los eliminados y los cerrados (15-oct)
 
 Germán: «quiero poder ver los eliminados en historial y los agotados y poder diferenciar» — el

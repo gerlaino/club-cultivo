@@ -77,6 +77,39 @@ RSpec.describe Informes::Inventario do
       expect(cierra?(f)).to be(true)
     end
 
+    # AC (Germán y Javi, 15-oct-2026, Mitocondria: 145,7 g que «no cierran»): la historia se cargó
+    # el 1-sep — los stocks con alta ese día y sus dispensas con su fecha real, anterior. El informe
+    # decía «ingresó 46,5, dispensado 0, quedaba 0». El stock entra el día que empezó a salir.
+    describe 'historia cargada después: dispensas con fecha anterior al alta del stock' do
+      let(:mes_pasado) { 1.month.ago.to_date }
+      let!(:frasco) do
+        externo!(cantidad: 46.5).tap do |e|
+          dispensar(e, 30, fecha: mes_pasado.beginning_of_month + 5)
+          dispensar(e, 16.5, fecha: mes_pasado.beginning_of_month + 9)
+        end
+      end
+
+      def del_mes_pasado = described_class.new(club: club, desde: mes_pasado.beginning_of_month, hasta: mes_pasado.end_of_month).call
+
+      it 'el período de las dispensas lo muestra entrando y saliendo, y cierra' do
+        f = fila(del_mes_pasado, frasco.reload)
+        expect(f).to include(habia: 0.0, ingreso: 46.5, dispensado: 46.5, quedaba: 0.0)
+        expect(f[:descuadre]).to be_nil
+        expect(cierra?(f)).to be(true)
+      end
+
+      it 'el período del alta no lo cuenta como ingreso sin salida' do
+        f = fila(informe, frasco.reload)
+        expect(f).to be_nil
+      end
+
+      it 'un stock con alta y dispensas en el mismo período sigue igual' do
+        p = propio!(cantidad: 100)
+        dispensar(p, 30)
+        expect(fila(informe, p.reload)).to include(habia: 0.0, ingreso: 100.0, quedaba: 70.0)
+      end
+    end
+
     it 'los ajustes se pueden ver uno por uno: cuándo, cuánto, quién y por qué' do
       e = externo!(cantidad: 50)
       ajuste!(e, 12, notas: 'Apareció un frasco en la heladera')

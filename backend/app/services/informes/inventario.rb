@@ -27,6 +27,11 @@ module Informes
   #     período (el de hoy, deshaciendo lo que pasó después) y «Había» sale de la cuenta. Un stock
   #     que nació en el período había 0: si con eso no cierra, la fila lo dice (`descuadre`) en vez
   #     de esconderlo en «Había».
+  #   · UN STOCK ENTRA EL DÍA QUE EMPEZÓ A SALIR, si eso fue antes de su alta (15-oct-2026,
+  #     Mitocondria: 145,7 g «sin explicar»). Al cargar historia, el stock se da de alta hoy y sus
+  #     dispensas llevan su fecha real, anterior: el período del alta decía «ingresó 46,5,
+  #     dispensado 0, quedaba 0» y el de las dispensas, que salió lo que no había entrado. La fecha
+  #     de entrada es la más temprana entre el alta y la primera dispensa.
   class Inventario
     DIAS_SIN_MOVIMIENTO = 30
     DIAS_VENCE_PRONTO   = 30
@@ -73,7 +78,7 @@ module Informes
 
       activos = movimientos_periodo.keys + dispensado_periodo.keys
       rel = base.where('stocks.cantidad > 0')
-                .or(base.where(created_at: rango_tiempo))
+                .or(base.where(created_at: rango_tiempo).where.not(id: entraron_antes))
                 .or(base.where(id: activos.uniq))
       rel = rel.where('stocks.cantidad > 0') if @filtros.saldo == 'con_saldo'
       rel = rel.where('stocks.cantidad <= 0') if @filtros.saldo == 'agotados'
@@ -89,7 +94,7 @@ module Informes
 
     def fila(s)
       movs      = movimientos_periodo[s.id] || []
-      nacio_aca = rango_tiempo.cover?(s.created_at)
+      nacio_aca = (@desde.to_date..@hasta.to_date).cover?(entrada(s))
       ingreso   = if nacio_aca
                     s.cantidad_inicial.to_d
                   else
@@ -151,6 +156,27 @@ module Informes
         valor_costo:  costo  ? (queda * costo).round(2).to_f  : nil,
         valor_venta:  precio ? (queda * precio).round(2).to_f : nil,
       }
+    end
+
+    # El día en que el stock entró: su alta o, si se dispensó antes (historia cargada después), la
+    # primera dispensa.
+    def entrada(s) = [s.created_at.to_date, primera_dispensa[s.id]].compact.min
+
+    # Los dados de alta en el período que en realidad entraron antes: en este período no nacieron.
+    def entraron_antes
+      primera_dispensa.select { |_, f| f < @desde.to_date }.keys
+    end
+
+    def primera_dispensa
+      @primera_dispensa ||= begin
+        del_club = ::Stock.where(club_id: @club.id).select(:id)
+        items  = DispensacionItem.joins(:dispensacion).merge(Dispensacion.no_canceladas)
+                                 .where(stock_id: del_club)
+                                 .group(:stock_id).minimum('dispensaciones.fecha_dispensacion')
+        viejas = Dispensacion.no_canceladas.where(stock_id: del_club).where.missing(:items)
+                             .group(:stock_id).minimum(:fecha_dispensacion)
+        items.merge(viejas) { |_, x, y| [x, y].compact.min }
+      end
     end
 
     # Los movimientos del período que no son dispensa (la dispensa se cuenta por línea), por stock.
