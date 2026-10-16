@@ -98,7 +98,7 @@ module Informes
       ingreso   = if nacio_aca
                     s.cantidad_inicial.to_d
                   else
-                    movs.select { |m| %w[produccion transferencia].include?(m.tipo) && m.gramos.positive? }.sum(&:gramos).to_d
+                    movs.select { |m| entrada_por_produccion?(m) }.sum(&:gramos).to_d
                   end
       # La mercadería que llegó a un stock externo ya existente NO está en el inicial: se suma
       # siempre, haya nacido el stock en el período o antes.
@@ -107,7 +107,8 @@ module Informes
       merma      = movs.select { |m| m.tipo == 'merma' }.sum { |m| -m.gramos.to_d }
       # Neto: una devolución (positiva) de un evento resta de las salidas. Lo positivo de producción
       # y traslado ya está en «Ingresó» (o en el inicial de uno nacido acá): no se cuenta dos veces.
-      otras      = movs.select { |m| OTRAS_SALIDAS.include?(m.tipo) && !(%w[produccion transferencia].include?(m.tipo) && m.gramos.positive?) }
+      # Lo que VOLVIÓ de un derivado eliminado también resta de las salidas: deshace una producción.
+      otras      = movs.select { |m| OTRAS_SALIDAS.include?(m.tipo) && !entrada_por_produccion?(m) }
                        .sum { |m| -m.gramos.to_d }
       ajustes    = movs.select { |m| m.tipo == 'ajuste' }.sum { |m| m.gramos.to_d }
       queda        = s.cantidad.to_d
@@ -156,6 +157,12 @@ module Informes
         valor_costo:  costo  ? (queda * costo).round(2).to_f  : nil,
         valor_venta:  precio ? (queda * precio).round(2).to_f : nil,
       }
+    end
+
+    # Positivo de producción o traslado que NO es la vuelta de un derivado eliminado (esa lleva el
+    # derivado en `stock_resultante_id`, como la salida que deshace).
+    def entrada_por_produccion?(m)
+      %w[produccion transferencia].include?(m.tipo) && m.gramos.positive? && m.stock_resultante_id.nil?
     end
 
     # El día en que el stock entró: su alta o, si se dispensó antes (historia cargada después), la

@@ -64,10 +64,9 @@ class MermaMostradorJob < ApplicationJob
   def avisar_por_mail(club, mostrador, semana, anterior)
     return unless club.feature?(:mailer)
 
-    NotificacionesMailer.merma_mostrador(
-      club: club, sede: mostrador.sede&.nombre,
-      pct: semana[:pct], pct_previo: anterior[:pct], ars: semana[:ars]
-    ).deliver_now
+    NotificacionesMailer.a_cada(NotificacionesMailer.admins_de(club), :merma_mostrador,
+                                club: club, sede: mostrador.sede&.nombre,
+                                pct: semana[:pct], pct_previo: anterior[:pct], ars: semana[:ars])
   rescue => e
     Rails.logger.warn "MermaMostradorJob: no se pudo mandar el mail — #{e.message}"
   end

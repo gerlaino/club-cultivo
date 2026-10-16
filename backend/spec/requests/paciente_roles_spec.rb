@@ -39,8 +39,9 @@ RSpec.describe 'Pacientes — role authorization matrix', type: :request do
     context 'medico PATCH con notas_clinicas' do
       it 'persiste correctamente' do
         sign_in_as(medico)
+        # Sólo lo de salud: los datos personales no son del médico (15-oct-2026).
         put "/pacientes/#{paciente.id}",
-            params: { paciente: { notas_clinicas: 'Nota medica', nombre: paciente.nombre, apellido: paciente.apellido, dni: paciente.dni, fecha_nacimiento: paciente.fecha_nacimiento } },
+            params: { paciente: { notas_clinicas: 'Nota medica' } },
             headers: auth_headers, as: :json
         expect(response).to have_http_status(:ok)
         expect(paciente.reload.notas_clinicas).to eq('Nota medica')

@@ -55,6 +55,17 @@ RSpec.describe 'Stock · historial: eliminados, cerrados y agotados', type: :req
     expect(response).to have_http_status(:ok)
   end
 
+  # Germán, 15-oct-2026: «un stock finalizado o agotado no me debería dejar ajustar, repartir…».
+  # La ficha apaga esas acciones con `agotado`, que no llegaba: todos los botones quedaban prendidos.
+  it 'la ficha dice si está agotado, para apagar las acciones' do
+    get "/api/stocks/#{agotado.id}"
+    expect(response.parsed_body['data']).to include('agotado' => true, 'situacion' => 'agotado')
+    get "/api/stocks/#{cerrado.id}"
+    expect(response.parsed_body['data']).to include('agotado' => true, 'situacion' => 'cerrado')
+    get "/api/stocks/#{vivo.id}"
+    expect(response.parsed_body['data']).to include('agotado' => false)
+  end
+
   it 'un eliminado no se puede tocar' do
     post "/api/stocks/#{eliminado.id}/ajuste", params: { gramos: 10, motivo: 'correccion' }, as: :json
     expect(response).to have_http_status(:not_found)

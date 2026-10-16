@@ -37,7 +37,7 @@ class PacientePolicy < ApplicationPolicy
   end
 
   def create?
-    mismo_club? && (admin? || medico? || user&.dispensador?)
+    mismo_club? && Paciente::ROLES_CREAN.include?(user&.role)
   end
 
   def update?

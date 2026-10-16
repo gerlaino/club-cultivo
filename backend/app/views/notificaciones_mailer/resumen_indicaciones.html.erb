@@ -29,7 +29,7 @@
   <div class="wrapper">
     <div class="header">
       <p class="header-title">🩺 Cultivo Espacial — Indicaciones médicas</p>
-      <p class="header-sub"><%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %></p>
+      <p class="header-sub"><%= @club.name %> · <%= Time.zone.today.strftime('%d/%m/%Y') %></p>
     </div>
 
     <div class="body">
@@ -37,53 +37,18 @@
         Hay <strong><%= @total %> indicación<%= @total == 1 ? '' : 'es' %></strong> que requieren atención.
       </p>
 
-      <% if @vencidas.any? %>
-        <p class="section-title"><span class="badge-danger">Vencidas</span></p>
-        <table>
-          <thead>
-            <tr>
-              <th>Paciente</th>
-              <th>Patología</th>
-              <th>Venció</th>
-              <th>Días vencida</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @vencidas.each do |ind| %>
-              <tr>
-                <td><%= ind.paciente.nombre_completo %></td>
-                <td><%= ind.patologia %></td>
-                <td class="danger"><%= ind.fecha_vencimiento.strftime('%d/%m/%Y') %></td>
-                <td class="danger"><%= (Date.today - ind.fecha_vencimiento).to_i %>d</td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% end %>
-
-      <% @por_vencer.each do |dias, lista| %>
-        <% next if lista.empty? %>
-        <p class="section-title"><span class="badge-warning">Vencen en <%= dias %> días</span></p>
-        <table>
-          <thead>
-            <tr>
-              <th>Paciente</th>
-              <th>Patología</th>
-              <th>Vencimiento</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% lista.each do |ind| %>
-              <tr>
-                <td><%= ind.paciente.nombre_completo %></td>
-                <td><%= ind.patologia %></td>
-                <td class="warn"><%= ind.fecha_vencimiento.strftime('%d/%m/%Y') %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% end %>
-
+      <%# SÓLO CUÁNTAS (15-oct-2026): ni nombres ni patologías por mail — son datos de salud. %>
+      <table>
+        <tbody>
+          <% if @vencidas.any? %>
+            <tr><td><span class="badge-danger">Vencidas</span></td><td class="danger"><%= @vencidas.size %></td></tr>
+          <% end %>
+          <% @por_vencer.each do |dias, lista| %>
+            <% next if lista.empty? %>
+            <tr><td><span class="badge-warning">Vencen en <%= dias %> días</span></td><td class="warn"><%= lista.size %></td></tr>
+          <% end %>
+        </tbody>
+      </table>
       <div class="divider"></div>
       <div class="cta">
         <a class="btn" href="<%= url_app('/pacientes') %>">

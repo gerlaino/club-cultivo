@@ -8,7 +8,9 @@ export const PERMISSIONS = {
   admin: { all: true },
 
   medico: {
-    socios: ['index', 'show', 'update'], // sin 'create': el alta la da administración (15-oct-2026)
+    // Sólo la salud (15-oct-2026): ni altas, ni bajas, ni datos personales. REPROCANN e historia
+    // clínica se editan desde la ficha (el backend acepta sólo esos campos del médico).
+    socios: ['index', 'show'],
     socio_notas: ['index', 'create', 'destroy'],
     indicaciones: ['index', 'show', 'create', 'update'],
     dispensaciones: ['index', 'show'],

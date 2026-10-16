@@ -22,13 +22,8 @@ class InformeSemestralJob < ApplicationJob
 
     cada_club_con(:cultivo, :produccion_dispensa) do |club|
       datos = Informes::Semestral.new(club: club, anio: anio, semestre: semestre).call
-      NotificacionesMailer.informe_semestral(
-        club:      club,
-        datos:     datos,
-        modo:      modo.to_sym,
-        anio:      anio,
-        semestre:  semestre
-      ).deliver_now
+      NotificacionesMailer.a_cada(NotificacionesMailer.admins_de(club), :informe_semestral,
+                                  club: club, datos: datos, modo: modo.to_sym, anio: anio, semestre: semestre)
     end
   end
 end

@@ -66,11 +66,9 @@ class IndicacionVencimientoJob < ApplicationJob
     end
 
     if vencidas.any? || por_vencer.values.any?(&:any?)
-      NotificacionesMailer.resumen_indicaciones(
-        club:       club,
-        vencidas:   vencidas,
-        por_vencer: por_vencer
-      ).deliver_now
+      destinatarios = club.users.where(role: %w[admin medico]).where.not(email: nil).to_a
+      NotificacionesMailer.a_cada(destinatarios, :resumen_indicaciones,
+                                  club: club, vencidas: vencidas, por_vencer: por_vencer)
     end
   end
 

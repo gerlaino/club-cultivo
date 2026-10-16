@@ -46,7 +46,10 @@ const error     = ref(null)
 const activeTab = ref(auth.user?.role === 'dispensador' ? 'dispensaciones' : 'info')
 
 const club       = useClubStore()
+// canEdit = lo de SALUD (REPROCANN, historia clínica): admin y médico. Los datos personales, el
+// alta y el portal son de administración: el médico sólo se ocupa de la salud (15-oct-2026).
 const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
+const canEditDatos = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 const s          = computed(() => store.current)
 const edadSocio  = computed(() => s.value ? edad(s.value.fecha_nacimiento) : null)
 
@@ -66,10 +69,10 @@ const canAgendar = computed(() => isAdmin.value || isMedico.value)
 
 // ── Admisión ──────────────────────────────────────────────────────────────────
 // Una ficha cargada en el mostrador existe pero todavía no fue admitida: se puede completar,
-// pero no recibir dispensaciones ni reservas. Aprobar es de admin y médico (lo valida el
+// pero no recibir dispensaciones ni reservas. Aprobar es de administración (lo valida el
 // backend; acá sólo se decide a quién se le muestra el botón).
 const pendienteAprobacion = computed(() => !!s.value && !s.value.aprobado_at)
-const puedeAprobar        = computed(() => isAdmin.value || isMedico.value)
+const puedeAprobar        = computed(() => isAdmin.value)
 const aprobando           = ref(false)
 
 // La bienvenida de un alta de mostrador sale ACÁ, no cuando la cargaron: recién al aprobarla
@@ -472,7 +475,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <RouterLink v-if="s?.carnet_token" :to="`/c/${s.carnet_token}`" target="_blank" class="sd__btn-carnet">
             <CreditCard :size="14" :stroke-width="1.75" /> Carnet
           </RouterLink>
-          <button v-if="canEdit" class="sd__btn-edit" @click="editarOpen = true">
+          <button v-if="canEditDatos" class="sd__btn-edit" @click="editarOpen = true">
             <Pencil :size="14" :stroke-width="1.75" /> Editar
           </button>
         </div>
@@ -905,7 +908,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
     </template>
   </div>
 
-  <SocioEditarModal v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
+  <SocioEditarModal v-if="canEditDatos" v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
 
   <!-- Mini-modal: activar REPROCANN con nueva fecha de vencimiento -->
   <Teleport to="body">

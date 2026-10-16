@@ -37,7 +37,7 @@ class StockBajoJob < ApplicationJob
 
     return if bajos.empty?
 
-    NotificacionesMailer.stock_bajo(club: club, stocks_data: bajos).deliver_now
+    NotificacionesMailer.a_cada(NotificacionesMailer.admins_de(club), :stock_bajo, club: club, stocks_data: bajos)
   end
 
   def alerta_reciente?(club, sede_id)

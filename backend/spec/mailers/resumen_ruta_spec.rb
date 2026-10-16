@@ -25,7 +25,7 @@ RSpec.describe NotificacionesMailer, '#resumen_ruta', type: :mailer do
     Cobro.create!(dispensacion: disp, club: club, created_by: delivery,
                   medio: 'efectivo', monto_ars: 5000, contexto: 'entrega', rendido: false)
 
-    mail = described_class.resumen_ruta(club: club, delivery: delivery,
+    mail = described_class.resumen_ruta(para: admin, club: club, delivery: delivery,
                                         entregados: [disp.reload], fallidos: [], caja_efectivo: 5000)
     cuerpo = mail.body.encoded
     expect(cuerpo).to include('Caja del delivery')
@@ -35,18 +35,28 @@ RSpec.describe NotificacionesMailer, '#resumen_ruta', type: :mailer do
 
   it 'embebe el logo del club en el mail si lo tiene' do
     club.logo.attach(io: StringIO.new('PNGFAKE'), filename: 'logo.png', content_type: 'image/png')
-    mail = described_class.resumen_ruta(club: club, delivery: delivery, entregados: [disp.reload], fallidos: [], caja_efectivo: 0)
+    mail = described_class.resumen_ruta(para: admin, club: club, delivery: delivery, entregados: [disp.reload], fallidos: [], caja_efectivo: 0)
     logo = mail.attachments.find { |a| a.inline? }
     expect(logo).to be_present
     expect(mail.body.encoded).to include('cid:')
   end
 
-  it 'va a TODOS los admins, usando el email personal (real) cuando existe' do
+  # Un mail por destinatario (15-oct-2026): antes iban todos en el mismo `To:`.
+  it 'sale uno por admin, cada uno a su email personal (real) cuando existe' do
     admin.update!(email: 'admin1@login.local', email_personal: 'admin1@gmail.com') # login inventado, personal real
     create(:user, :admin, club: club, email: 'admin2@gmail.com')                   # sin personal → cae al login
+    ActionMailer::Base.deliveries.clear
 
-    mail = described_class.resumen_ruta(club: club, delivery: delivery,
-                                        entregados: [disp.reload], fallidos: [], caja_efectivo: 0)
-    expect(mail.to).to contain_exactly('admin1@gmail.com', 'admin2@gmail.com')
+    described_class.a_cada(described_class.admins_de(club), :resumen_ruta,
+                           club: club, delivery: delivery, entregados: [disp.reload], fallidos: [], caja_efectivo: 0)
+    tos = ActionMailer::Base.deliveries.map(&:to)
+    expect(tos).to contain_exactly(['admin1@gmail.com'], ['admin2@gmail.com'])
+  end
+
+  it 'dice el paquete, no el nombre de quien lo recibió' do
+    cuerpo = described_class.resumen_ruta(para: admin, club: club, delivery: delivery,
+                                          entregados: [disp.reload], fallidos: [], caja_efectivo: 0).body.encoded
+    expect(cuerpo).to include(disp.codigo_paquete.to_s)
+    expect(cuerpo).not_to include(pac.nombre_completo)
   end
 end

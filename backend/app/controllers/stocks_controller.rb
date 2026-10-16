@@ -1034,6 +1034,9 @@ class StocksController < ApplicationController
       club_id:                 s.club_id,
       sede_id:                 s.sede_id,
       estado:                  s.estado,
+      # La ficha deshabilitaba ajustar/repartir/finalizar con `agotado` y nunca llegaba: todos los
+      # botones quedaban prendidos en un stock en cero (15-oct-2026).
+      agotado:                 s.estado == 'agotado',
       # Lo que tiene el frasco ENTERO (depósito + mesa). Al mostrador `cantidad` le llega pisada con
       # lo de la mesa; éste no: es el que dice si una dispensa se lleva lo último del frasco.
       cantidad_frasco:         s.cantidad.to_f,

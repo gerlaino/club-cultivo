@@ -39,19 +39,26 @@ class EliminarStockService
     stock.reload.destroy! # stock_movimientos se borran en cascada
   end
 
-  # Un derivado consumió gramos de un stock de origen. Al borrarlo, devolvemos los gramos Y
-  # quitamos el movimiento de producción del historial del origen (no queda rastro huérfano).
-  # Si el origen también está siendo borrado en esta cascada, es inocuo (se elimina después).
+  # Un derivado consumió gramos de un stock de origen. Al borrarlo, los gramos vuelven al origen
+  # CON SU MOVIMIENTO (15-oct-2026): antes se borraba el de producción y el saldo subía sin una
+  # línea que lo explicara, así que el historial del origen y el informe de stock no cerraban. Lo
+  # que pasó queda escrito: la producción (salió) y la vuelta (entró), las dos con el derivado.
+  # Si el origen también se está borrando en esta cascada, es inocuo (se elimina después).
   def devolver_gramos_al_origen(stock)
     origen = stock.producido_desde_stock
     gramos = stock.lote_origen_consumido_g.to_d
     return unless origen && gramos > 0
 
+    salida = origen.stock_movimientos.where(stock_resultante_id: stock.id).order(:created_at).first
     origen.update!(
       cantidad: origen.cantidad.to_d + gramos,
       estado:   origen.estado == 'agotado' ? 'asignado' : origen.estado,
     )
-    origen.stock_movimientos.where(stock_resultante_id: stock.id).destroy_all
+    origen.stock_movimientos.create!(
+      tipo: salida&.tipo || 'produccion', gramos: gramos, usuario: @usuario, stock_resultante: stock,
+      fecha: Time.zone.today,
+      notas: "Volvieron #{gramos.to_s('F')} g de #{stock.numero_lote_producto} (eliminado)",
+    )
   end
 
   # Valida el stock y, recursivamente, todos sus derivados.

@@ -1,8 +1,6 @@
-CLUB CULTIVO — ALERTA STOCK BAJO
-<%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %>
-================================================
+<%= @club.name %> — Stock bajo · <%= Time.zone.today.strftime('%d/%m/%Y') %>
 
-Los siguientes productos tienen stock por debajo del umbral mínimo (50g):
+Los siguientes productos tienen stock por debajo del mínimo que configuró la organización:
 
 <% @stocks_data.each do |s| %>
 <% next unless s[:alerta] %>

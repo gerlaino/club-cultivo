@@ -5,6 +5,7 @@
     <%= l(Date.current, format: :long) rescue Date.current.strftime('%d/%m/%Y') %>.
   </p>
 
+  <%# Por paquete, sin el nombre de quién lo recibió (15-oct-2026): la ficha está en la app. %>
   <% medio_label = ->(m) { { 'efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'cuenta_corriente' => 'Cuenta corriente' }[m] || m } %>
 
   <% if @caja_efectivo && @caja_efectivo > 0 %>
@@ -18,8 +19,7 @@
     <ul>
       <% @entregados.each do |d| %>
         <li style="margin-bottom: 8px;">
-          <strong><%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %></strong>
-          — paquete <%= d.codigo_paquete %>
+          Paquete <strong><%= d.codigo_paquete %></strong>
           <% pagos = d.cobros.reject { |c| c.monto_ars.to_d <= 0 } %>
           <% if pagos.any? %>
             <br><span style="color: #64748b; font-size: 13px;">
@@ -39,8 +39,7 @@
     <ul>
       <% @fallidos.each do |d| %>
         <li>
-          <strong><%= d.paciente&.nombre_completo.presence || d.contacto_nombre.presence || "Paciente ##{d.paciente_id}" %></strong>
-          — paquete <%= d.codigo_paquete %>
+          Paquete <strong><%= d.codigo_paquete %></strong>
           <% if d.motivo_fallo.present? %><br><span style="color: #64748b;">Motivo: <%= d.motivo_fallo %></span><% end %>
         </li>
       <% end %>

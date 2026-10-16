@@ -72,11 +72,8 @@ class ReprocannVencimientoJob < ApplicationJob
 
     # Enviar email resumen si hay algo que reportar
     if vencidos.any? || por_vencer.values.any?(&:any?)
-      NotificacionesMailer.resumen_reprocann(
-        club:        club,
-        vencidos:    vencidos,
-        por_vencer:  por_vencer
-      ).deliver_now
+      NotificacionesMailer.a_cada(NotificacionesMailer.admins_de(club), :resumen_reprocann,
+                                  club: club, vencidos: vencidos, por_vencer: por_vencer)
     end
   end
 

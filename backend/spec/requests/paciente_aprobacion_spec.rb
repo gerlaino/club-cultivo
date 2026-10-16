@@ -46,11 +46,12 @@ RSpec.describe 'Aprobación de pacientes', type: :request do
       expect(alta['aprobado_at']).to be_nil
     end
 
-    it 'avisa a admin y a médico, que son los que pueden aprobar' do
+    # El médico sólo se ocupa de la salud (15-oct-2026): aprueba administración.
+    it 'avisa a administración, que es quien aprueba' do
       sign_in_as(dispensador)
-      expect { alta }.to change { AlertaInterna.where(tipo: 'paciente_pendiente_aprobacion').count }.by(2)
+      expect { alta }.to change { AlertaInterna.where(tipo: 'paciente_pendiente_aprobacion').count }.by(1)
       expect(AlertaInterna.where(tipo: 'paciente_pendiente_aprobacion').pluck(:destinada_a_role))
-        .to match_array(%w[admin medico])
+        .to match_array(%w[admin])
     end
   end
 
@@ -97,11 +98,12 @@ RSpec.describe 'Aprobación de pacientes', type: :request do
       expect(paciente.aprobado_por_id).to eq(admin.id)
     end
 
-    it 'el médico también puede, si el paciente está vinculado a él' do
+    # Germán, 15-oct-2026: el médico «ni altas ni bajas ni editar, nada, sólo se ocupa de la salud».
+    it 'el médico NO aprueba, aunque el paciente esté vinculado a él' do
       MedicoPaciente.vincular!(medico: medico, paciente: paciente)
       sign_in_as(medico)
       post "/api/pacientes/#{paciente.id}/aprobar"
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:forbidden)
     end
 
     %i[dispensador supervisor].each do |rol|

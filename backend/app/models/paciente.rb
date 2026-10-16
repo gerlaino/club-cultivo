@@ -121,7 +121,15 @@ class Paciente < ApplicationRecord
   # El médico NO da altas (Germán y Javi, 15-oct-2026): las da administración y lo vincula. Sigue
   # aprobando las altas de sus pacientes vinculados (`ROLES_APRUEBAN`).
   ROLES_CREAN   = %w[admin supervisor dispensador].freeze
-  ROLES_APRUEBAN = %w[admin medico].freeze
+  # El médico se ocupa SÓLO de la salud (Germán, 15-oct-2026): «ni altas ni bajas ni editar,
+  # nada». No aprueba altas, no elimina, no toca datos personales ni el acceso al portal.
+  ROLES_APRUEBAN = %w[admin].freeze
+  # Lo que el médico sí puede escribir en la ficha: REPROCANN, seguimiento y la historia clínica.
+  CAMPOS_SALUD = %w[reprocann_numero reprocann_vencimiento reprocann_estado reprocann_vinculo
+                    con_seguimiento_medico notas_clinicas motivo_consulta anamnesis
+                    antecedentes_personales antecedentes_familiares diagnostico_principal
+                    diagnostico_secundario evolucion_clinica alergias medicacion_habitual
+                    grupo_sanguineo].freeze
 
   # Un alta nace APROBADA salvo que venga del mostrador. La excepción es el mostrador, no la
   # regla: las importaciones de padrón, los seeds, la migración de una organización y el alta de

@@ -77,10 +77,10 @@ RSpec.describe 'Ola 5 — con_seguimiento_medico', type: :request do
         post '/pacientes',
              params: { paciente: { nombre: 'Pedro', apellido: 'Gil', dni: '44333222', fecha_nacimiento: '1988-08-10' } },
              headers: auth_headers, as: :json
-      }.to change(AlertaInterna, :count).by(2)
+      }.to change(AlertaInterna, :count).by(1)
 
       alertas = AlertaInterna.where(tipo: 'paciente_pendiente_aprobacion')
-      expect(alertas.pluck(:destinada_a_role)).to match_array(%w[admin medico])
+      expect(alertas.pluck(:destinada_a_role)).to match_array(%w[admin])
       expect(alertas.pluck(:club_id).uniq).to eq([club.id])
     end
   end

@@ -1,5 +1,25 @@
 # Changelog
 
+## Octubre 2026 (fn) — El médico sólo la salud, derivados con rastro, mails con lo justo (15/16-oct)
+
+- **Médico** (Germán: «ni altas ni bajas ni editar, nada, sólo se ocupa de la salud»): no aprueba
+  altas (`ROLES_APRUEBAN = admin`), no elimina, no edita datos personales ni gestiona el portal.
+  `update` le acepta sólo `Paciente::CAMPOS_SALUD`. Sin tachito en «Mis pacientes» ni «Editar» en
+  la ficha. De paso: `update` y `destroy` no tenían chequeo de rol — el dispensador podía eliminar
+  pacientes por API. Ahora eliminar es de administración y editar de administración + médico (salud).
+- **Eliminar un derivado** devuelve los gramos al origen CON un movimiento («Volvieron N g de
+  ST-xx (eliminado)») y la producción queda en el historial. El informe de stock la netea en
+  «Otras salidas» y la trazabilidad la cuenta como entrada.
+- **Historia cargada**: `historia_cargada_cruce_spec` carga como Javi (alta hoy, dispensas
+  atrasadas, una editada dos veces) y cruza saldo del stock, informe de stock e informe de
+  dispensaciones.
+- **Mails**: uno por destinatario (`NotificacionesMailer.a_cada`); REPROCANN e indicaciones
+  dicen cuántos, sin nombres, números de REPROCANN ni patologías; la ruta del delivery por paquete;
+  «CLUB CULTIVO» fuera de los encabezados; el stock bajo ya no dice «50 g» fijo.
+- **Stock agotado**: la ficha apagaba las acciones con `agotado`, que el backend no mandaba — en un
+  stock en cero se podía repartir, finalizar, etc. Ahora llega, y el aviso distingue «finalizado
+  (con motivo)» de «agotado (salió todo)».
+
 ## Octubre 2026 (fm) — Informe de stock: los 145,7 g que «no cerraban» (15-oct)
 
 Mitocondria: ST-26-0009, 0010 y 0011 (46,5 + 48,5 + 50,7 = 145,7) figuraban «ingresó, no salió,

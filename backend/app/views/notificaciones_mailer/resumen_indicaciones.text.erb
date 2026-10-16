@@ -1,21 +1,8 @@
-<%= @club.name %> — Indicaciones médicas
-<%= Date.today.strftime('%d/%m/%Y') %>
+<%= @club.name %> — Indicaciones médicas · <%= Time.zone.today.strftime('%d/%m/%Y') %>
 
 Hay <%= @total %> indicación<%= @total == 1 ? '' : 'es' %> que requieren atención.
-
 <% if @vencidas.any? %>
-VENCIDAS:
-<% @vencidas.each do |ind| %>
-- <%= ind.paciente.nombre_completo %> — <%= ind.patologia %> (venció <%= ind.fecha_vencimiento.strftime('%d/%m/%Y') %>)
+- Vencidas: <%= @vencidas.size %>
+<% end %><% @por_vencer.each do |dias, lista| %><% next if lista.empty? %>- Vencen en <%= dias %> días: <%= lista.size %>
 <% end %>
-<% end %>
-
-<% @por_vencer.each do |dias, lista| %>
-<% next if lista.empty? %>
-VENCEN EN <%= dias %> DÍAS:
-<% lista.each do |ind| %>
-- <%= ind.paciente.nombre_completo %> — <%= ind.patologia %> (<%= ind.fecha_vencimiento.strftime('%d/%m/%Y') %>)
-<% end %>
-<% end %>
-
-Ver en el sistema: <%= url_app('/pacientes') %>
+Cuáles son, en la app: <%= url_app('/pacientes') %>

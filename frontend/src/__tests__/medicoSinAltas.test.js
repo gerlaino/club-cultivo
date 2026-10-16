@@ -29,4 +29,23 @@ describe('el médico no da altas de pacientes', () => {
     expect(can('socios', 'create')).toBe(false)
     expect(can('socios', 'show')).toBe(true)
   })
+
+  // AC (Germán, 15-oct-2026): «ni altas ni bajas ni editar, nada, sólo se ocupa de la salud».
+  it('tampoco elimina ni edita los datos personales', async () => {
+    setActivePinia(createPinia())
+    useAuthStore().user = { id: 1, role: 'medico' }
+    const { can } = usePermissions()
+    expect(can('socios', 'destroy')).toBe(false)
+    expect(can('socios', 'update')).toBe(false)
+
+    const { getMedicoPacientes } = await import('../lib/api.js')
+    getMedicoPacientes.mockResolvedValueOnce({ data: { data: [
+      { id: 7, nombre: 'Ana', apellido: 'Díaz', dni: '30111222', es_paciente: true },
+    ], meta: { total: 1, kpis: {} } } })
+    const V = (await import('../views/medico/MedicoPacientesView.vue')).default
+    const w = mount(V, { global: { stubs: { teleport: true, RouterLink: { template: '<a><slot /></a>' } }, directives: { modal: {} } } })
+    await flushPromises()
+    expect(w.text()).toContain('Díaz')
+    expect(w.find('[title="Eliminar paciente"]').exists()).toBe(false)
+  })
 })

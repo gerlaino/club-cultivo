@@ -77,11 +77,13 @@
         <span>Stock eliminado el {{ formatDate(stock.eliminado_at) }}{{ stock.eliminado_por ? ` por ${stock.eliminado_por}` : '' }}.
         Ya no está en el inventario ni en los informes; se muestra para saber qué tenía y qué movimientos hubo.</span>
       </div>
-      <!-- Stock finalizado: cerrado, ya no hay nada que hacer con él -->
-      <div v-else-if="stock.agotado" class="sd__finalizado">
+      <!-- Cerrado a mano (con motivo) o agotado (se entregó todo): ya no hay nada que mover. -->
+      <div v-else-if="stock.agotado" class="sd__finalizado" data-testid="stock-agotado">
         <i class="bi bi-flag-fill"></i>
-        <span>Stock finalizado — cerrado. Lo que quedaba salió del inventario con su motivo, y ya no
-        aparece en el disponible.</span>
+        <span v-if="stock.situacion === 'cerrado'">Stock finalizado{{ stock.cierre_motivo ? ` — ${stock.cierre_motivo}` : '' }}.
+        Lo que quedaba salió del inventario con su motivo, y ya no aparece en el disponible.</span>
+        <span v-else>Stock agotado: salió todo lo que tenía.<template v-if="esExterno"> Si llegó más
+        mercadería de lo mismo, cargala con «Ajustar gramos».</template></span>
       </div>
 
       <!-- ── Layout ─────────────────────────────────────────────────── -->

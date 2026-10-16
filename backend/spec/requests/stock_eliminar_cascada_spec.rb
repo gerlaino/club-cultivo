@@ -74,4 +74,37 @@ RSpec.describe 'DELETE /stocks/:id — cascada a derivados', type: :request do
     expect(JSON.parse(response.body)['error']).to include('en camino')
     expect(Stock.where(id: derivado.id)).to exist
   end
+
+  # AC (Germán, 15-oct-2026): eliminar un derivado devolvía los gramos al origen sin dejar
+  # movimiento y borraba el de producción: el saldo subía sin explicación. Ahora queda escrito.
+  describe 'eliminar sólo el derivado' do
+    let(:origen) { create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3) }
+
+    it 'los gramos vuelven al origen con su movimiento, y la producción sigue en el historial' do
+      derivado = producir_derivado(origen)
+      expect(origen.reload.cantidad).to eq(120)
+
+      delete "/stocks/#{derivado.id}", headers: auth_headers, as: :json
+      expect(response).to have_http_status(:no_content)
+
+      expect(origen.reload.cantidad).to eq(200)
+      movs = origen.stock_movimientos.order(:created_at)
+      expect(movs.map { |m| m.gramos.to_f }).to eq([-80.0, 80.0])
+      expect(movs.last.notas).to include(derivado.numero_lote_producto, 'eliminado')
+      expect(movs.last.usuario_id).to eq(admin.id)
+    end
+
+    it 'el informe de stock del origen cierra, sin nada «sin explicar»' do
+      origen.update_columns(created_at: 2.months.ago, cantidad_inicial: 200)
+      derivado = producir_derivado(origen)
+      delete "/stocks/#{derivado.id}", headers: auth_headers, as: :json
+
+      d = ActsAsTenant.with_tenant(club) do
+        Informes::Inventario.new(club: club, desde: Time.zone.today.beginning_of_month, hasta: Time.zone.today).call
+      end
+      f = d[:stocks].find { |x| x[:id] == origen.id }
+      expect(f).to include(habia: 200.0, ingreso: 0.0, otras_salidas: 0.0, quedaba: 200.0)
+      expect(f[:descuadre]).to be_nil
+    end
+  end
 end

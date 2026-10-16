@@ -115,16 +115,6 @@
           <div v-if="vinculoLabel(p.reprocann_vinculo)" class="mpv__vinculo">{{ vinculoLabel(p.reprocann_vinculo) }}</div>
         </div>
 
-        <!-- La fila entera ya abre la ficha: no hace falta un botón que lleve al mismo lado. -->
-        <div class="mpv__actions" @click.prevent>
-          <button
-            class="mpv__action-btn mpv__action-btn--danger"
-            @click.prevent="openDelete(p)"
-            title="Eliminar paciente"
-          >
-            <Trash2 :size="14" />
-          </button>
-        </div>
       </RouterLink>
 
       <div v-if="hayMas" class="mpv__mas">
@@ -142,9 +132,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Users, Trash2 } from 'lucide-vue-next'
-import { usePacientesStore } from '../../stores/pacientes.js'
-import { useConfirm } from '../../composables/useConfirm.js'
+import { Search, Users } from 'lucide-vue-next'
 import { useToast } from '../../composables/useToast.js'
 import { getMedicoPacientes } from '../../lib/api.js'
 import { logger } from '../../utils/logger.js'
@@ -155,10 +143,8 @@ import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const LIMITE = 30
 
-const store  = usePacientesStore()
 const router = useRouter()
-const { confirm } = useConfirm()
-const { success: toastOk, error: toastErr } = useToast()
+const { error: toastErr } = useToast()
 
 const pacientes = ref([])
 const meta      = ref(null)
@@ -166,22 +152,6 @@ const pagina    = ref(1)
 const loading   = ref(false)
 const search    = ref('')
 const filtro    = ref('todos')
-async function openDelete(p) {
-  const ok = await confirm({
-    title: 'Eliminar paciente',
-    message: `¿Eliminar a ${p.nombre} ${p.apellido}? Se eliminará su historial. Esta acción no se puede deshacer.`,
-    confirmText: 'Eliminar',
-    variant: 'danger',
-  })
-  if (!ok) return
-  try {
-    await store.remove(p.id)
-    await cargar({ reset: true })
-    toastOk('Paciente eliminado')
-  } catch {
-    toastErr('No se pudo eliminar el paciente')
-  }
-}
 
 let searchTimer = null
 function onSearch() {

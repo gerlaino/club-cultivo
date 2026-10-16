@@ -20,11 +20,11 @@ export const ROLES = [
   },
   {
     value: 'medico', label: 'Médico', icon: 'bi-heart-pulse-fill',
-    desc: 'Pacientes, historia clínica, indicaciones y turnos. Sin acceso a producción.',
+    desc: 'Sólo la salud: historia clínica, REPROCANN, indicaciones y turnos de sus pacientes.',
     sedes: { pide: false, hint: 'Ve sólo los pacientes que administración le vincula.' },
     permisos: [
       { ok: true,  label: 'Sus pacientes vinculados' },
-      { ok: false, label: 'Dar de alta pacientes (lo hace administración)' },
+      { ok: false, label: 'Dar de alta, aprobar, editar datos o eliminar pacientes (lo hace administración)' },
       { ok: true,  label: 'Historia clínica e indicaciones' },
       { ok: true,  label: 'Turnos' },
       { ok: false, label: 'Cultivo y producción' },

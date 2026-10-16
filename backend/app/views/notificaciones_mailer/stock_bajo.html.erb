@@ -23,10 +23,10 @@
   <div class="wrapper">
     <div class="header">
       <p class="header-title">⚠️ Cultivo Espacial — Stock Bajo</p>
-      <p class="header-sub"><%= @club.name %> · <%= Date.today.strftime('%d/%m/%Y') %></p>
+      <p class="header-sub"><%= @club.name %> · <%= Time.zone.today.strftime('%d/%m/%Y') %></p>
     </div>
     <div class="body">
-      <p class="intro">Los siguientes productos tienen stock por debajo del umbral mínimo (50g):</p>
+      <p class="intro">Los siguientes productos tienen stock por debajo del mínimo que configuró la organización:</p>
       <table>
         <thead>
           <tr>

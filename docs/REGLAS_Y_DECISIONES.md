@@ -577,9 +577,16 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (nunca `club.pacientes`): lista, ficha, timeline, indicaciones, documentos, notas, turnos,
   check-ins, CSV. Administración vincula y desvincula desde la ficha; **dar un turno vincula
   directo**. **El médico NO da altas** (15-oct-2026, Germán y Javi; reemplaza «el médico que da de alta
-  queda vinculado»): las da administración y lo vincula. El médico sólo aprueba altas
-  de pacientes vinculados a él. La migración vinculó a cada médico con los pacientes con los que ya
+  queda vinculado»): las da administración y lo vincula. **El médico sólo se ocupa de la salud**
+  (15-oct-2026, Germán: «ni altas ni bajas ni editar, nada»): no aprueba altas, no elimina, no
+  toca datos personales ni el acceso al portal. Escribe sólo `Paciente::CAMPOS_SALUD` (REPROCANN,
+  seguimiento e historia clínica); si manda otro campo, 403 y no se guarda nada. La migración vinculó a cada médico con los pacientes con los que ya
   tenía un turno o una indicación.
+- **LOS MAILS DICEN CUÁNTOS, NO QUIÉNES** (15-oct-2026, Germán: «que se muestre sólo la data
+  necesaria»): los avisos internos (REPROCANN, indicaciones) cuentan y llevan a la app; nombres,
+  números de REPROCANN y patologías quedan detrás del login. La ruta del delivery va por paquete.
+  El aviso de turno al médico sí lleva el nombre (lo necesita) y nunca el motivo. **Uno por
+  destinatario**: `NotificacionesMailer.a_cada(usuarios, :accion, ...)`, cada acción recibe `para:`.
 - **TURNO DADO POR ADMINISTRACIÓN: AVISO Y «LO VI»** (6-oct-2026, Javi): al darle, moverle o
   cancelarle un turno, al médico le llega push (`turno_asignado` del catálogo) y mail (por el
   correo de la plataforma, sin el motivo de la consulta). El turno queda sin ver (`visto_at` nil)

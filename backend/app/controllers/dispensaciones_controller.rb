@@ -867,9 +867,9 @@ class DispensacionesController < ApplicationController
     # Caja del delivery: efectivo cobrado en la entrega y todavía no rendido al club.
     caja = Cobro.efectivo_en_transito.del_delivery(d.delivery_id).sum(:monto_ars)
 
-    NotificacionesMailer.resumen_ruta(
-      club: club, delivery: d.delivery_user, entregados: entregados, fallidos: fallidos, caja_efectivo: caja
-    ).deliver_now
+    NotificacionesMailer.a_cada(NotificacionesMailer.admins_de(club), :resumen_ruta,
+                                club: club, delivery: d.delivery_user, entregados: entregados, fallidos: fallidos,
+                                caja_efectivo: caja)
   rescue => e
     Rails.logger.error("[ResumenRuta] #{e.message}")
   end

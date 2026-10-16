@@ -328,7 +328,7 @@ class PacientesController < ApplicationController
   # POST /pacientes/:id/aprobar — admitir a alguien cargado desde el mostrador.
   def aprobar
     unless Paciente::ROLES_APRUEBAN.include?(current_user.role)
-      return render json: { error: 'Sólo un administrador o el médico puede aprobar un alta.' },
+      return render json: { error: 'Sólo administración puede aprobar un alta.' },
                     status: :forbidden
     end
 
@@ -343,6 +343,17 @@ class PacientesController < ApplicationController
   end
 
   def update
+    unless %w[admin super_admin medico].include?(current_user.role)
+      return render json: { error: 'Sólo administración modifica los datos del paciente.' }, status: :forbidden
+    end
+    if current_user.medico?
+      fuera = ((params[:paciente] || params[:socio])&.keys.to_a - Paciente::CAMPOS_SALUD)
+      if fuera.any?
+        return render json: { error: 'El médico sólo modifica datos de salud: REPROCANN e historia clínica.' },
+                      status: :forbidden
+      end
+    end
+
     if params_include_notas_clinicas? && !can_edit_notas_clinicas?
       return render json: { error: 'No autorizado para modificar notas clínicas' }, status: :forbidden
     end
@@ -364,7 +375,12 @@ class PacientesController < ApplicationController
     end
   end
 
+  # Sólo administración (15-oct-2026): antes no había chequeo y el médico tenía el tachito.
   def destroy
+    unless current_user.admin? || current_user.super_admin?
+      return render json: { error: 'Sólo administración elimina pacientes.' }, status: :forbidden
+    end
+
     @paciente.update!(deleted_by_id: current_user.id)
     @paciente.destroy
     head :no_content
@@ -715,7 +731,7 @@ class PacientesController < ApplicationController
       return false
     end
     unless Paciente::ROLES_APRUEBAN.include?(current_user.role)
-      render json: { errors: ['Sólo un administrador o el médico puede gestionar el acceso al portal.'] },
+      render json: { errors: ['Sólo administración gestiona el acceso al portal.'] },
              status: :forbidden
       return false
     end
