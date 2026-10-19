@@ -10,9 +10,15 @@
       <!-- El resumen: qué recibió en todo el ciclo -->
       <div class="lns__stats">
         <div class="lns__stat"><span class="lns__stat-n">{{ t.aplicaciones }}</span><span class="lns__stat-l">{{ t.aplicaciones === 1 ? 'fertilización' : 'fertilizaciones' }}</span></div>
-        <div v-if="t.aplicaciones" class="lns__stat">
+        <!-- «Sin volumen cargado» no es «0 L» (regla del agua del riego): una fertilización cargada
+             como texto, de cama o dictada sin litros no suma solución. -->
+        <div v-if="t.aplicaciones && Number(t.litros) > 0" class="lns__stat">
           <span class="lns__stat-n">{{ num(t.litros) }} L</span>
           <span class="lns__stat-l">de solución<template v-if="t.litros_por_planta != null"> · {{ num(t.litros_por_planta) }} L/planta</template></span>
+        </div>
+        <div v-else-if="t.aplicaciones" class="lns__stat">
+          <span class="lns__stat-n">—</span>
+          <span class="lns__stat-l">sin volumen de solución cargado</span>
         </div>
         <div v-if="t.agua_l != null" class="lns__stat">
           <span class="lns__stat-n">{{ num(t.agua_l) }} L</span>

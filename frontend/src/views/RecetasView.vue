@@ -2,15 +2,15 @@
   <div class="rc">
     <header class="rc__head">
       <div>
-        <h1 class="rc__title">{{ esPersonal ? 'Nutrientes y recetas' : 'Recetas de nutrientes' }}</h1>
+        <h1 class="rc__title">Nutrientes y recetas</h1>
         <p class="rc__sub">
           {{ esPersonal
             ? 'Lo que tenés y cómo lo mezclás. Al regar, aplicás la receta y se descuenta solo.'
-            : 'Se arman con los productos del depósito. Al regar, aplicar la receta descuenta del depósito y le cuesta al lote.' }}
+            : 'Las recetas son de la organización y se usan en cualquier sede. Al regar, se descuenta del depósito de la sede de esa sala y le cuesta al lote.' }}
         </p>
       </div>
       <div class="rc__head-right">
-        <RouterLink v-if="!esPersonal" to="/insumos" class="rc__btn-ghost"><i class="bi bi-box-seam"></i> Depósito</RouterLink>
+        <RouterLink v-if="!esPersonal && vePlata" to="/insumos" class="rc__btn-ghost"><i class="bi bi-box-seam"></i> Depósito</RouterLink>
         <button class="rc__btn-primary" @click="nueva"><i class="bi bi-plus-lg"></i> Nueva receta</button>
       </div>
     </header>
@@ -69,6 +69,47 @@
       </div>
     </section>
 
+    <!-- ── Organización: los nutrientes del depósito, por sede (19-oct-2026) ── -->
+    <!-- Cuánto queda en cada sede, para cuántos riegos alcanza y si queda poco. Comprar tiene UNA
+         puerta (Contabilidad → Nueva compra: asiento, caja, depósito); «Cargar compra» lleva ahí con
+         el producto ya elegido. Dar de alta un producto sin stock lo puede hacer quien cultiva. -->
+    <section v-if="!esPersonal" class="rc__card">
+      <div class="rc__card-head">
+        <div>
+          <h2 class="rc__card-title">Nutrientes</h2>
+          <p class="rc__card-sub">Cuánto queda en cada sede. Al regar en una sala se descuenta del depósito de su sede, nunca de otra.</p>
+        </div>
+        <button class="rc__btn-ghost" @click="nuevoNutriente"><i class="bi bi-plus-lg"></i> Producto</button>
+      </div>
+      <div v-if="sedesNut.length > 1" class="rc__tabs" role="tablist" aria-label="Sede">
+        <button role="tab" class="rc__tab" :class="{ 'rc__tab--on': sedeNut === null }" :aria-selected="sedeNut === null" @click="sedeNut = null">Todas</button>
+        <button v-for="sd in sedesNut" :key="sd.id ?? 'pool'" role="tab" class="rc__tab" :class="{ 'rc__tab--on': sedeNut === sd.id }"
+                :aria-selected="sedeNut === sd.id" @click="sedeNut = sd.id">{{ sd.nombre }}</button>
+      </div>
+      <div v-if="!productosOrg.length" class="rc__empty">
+        Todavía no hay nutrientes en el depósito. Se cargan con la compra (Contabilidad → Nueva compra) o con «Producto», sin stock, para armar una receta.
+      </div>
+      <div v-else class="rc__nutrientes">
+        <div v-for="g in productosOrg" :key="g.clave" class="rc__producto">
+          <div class="rc__producto-nombre">{{ g.nombre }} <span class="rc__producto-u">{{ u(g.unidad) }}</span></div>
+          <div v-for="i in g.porSede" :key="i.id" class="rc__nutriente" :class="{ 'rc__nutriente--bajo': i.stock_bajo }">
+            <div class="rc__nutriente-main">
+              <span class="rc__nutriente-sede">{{ i.sede_nombre || 'Sin sede' }}</span>
+              <span class="rc__nutriente-stock">
+                quedan <b>{{ num(i.stock_actual) }} {{ u(i.unidad_medida) }}</b>
+                <template v-if="i.aplicaciones_estimadas != null"> · alcanza para ~{{ i.aplicaciones_estimadas }} riego{{ i.aplicaciones_estimadas === 1 ? '' : 's' }}</template>
+                <template v-if="i.stock_bajo"> · <span class="rc__bajo">queda poco</span></template>
+                <template v-if="vePlata && i.costo_promedio_ars"> · {{ formatARS(i.costo_promedio_ars) }}/{{ u(i.unidad_medida) }}</template>
+              </span>
+            </div>
+            <div v-if="vePlata" class="rc__nutriente-acts">
+              <button class="rc__btn-ghost rc__btn-ghost--sm" @click="cargarCompra(i)"><i class="bi bi-cart-plus"></i> Cargar compra</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Recetas ── -->
     <div v-if="cargando" class="rc__empty"><DsSpinner :size="18" /></div>
     <div v-else-if="!recetas.length" class="rc__card rc__empty">
@@ -84,6 +125,7 @@
               <span v-if="r.fase_label" class="rc__chip">{{ r.fase_label }}</span>
               <span v-if="r.ph_objetivo" class="rc__chip rc__chip--soft">pH {{ r.ph_objetivo }}</span>
               <span v-if="r.ec_objetivo" class="rc__chip rc__chip--soft">EC {{ r.ec_objetivo }}</span>
+              <span v-if="r.costo_por_base_ars" class="rc__chip rc__chip--soft" title="Con el costo promedio de cada producto">{{ formatARS(r.costo_por_base_ars) }} / {{ r.base_unidad || 'L' }}</span>
               <span v-if="!r.activa" class="rc__chip rc__chip--off">Archivada</span>
             </div>
           </div>
@@ -225,21 +267,21 @@
                 <tbody>
                   <tr v-for="c in uso.uso.camas" :key="c.id">
                     <td><RouterLink :to="`/camas/${c.id}`">{{ c.nombre }}</RouterLink></td>
-                    <td>{{ c.aplicaciones }}</td><td>{{ formatARS(c.costo_ars) }}</td>
+                    <td>{{ c.aplicaciones }}</td><td v-if="uso.uso.con_costo">{{ formatARS(c.costo_ars) }}</td>
                   </tr>
                 </tbody>
               </table>
             </template>
             <template v-if="uso.uso.lotes.length">
-              <p class="rc__hint">{{ uso.uso.aplicaciones }} aplicaciones · {{ formatARS(uso.uso.costo_total_ars) }} en total</p>
+              <p class="rc__hint">{{ uso.uso.aplicaciones }} aplicaciones<template v-if="uso.uso.con_costo"> · {{ formatARS(uso.uso.costo_total_ars) }} en total</template></p>
               <table class="rc__table">
-                <thead><tr><th>Lote</th><th>Estado</th><th>Riegos</th><th>Litros</th><th>$ nutrientes</th><th>$ / planta</th></tr></thead>
+                <thead><tr><th>Lote</th><th>Estado</th><th>Riegos</th><th>Litros</th><th v-if="uso.uso.con_costo">$ nutrientes</th><th v-if="uso.uso.con_costo">$ / planta</th></tr></thead>
                 <tbody>
                   <tr v-for="l in uso.uso.lotes" :key="l.id">
                     <td><RouterLink :to="`/lotes/${l.id}`">{{ l.codigo }}</RouterLink></td>
                     <td>{{ l.estado }}</td><td>{{ l.aplicaciones }}</td><td>{{ num(l.litros) }}</td>
-                    <td>{{ formatARS(l.costo_ars) }}</td>
-                    <td>{{ l.plantas ? formatARS(l.costo_ars / l.plantas) : '—' }}</td>
+                    <td v-if="uso.uso.con_costo">{{ formatARS(l.costo_ars) }}</td>
+                    <td v-if="uso.uso.con_costo">{{ l.plantas ? formatARS(l.costo_ars / l.plantas) : '—' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -254,7 +296,7 @@
       <div v-modal="() => nutForm = null" v-if="nutForm" class="rc__overlay">
         <div class="rc__modal rc__modal--sm">
           <div class="rc__modal-head">
-            <h3 class="rc__modal-title">{{ nutForm.id ? `Repuse ${nutForm.nombre}` : 'Nuevo nutriente' }}</h3>
+            <h3 class="rc__modal-title">{{ nutForm.id ? `Repuse ${nutForm.nombre}` : esPersonal ? 'Nuevo nutriente' : 'Nuevo producto' }}</h3>
             <button class="rc__x" @click="nutForm = null"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="rc__modal-body">
@@ -279,7 +321,14 @@
               </label>
               <DosisEtiqueta v-model="nutForm.dosis" :unidad-medida="nutForm.unidad_medida" :nombre="nutForm.nombre" />
             </template>
-            <div class="rc__row">
+            <label v-if="!esPersonal && sedesNut.length > 1" class="rc__field">
+              <span class="rc__label">Sede</span>
+              <select v-model="nutForm.sede_id" class="rc__input">
+                <option v-for="sd in sedesNut" :key="sd.id ?? 'pool'" :value="sd.id">{{ sd.nombre }}</option>
+              </select>
+            </label>
+            <span v-if="!esPersonal" class="rc__hint">Se da de alta sin stock y <b>sin registro contable</b>. Lo que compren se carga con «Cargar compra» (Contabilidad → Nueva compra), así el gasto y el costo quedan bien.</span>
+            <div v-if="esPersonal" class="rc__row">
               <label class="rc__field">
                 <span class="rc__label">{{ nutForm.id ? 'Cuánto compraste' : 'Cuánto tenés' }} ({{ u(nutForm.unidad_medida) }})</span>
                 <input v-model.number="nutForm.cantidad" type="number" min="0" step="1" class="rc__input" placeholder="1000" />
@@ -289,7 +338,7 @@
                 <input v-model.number="nutForm.costo" type="number" min="0" step="1" class="rc__input" placeholder="18000" />
               </label>
             </div>
-            <span class="rc__hint">Si ya lo tenías y no sabés cuánto pagaste, dejá el precio en 0: sólo carga la cantidad.</span>
+            <span v-if="esPersonal" class="rc__hint">Si ya lo tenías y no sabés cuánto pagaste, dejá el precio en 0: sólo carga la cantidad.</span>
           </div>
           <div class="rc__modal-foot">
             <button class="rc__btn-ghost" @click="nutForm = null">Cancelar</button>
@@ -390,10 +439,16 @@ import { formatARS } from '../lib/formatters.js'
 import { listRecetas, getReceta, createReceta, updateReceta, listInsumos, createInsumo, comprarInsumo, updateInsumo, reconteoInsumo, deleteInsumo } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { reglasSueloVivo } from '../lib/camas.js'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const toast = useToast()
 const { confirm } = useConfirm()
 const { esPersonal } = useUsoPersonal()
+const router = useRouter()
+const auth = useAuthStore()
+// La plata, sólo administración (el backend tampoco se la manda al cultivador).
+const vePlata = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const recetas  = ref([])
 const todosInsumos = ref([])
@@ -405,6 +460,29 @@ const litrosPor = ref({})
 const num = v => (v == null ? '—' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 2 }))
 const U = { mililitro: 'ml', gramo: 'g', litro: 'L', kilogramo: 'kg', unidad: 'un' }
 const u = x => U[x] || x || ''
+
+// ── Organización: los nutrientes agrupados por producto, una fila por sede ──
+const sedeNut = ref(null)
+const sedesNut = computed(() => {
+  const m = new Map()
+  insumos.value.forEach(i => { if (!m.has(i.sede_id ?? null)) m.set(i.sede_id ?? null, { id: i.sede_id ?? null, nombre: i.sede_nombre || 'Sin sede' }) })
+  return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre))
+})
+const productosOrg = computed(() => {
+  const g = new Map()
+  insumos.value
+    .filter(i => sedeNut.value === null || (i.sede_id ?? null) === sedeNut.value)
+    .forEach(i => {
+      const clave = `${String(i.nombre).trim().toLowerCase()}|${i.unidad_medida}`
+      if (!g.has(clave)) g.set(clave, { clave, nombre: i.nombre, unidad: i.unidad_medida, porSede: [] })
+      g.get(clave).porSede.push(i)
+    })
+  return [...g.values()].sort((a, b) => a.nombre.localeCompare(b.nombre))
+})
+// Comprar tiene una sola puerta: Contabilidad → Nueva compra, con el producto y su depósito ya elegidos.
+function cargarCompra(i) {
+  router.push({ name: 'contabilidad', query: { nuevo: 'compra', deposito: i.deposito_id ?? undefined, nombre: i.nombre, unidad: i.unidad_medida } })
+}
 
 async function cargar() {
   try {
@@ -508,7 +586,11 @@ const nutForm = ref(null)
 // La etiqueta y la medida casera (`DosisEtiqueta`): viajan tal cual al insumo.
 const CAMPOS_DOSIS = ['medida_casera', 'medida_casera_cantidad', 'dosis_unidad', 'dosis_enraizado', 'dosis_vegetativo', 'dosis_floracion']
 const dosisDe = (i = {}) => Object.fromEntries(CAMPOS_DOSIS.map(k => [k, i[k] ?? null]))
-function nuevoNutriente() { formError.value = null; nutForm.value = { id: null, nombre: '', unidad_medida: 'mililitro', stock_minimo: null, cantidad: null, costo: null, dosis: dosisDe() } }
+function nuevoNutriente() {
+  formError.value = null
+  nutForm.value = { id: null, nombre: '', unidad_medida: 'mililitro', stock_minimo: null, cantidad: null, costo: null, dosis: dosisDe(),
+                    sede_id: sedeNut.value ?? sedesNut.value[0]?.id ?? null }
+}
 function reponer(i) { formError.value = null; nutForm.value = { id: i.id, nombre: i.nombre, unidad_medida: i.unidad_medida, cantidad: null, costo: null } }
 async function guardarNutriente() {
   formError.value = null
@@ -518,14 +600,15 @@ async function guardarNutriente() {
     if (!id) {
       if (!nutForm.value.nombre) { formError.value = 'Ponele un nombre'; return }
       const { data } = await createInsumo({ nombre: nutForm.value.nombre, unidad_medida: nutForm.value.unidad_medida, tipo: 'cultivo',
-                                            stock_minimo: nutForm.value.stock_minimo || 0, ...(nutForm.value.dosis || {}) })
+                                            stock_minimo: nutForm.value.stock_minimo || 0, ...(nutForm.value.dosis || {}),
+                                            ...(!esPersonal.value && nutForm.value.sede_id ? { sede_id: nutForm.value.sede_id } : {}) })
       id = data.id ?? data.insumo?.id
     }
-    if (nutForm.value.cantidad > 0) {
+    if (esPersonal.value && nutForm.value.cantidad > 0) {
       // Con precio es una compra (queda como gasto); sin precio, sólo se carga lo que hay.
       await comprarInsumo(id, { cantidad: nutForm.value.cantidad, costo_total_ars: nutForm.value.costo || 0, generar_egreso: !!nutForm.value.costo })
     }
-    toast.success(nutForm.value.id ? 'Cargado' : 'Nutriente creado')
+    toast.success(nutForm.value.id ? 'Cargado' : esPersonal.value ? 'Nutriente creado' : 'Producto dado de alta, sin stock ni registro contable')
     nutForm.value = null
     await cargar()
   } catch (e) { formError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo guardar' }
@@ -670,6 +753,17 @@ async function reactivarNutriente(i) {
 .rc__nutriente-nombre { font-weight: 700; }
 .rc__nutriente-stock { font-size: .8rem; color: var(--c-ink-500); }
 .rc__bajo { color: #b45309; font-weight: 700; }
+/* Organización: un producto con una fila por sede. */
+.rc__producto { display: flex; flex-direction: column; gap: .35rem; padding: .25rem 0 .5rem; }
+.rc__producto + .rc__producto { border-top: 1px dashed var(--c-ink-100); padding-top: .6rem; }
+.rc__producto-nombre { font-weight: 800; font-size: .92rem; color: var(--c-ink-900); }
+.rc__producto-u { font-weight: 500; font-size: .75rem; color: var(--c-ink-500); }
+.rc__nutriente-sede { font-weight: 700; font-size: .84rem; }
+.rc__tabs { overflow-x: auto; scrollbar-width: none; }
+@media (max-width: 560px) {
+  .rc__nutriente { flex-direction: column; align-items: stretch; }
+  .rc__nutriente-acts { justify-content: flex-end; }
+}
 .rc__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .85rem; }
 .rc__receta { background: #fff; border: 1.5px solid var(--c-ink-100); border-radius: 14px; padding: 1rem; display: flex; flex-direction: column; gap: .6rem; }
 .rc__receta--off { opacity: .6; }

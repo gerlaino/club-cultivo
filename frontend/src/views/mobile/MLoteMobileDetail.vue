@@ -76,6 +76,12 @@
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
         <span class="mlot__qa-lbl">{{ lote.avanza_con_el_espacio ? `Pasar ${lote.sala?.nombre || 'el espacio'} a floración` : 'Avanzar fase' }}</span>
       </button>
+      <!-- Regar, a un toque (19-oct-2026): con receta, nutrientes sueltos o sólo agua. En cama se
+           riega la cama (abajo). -->
+      <button class="mlot__qa" v-if="!lote.en_cama && enCultivo" @click="abrirDiario('riego')">
+        <span class="mlot__qa-ico" style="background:var(--c-sky-100);color:var(--c-sky-600)"><i class="bi bi-droplet-fill"></i></span>
+        <span class="mlot__qa-lbl">Regar</span>
+      </button>
       <!-- Suelo vivo: lo que se le hace a la tierra es de la cama (top dress, té, cobertura). -->
       <button class="mlot__qa" v-if="lote.en_cama && enCultivo" @click="abrirCama('alimentar')">
         <span class="mlot__qa-ico" style="background:var(--c-amber-100);color:var(--c-slate-900)"><i class="bi bi-basket"></i></span>

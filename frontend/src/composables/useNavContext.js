@@ -44,8 +44,10 @@ export const NAV_GROUPS = [
       { to: '/geneticas', label: 'Genéticas' },
       // Recetas de nutrientes: en organización se arman con lo del depósito; el cultivador de
       // casa no tiene depósito, así que acá viven también sus nutrientes.
-      { to: '/recetas', label: 'Recetas', labelPersonal: 'Nutrientes y recetas' },
-      { to: '/guia-nutrientes', label: 'Guía de nutrientes', soloPersonal: true },
+      // Mismo nombre en los dos (19-oct-2026): en una organización la pantalla también muestra los
+      // nutrientes del depósito, por sede.
+      { to: '/recetas', label: 'Nutrientes y recetas' },
+      { to: '/guia-nutrientes', label: 'Guía de nutrientes' },
     ],
   },
   {

@@ -21,6 +21,11 @@ class Turno < ApplicationRecord
   # (realizados, la org de demo) no pasan por acá.
   attr_accessor :agendando
   validate  :no_en_el_pasado, if: -> { agendando && cambia_el_momento? }
+  # UN MÉDICO, UN TURNO A LA VEZ (Germán, 19-oct-2026: «no pueden haber dos turnos en el mismo
+  # horario»). Se valida al agendar o mover: el horario que ofrece la pantalla ya esconde los
+  # ocupados, pero dos personas pueden elegir el mismo a la vez, o el navegador estar en otro huso.
+  ESTADOS_OCUPAN = %w[programado confirmado realizado].freeze
+  validate  :sin_superposicion, if: -> { agendando && ESTADOS_OCUPAN.include?(estado) && cambia_la_agenda? }
 
   # «Lo vi» (6-oct-2026): el turno que se da el propio médico nace visto; el que le da
   # administración, no, hasta que lo confirma. Si se lo mueven, vuelve a quedar sin ver.
@@ -75,6 +80,29 @@ class Turno < ApplicationRecord
     return true if new_record?
     antes, despues = fecha_hora_change_to_be_saved
     antes.nil? || despues.nil? ? will_save_change_to_fecha_hora? : (despues - antes).abs >= 60
+  end
+
+  def cambia_la_agenda?
+    new_record? || cambia_el_momento? || will_save_change_to_duracion_minutos? ||
+      will_save_change_to_medico_id? || (will_save_change_to_estado? && !ESTADOS_OCUPAN.include?(estado_was))
+  end
+
+  # El candado por médico (hasta el fin de la transacción del save) hace que dos altas simultáneas
+  # en el mismo horario no pasen las dos la validación.
+  def sin_superposicion
+    return unless medico_id && fecha_hora
+
+    self.class.connection.execute("SELECT pg_advisory_xact_lock(#{self.class.connection.quote(7_301_000_000 + medico_id.to_i)})")
+    fin = fecha_hora + (duracion_minutos.presence || 30).to_i.minutes
+    choca = Turno.where(medico_id: medico_id, estado: ESTADOS_OCUPAN)
+                 .where.not(id: id)
+                 .where('fecha_hora < ?', fin)
+                 .where("fecha_hora + (duracion_minutos * INTERVAL '1 minute') > ?", fecha_hora)
+                 .order(:fecha_hora).first
+    return unless choca
+
+    errors.add(:base, "El médico ya tiene un turno a las #{choca.fecha_hora.in_time_zone.strftime('%H:%M')} " \
+                      "del #{choca.fecha_hora.in_time_zone.strftime('%d/%m')}: elegí otro horario")
   end
 
   def no_en_el_pasado

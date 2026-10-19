@@ -633,6 +633,15 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`Paciente::PasoInvalido`) y la pantalla ofrece sólo `situacion.acciones`.
   Los turnos agregan datos chicos: próximo turno, «faltó al turno del 12/10» (último no cancelado
   ausente y sin otro después) y «turno pasado sin cerrar» (aviso para médico y administración).
+- **NUTRIENTES EN ORGANIZACIONES COMO EN AUTOCULTIVO** (19-oct-2026, Germán): la receta es de la
+  organización y al regar se elige cualquiera; el stock se muestra por sede y se descuenta de la sede
+  de la sala. Comprar sigue teniendo UNA puerta (Contabilidad → Nueva compra). La plata (costos de
+  insumos, de recetas, del riego) la ven admin, supervisor y auditor: el backend no se la manda al
+  cultivador. La guía de nutrientes la lee quien cultiva; aplicarla es sólo del autocultivo.
+- **UN MÉDICO, UN TURNO A LA VEZ** (19-oct-2026, Germán: «no pueden haber dos turnos en el mismo
+  horario»): al agendar o mover (`agendando`), un turno programado/confirmado/realizado no puede
+  pisar a otro del mismo médico (`Turno#sin_superposicion`, con candado por médico). Pegados sí
+  (10:00–10:30 y 10:30); cancelado libera el horario; otro médico, sin problema.
 - **EL ALTA ES POR PASOS Y LA EDICIÓN POR SOLAPAS, CON EL MISMO FORMULARIO** (19-oct-2026):
   Persona → Domicilio → REPROCANN → Turno y confirmar (`components/pacientes/formulario/`). El DNI
   repetido se avisa en el paso 1. El turno es opcional, lo da administración y viaja en el mismo

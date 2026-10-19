@@ -24,14 +24,14 @@ class InsumosController < ApplicationController
     scope = scope.para_sede(sede_del_cultivo_param&.id) if params[:sala_id].present? || params[:lote_id].present?
     render json: {
       insumos:         scope.order(:nombre).map { |i| serialize(i) },
-      valorizado_total: scope.sum { |i| i.valorizado_ars }.round(2),
+      valorizado_total: ve_plata? ? scope.sum { |i| i.valorizado_ars }.round(2) : nil,
     }
   end
 
   # GET /insumos/:id
   def show
     render json: serialize(@insumo).merge(
-      compras:  @insumo.insumo_compras.order(fecha: :desc).limit(50).map  { |c| serialize_compra(c) },
+      compras:  ve_plata? ? @insumo.insumo_compras.order(fecha: :desc).limit(50).map { |c| serialize_compra(c) } : [],
       consumos: @insumo.insumo_consumos.includes(:lote, :sala).order(fecha: :desc).limit(50).map { |c| serialize_consumo(c) },
     )
   end
@@ -254,6 +254,9 @@ class InsumosController < ApplicationController
   ROLES_CONSUMO = %w[admin supervisor cultivador].freeze
   ROLES_ALTA    = %w[admin supervisor cultivador].freeze
 
+  # El auditor también: lee el depósito valorizado para los informes.
+  def ve_plata? = ROLES_GESTION.include?(current_user&.role) || current_user&.auditor? || current_user&.super_admin?
+
   def require_alta
     render json: { error: 'No autorizado' }, status: :forbidden unless ROLES_ALTA.include?(current_user&.role)
   end
@@ -283,8 +286,10 @@ class InsumosController < ApplicationController
       nombre:             i.nombre,
       unidad_medida:      i.unidad_medida,
       stock_actual:       i.stock_actual.to_f,
-      costo_promedio_ars: i.costo_promedio_ars.to_f,
-      valorizado_ars:     i.valorizado_ars.to_f,
+      # La plata, sólo administración (19-oct-2026): el cultivador lee el depósito para regar y
+      # armar recetas, y el formulario de riego le mostraba «≈ $ X en nutrientes».
+      costo_promedio_ars: ve_plata? ? i.costo_promedio_ars.to_f : nil,
+      valorizado_ars:     ve_plata? ? i.valorizado_ars.to_f : nil,
       stock_minimo:       i.stock_minimo.to_f,
       stock_bajo:         i.stock_bajo?,
       # Para cuántos riegos más alcanza, según lo descontado por receta las últimas veces.
@@ -330,7 +335,7 @@ class InsumosController < ApplicationController
 
   def serialize_consumo(c)
     {
-      id: c.id, cantidad: c.cantidad.to_f, costo_imputado_ars: c.costo_imputado_ars.to_f,
+      id: c.id, cantidad: c.cantidad.to_f, costo_imputado_ars: ve_plata? ? c.costo_imputado_ars.to_f : nil,
       fecha: c.fecha, notas: c.notas,
       lote: c.lote ? { id: c.lote.id, codigo: c.lote.codigo } : nil,
       sala: c.sala ? { id: c.sala.id, nombre: c.sala.nombre } : nil,

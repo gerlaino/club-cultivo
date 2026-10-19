@@ -169,6 +169,35 @@ RSpec.describe 'Recetas de nutrientes', type: :request do
     expect(json['uso']['lotes'].first).to include('codigo' => lote.codigo, 'litros' => 20.0, 'costo_ars' => 2800.0)
   end
 
+  # La plata, sólo administración (19-oct-2026; regla de `Lotes::Nutricion`).
+  describe 'quién ve la plata' do
+    it 'administración ve el costo por litro de la receta y cuánto costó cada lote' do
+      r = crear_receta
+      # Bio-Grow $20/ml × 2 ml/L + Cal-Mag $100/ml × 1 ml/L = $140 por litro.
+      expect(r['costo_por_base_ars']).to eq(140.0)
+    end
+
+    it 'el cultivador arma y aplica, pero no ve costos en recetas, insumos ni «dónde se usó»' do
+      r = crear_receta
+      post "/lotes/#{lote.id}/registros_ambientales", params: { registro_ambiental: { fertilizacion: true }, nutricion: { receta_id: r['id'], litros: 20 } }, headers: auth_headers, as: :json
+      sign_in_as(create(:user, :cultivador, club: club))
+
+      get "/recetas/#{r['id']}", headers: auth_headers
+      expect(json).not_to have_key('costo_por_base_ars')
+      expect(json['uso']).to include('aplicaciones' => 1, 'con_costo' => false, 'costo_total_ars' => nil)
+      expect(json['uso']['lotes'].first).to include('litros' => 20.0, 'costo_ars' => nil)
+
+      get '/insumos', params: { tipo: 'cultivo' }, headers: auth_headers
+      fila = json['insumos'].find { |i| i['nombre'] == 'Bio-Grow' }
+      expect(fila).to include('costo_promedio_ars' => nil, 'valorizado_ars' => nil, 'stock_actual' => 960.0)
+      expect(json['valorizado_total']).to be_nil
+
+      get "/insumos/#{grow.id}", headers: auth_headers
+      expect(json['compras']).to eq([])
+      expect(json['consumos'].first['costo_imputado_ars']).to be_nil
+    end
+  end
+
   it 'el insumo dice para cuántos riegos más alcanza' do
     r = crear_receta
     post "/lotes/#{lote.id}/registros_ambientales", params: { registro_ambiental: { fertilizacion: true }, nutricion: { receta_id: r['id'], litros: 20 } }, headers: auth_headers, as: :json

@@ -34,9 +34,10 @@
     </div>
 
     <!-- Acciones -->
-    <!-- Autocultivo: lo de todos los días, a un toque. Regar dice cuánto y con qué (receta, nutrientes
-         sueltos o sólo agua): regar y alimentar no van separados. -->
-    <div v-if="esPersonal" class="msal__rapidas">
+    <!-- Lo de todos los días, a un toque (también en una organización, 19-oct-2026: «lo que se hace
+         todos los días tiene que estar en el teléfono»). Regar dice cuánto y con qué (receta,
+         nutrientes sueltos o sólo agua) y descuenta del depósito de la sede de esta sala. -->
+    <div class="msal__rapidas">
       <button type="button" class="msal__rapida msal__rapida--principal" @click="abrirRegistro('riego')">
         <i class="bi bi-droplet-fill" aria-hidden="true"></i> Regar
       </button>
@@ -44,14 +45,10 @@
       <button type="button" class="msal__rapida" @click="abrirRegistro('ambiental')"><i class="bi bi-thermometer-half" aria-hidden="true"></i> Ambiente</button>
       <button type="button" class="msal__rapida" @click="showAcciones = true"><i class="bi bi-three-dots" aria-hidden="true"></i> Más</button>
     </div>
-    <div v-else class="msal__actions">
+    <div v-if="!esPersonal" class="msal__actions">
       <button class="msal__btn-registrar" @click="abrirRegistro()">
         <i class="bi bi-pencil-square"></i>
-        {{ esPersonal ? 'Registrar el espacio' : 'Registrar sala' }}
-      </button>
-      <button class="msal__btn-acciones" @click="showAcciones = true">
-        <i class="bi bi-three-dots-vertical"></i>
-        Más
+        Registrar sala
       </button>
     </div>
 

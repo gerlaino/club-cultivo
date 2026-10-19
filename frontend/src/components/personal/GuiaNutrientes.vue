@@ -22,7 +22,7 @@
           <div v-for="t in TIPOS" :key="t.k" class="gnu__rango">
             <span class="gnu__rango-k">{{ t.label }}</span>
             <strong class="gnu__rango-v">{{ rango(f[t.k]) }}</strong>
-            <span v-if="distinto(f, t.k)" class="gnu__rango-tuyo">tu alerta: {{ rango(f.tus_rangos[t.k]) }}</span>
+            <span v-if="distinto(f, t.k)" class="gnu__rango-tuyo">{{ esPersonal ? 'tu alerta' : 'alerta configurada' }}: {{ rango(f.tus_rangos[t.k]) }}</span>
             <span class="gnu__rango-cmp" :class="claseCmp(f.comparacion[t.k])">{{ textoCmp(f.comparacion[t.k]) }}</span>
           </div>
         </div>
@@ -33,7 +33,10 @@
         <p><strong>pH en tierra.</strong> {{ guia.ph_tierra }}</p>
       </section>
 
-      <div class="gnu__aplicar">
+      <!-- En una organización la guía se lee y nada más: los rangos de sus alertas son su criterio
+           y se configuran en Configuración → Alertas (el backend no deja aplicarla). -->
+      <p v-if="!esPersonal" class="gnu__aplicar-p">Los rangos de las alertas de la organización se configuran en Configuración → Alertas.</p>
+      <div v-else class="gnu__aplicar">
         <p v-if="guia.aplicada" class="gnu__aplicada"><i class="bi bi-check2-circle"></i> Tus alertas usan estos rangos.</p>
         <template v-else>
           <p class="gnu__aplicar-p">Si querés, usá estos rangos para tus alertas de ambiente. Después los cambiás cuando quieras en Configuración → Alertas.</p>
@@ -55,12 +58,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getGuiaNutricion, aplicarGuiaNutricion } from '../../lib/api'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast'
 
 const TIPOS = [{ k: 'ec', label: 'EC' }, { k: 'ph', label: 'pH' }]
 const { confirm } = useConfirm()
 const toast = useToast()
+const { esPersonal } = useUsoPersonal()
 
 const guia = ref(null)
 const cargando = ref(true)

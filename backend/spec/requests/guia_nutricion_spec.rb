@@ -69,12 +69,26 @@ RSpec.describe 'Guía de nutrientes (autocultivo)', type: :request do
     expect(vege['comparacion']['ph']).to eq('registros' => 2, 'fuera' => 1)
   end
 
-  it 'una organización no la tiene' do
+  # 19-oct-2026 (Germán, nutrientes «como en autocultivo»): una organización la LEE; aplicarla a
+  # sus alertas no, porque sus rangos se configuran en Configuración → Alertas.
+  it 'una organización la lee (quien cultiva), pero no la aplica a sus alertas' do
     org = create(:club, plan: 'basico', features: { 'cultivo' => true })
-    sign_in_as(create(:user, :admin, club: org))
-
+    sign_in_as(create(:user, :cultivador, club: org))
     get '/guia_nutricion'
-    expect(response).to have_http_status(:not_found)
+    expect(response).to have_http_status(:ok)
+    expect(json['fases'].map { |f| f['fase'] }).to include('vegetativo', 'floracion')
+
+    sign_in_as(create(:user, :admin, club: org))
+    expect { post '/guia_nutricion/aplicar' }.not_to change(SetpointFase, :count)
+    expect(response).to have_http_status(:forbidden)
+    expect(json['error']).to match(/Configuración → Alertas/)
+  end
+
+  it 'en una organización, quien no cultiva no la ve' do
+    org = create(:club, plan: 'basico', features: { 'cultivo' => true, 'produccion_dispensa' => true })
+    sign_in_as(create(:user, :dispensador, club: org))
+    get '/guia_nutricion'
+    expect(response).to have_http_status(:forbidden)
   end
 
   it 'aislamiento: aplicar no toca las alertas de otra cuenta' do

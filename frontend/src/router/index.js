@@ -316,7 +316,8 @@ const routes = [
     name: "guia-nutrientes",
     component: () => import("../views/personal/GuiaNutrientesView.vue"),
     meta: { requiresAuth: true },
-    beforeEnter: () => (esUsoPersonal() ? true : '/salas'),
+    // También en organizaciones (19-oct-2026), sólo para leer: aplicarla es del autocultivo.
+    // Quién entra lo dice la matriz de prefijos (quien cultiva).
   },
   {
     path: "/mis-informes",
@@ -1147,6 +1148,10 @@ const routes = [
       { path: 'geneticas', component: () => import('../views/GeneticasView.vue') },
       { path: 'historial', component: () => import('../views/HistorialDispensacionesView.vue') },
       { path: 'pacientes', component: () => import('../views/PacientesDispatch.vue') },
+      // Nutrientes y recetas, y la guía, también dentro del shell (19-oct-2026): en una organización
+      // no había forma de verlas desde la app del teléfono.
+      { path: 'recetas',         component: () => import('../views/RecetasView.vue') },
+      { path: 'guia-nutrientes', component: () => import('../views/personal/GuiaNutrientesView.vue') },
       // El alta y la ficha también dentro del shell (19-oct-2026): con la PWA instalada, «Nuevo
       // paciente» y tocar una fila llevaban al inicio (el guard no encontraba `/m/pacientes/…`).
       { path: 'pacientes/nuevo', component: () => import('../views/SocioNuevoView.vue'),
@@ -1275,12 +1280,12 @@ const ROLE_ALLOWED_PREFIX = {
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
   // Sin '/plan-trabajo': los planes son de administración (el backend sólo deja a admin/supervisor)
   // y la pantalla no puede ofrecer lo que el backend rechaza (7-oct-2026).
-  cultivador: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas',
+  cultivador: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/guia-nutrientes', '/tareas',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/m', ...ETIQUETAS, ...COMUNES],
 
   // Supervisa el cultivo de sus sedes y además dispensa.
-  supervisor: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
+  supervisor: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/guia-nutrientes', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
                '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m',

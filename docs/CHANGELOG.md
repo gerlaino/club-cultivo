@@ -1,5 +1,26 @@
 # Changelog
 
+## Octubre 2026 (fs) — Nutrientes en organizaciones: como en autocultivo, por sede (19-oct)
+
+- «Nutrientes y recetas» también en organizaciones: arriba, los nutrientes del depósito agrupados
+  por producto con una fila por sede (cuánto queda, para cuántos riegos alcanza, «queda poco»),
+  filtro por sede, «Producto» (alta sin stock) y «Cargar compra», que lleva a la única puerta de la
+  compra (Contabilidad → Nueva compra) con el producto y su depósito. Cada receta dice cuánto
+  cuesta el litro (`costo_por_base_ars`, sólo administración).
+- La plata, sólo administración: el cultivador ya no recibe costos de insumos (lista, ficha,
+  compras, consumos), ni de «Dónde se usó» una receta, ni el «≈ $ X en nutrientes» del riego.
+- Teléfono: «Regar · Foto · Ambiente · Más» en la sala también en organizaciones, «Regar» en el
+  lote, y `/m/recetas` y `/m/guia-nutrientes` (Nutrientes en la barra del cultivador y del admin).
+- La guía de nutrientes se lee en organizaciones (quien cultiva); aplicarla a las alertas sigue
+  siendo del autocultivo (en una organización: Configuración → Alertas).
+- La ficha del lote ya no dice «0 L de solución» cuando ninguna fertilización tiene volumen.
+
+## Octubre 2026 (fr) — Un médico no tiene dos turnos en el mismo horario (19-oct)
+
+- `Turno#sin_superposicion` (Germán): agendar, reprogramar o dar el turno en el alta encima de otro
+  turno del mismo médico se rechaza con «El médico ya tiene un turno a las 10:00 del 20/10». Vale
+  para la agenda de administración, la del médico y el alta. Turnos pegados y cancelados, permitidos.
+
 ## Octubre 2026 (fq) — Los tres estados del paciente; alta por pasos y edición por solapas (19-oct)
 
 - **Tres ejes** (Germán): vínculo, REPROCANN y paciente, calculados en `Pacientes::Situacion` y

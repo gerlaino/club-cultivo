@@ -82,7 +82,26 @@ class RecetasController < ApplicationController
       # la pantalla calcula cualquier cantidad sin volver a pedir.
       por_litro: r.receta_items.map { |it| { insumo_id: (aca[it.id] || it.insumo).id, dosis: it.dosis, factor: it.factor_a_insumo.to_f } },
     }
+    base[:costo_por_base_ars] = costo_por_base(r, aca) if ve_plata?
     con_uso ? base.merge(uso: uso_de(r)) : base
+  end
+
+  # La plata, sólo administración (la misma regla que `Lotes::Nutricion`): el cultivador arma y
+  # aplica recetas, pero no ve cuánto cuestan. En uso personal la persona es admin.
+  def ve_plata? = current_user.admin? || current_user.supervisor? || current_user.super_admin?
+
+  # Cuánto cuesta una unidad de base (un litro de solución, un m², un litro de suelo) con el costo
+  # promedio de cada producto en la sede donde se aplica. Nil si algún producto no tiene costo:
+  # mostrar un número que no cuenta todo sería peor que no mostrarlo.
+  def costo_por_base(r, aca)
+    partes = r.receta_items.map do |it|
+      ins = aca[it.id] || it.insumo
+      costo = ins.costo_promedio_ars.to_d
+      return nil unless costo.positive?
+
+      it.dosis.to_d * it.factor_a_insumo.to_d * costo
+    end
+    partes.sum.round(2).to_f
   end
 
   # Dónde se usó: lotes, aplicaciones y plata. Para comparar «con qué receta rindió más».
@@ -95,16 +114,19 @@ class RecetasController < ApplicationController
       aplicaciones: registros.size + de_camas.size,
       camas: de_camas.group_by(&:cama).map { |cama, regs|
         { id: cama.id, nombre: cama.nombre, aplicaciones: regs.size,
-          costo_ars: regs.sum(&:costo_ars).round(2) }
+          costo_ars: plata(regs.sum(&:costo_ars).round(2)) }
       },
       lotes: lotes.map { |l|
         regs = registros.select { |x| x.lote_id == l.id }
         { id: l.id, codigo: l.codigo, estado: l.estado, aplicaciones: regs.size,
           litros: regs.sum { |x| x.litros.to_f }.round(1),
-          costo_ars: regs.sum { |x| x.nutricion.to_h['costo_ars'].to_f }.round(2),
+          costo_ars: plata(regs.sum { |x| x.nutricion.to_h['costo_ars'].to_f }.round(2)),
           plantas: l.plants_count }
       },
-      costo_total_ars: (registros.sum { |x| x.nutricion.to_h['costo_ars'].to_f } + de_camas.sum(&:costo_ars)).round(2),
+      costo_total_ars: plata((registros.sum { |x| x.nutricion.to_h['costo_ars'].to_f } + de_camas.sum(&:costo_ars)).round(2)),
+      con_costo: ve_plata?,
     }
   end
+
+  def plata(valor) = ve_plata? ? valor : nil
 end

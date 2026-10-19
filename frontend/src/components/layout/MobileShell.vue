@@ -238,6 +238,8 @@ const NAV = {
     // sala; una lista de todas las plantas en el teléfono no se usa. Genéticas es material de
     // consulta de escritorio. Queda "Mis horas", que sí se marca de pie.
     { to: '/m/horas',             icon: 'bi-clock-history', label: 'Mis horas' },
+    // Las recetas para regar y cuánto queda de cada nutriente en su sede (19-oct-2026).
+    { to: '/m/recetas',           icon: 'bi-droplet-half',  label: 'Nutrientes', feature: 'cultivo' },
   ] },
   // El admin en el celular NO administra: mira cómo va el día y desbloquea lo que traba a otros.
   // Lo de escritorio —contabilidad, informes, configuración— no se bloquea (si lo necesita abre
@@ -252,6 +254,7 @@ const NAV = {
     { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },
     { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas', feature: 'produccion_dispensa' },
     { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes', feature: 'produccion_dispensa' },
+    { to: '/m/recetas',       icon: 'bi-droplet-half',  label: 'Nutrientes', feature: 'cultivo' },
     // Sin "Plantas": el mismo criterio que en el cultivador, que es quien las trabaja —a una
     // planta se llega escaneando su QR o desde su lote, no de una lista de todas. Para el admin
     // en el celular tiene todavía menos sentido: no registra plantas, mira cómo va el día.
