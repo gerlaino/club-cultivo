@@ -478,7 +478,11 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin
   recargar. No inventar otro canal ni otro payload: el aviso no lleva datos, la pantalla re-pide.
   Los `refrescar()` de los stores son SILENCIOSOS (sin `loading`): un spinner encima de una
-  lista que cambia un número es un parpadeo.
+  lista que cambia un número es un parpadeo. **Lo que pasó sin señal se re-pide** (16-oct-2026):
+  en el teléfono el WebSocket se corta con la pantalla apagada y esos avisos no llegan nunca; al
+  reconectar o al volver a la app (más de 3 s afuera) `lib/cambios.js` corre todas las recargas
+  anotadas con `alCambiarAgrupado`/`useRecargaEnCambios`, sin pasar por sus filtros. Una pantalla
+  cuya recarga silenciosa da 404 (el registro dejó de estar a su alcance) lo dice y se va.
 - **PUSH: LO QUE NO SE OFRECE NO SE MANDA** (20-sep-2026). `Notificaciones::Catalogo` es la única
   lista de avisos al teléfono: por rol, por módulo contratado, con default y con `personal`.
   `PushNotificationService` exige `tipo:` en todo disparador nuevo y filtra con
@@ -562,6 +566,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   arregla peso confirmado + stock con un movimiento que nombra el lote. `compra_externa` sí
   puede subir (respaldo: la factura). Merma y pérdida nunca suman: eso es un reconteo. Es la
   misma familia que «contar no crea stock» en el mostrador.
+- **ELIMINAR UN STOCK ES PARA EL ERROR DE CARGA** (16-oct-2026, Germán): un stock con dispensas
+  —él o cualquier derivado, anuladas incluidas— **no se elimina, se finaliza**. Lo valida
+  `EliminarStockService` (mira la columna espejo y TODAS las líneas de las dispensas) y la ficha
+  apaga el botón con `eliminar_bloqueo`. Eliminar un derivado es deshacer un error: los gramos
+  vuelven al origen y la producción **se quita** de su historial, sin movimiento de vuelta
+  («no debería reflejarse en el historial ya que sería un error humano»; reemplaza lo de (fn)).
 - **LOS ESTADOS DEL REPROCANN** (2-oct-2026, Germán; «vencido» desde el 6-oct, Javi): sin registro,
   pendiente de aprobación (en trámite), **vigente** (guardado como `activo`, por historia) y
   **vencido**. «Vencido» SE PUEDE GUARDAR desde el 6-oct, para cuando saben que venció aunque no
@@ -606,11 +616,28 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`otra_organizacion`) = paciente nuevo con REPROCANN vigente, vinculado a otra organización por
   ahora. Vacío = sin dato: los que ya existían arrancan así, nadie adivina. El mostrador no lo ve
   (como el resto del REPROCANN). PENDIENTE DE DECIDIR: si los adherentes salen en el informe REPROCANN.
-- **PENDIENTE DE ENTREVISTA / FALTÓ AL TURNO** (6-oct-2026, Germán): se calculan solos de los
-  turnos (`Pacientes::Entrevista`), nadie los marca. Pendiente = tiene un turno cuya hora pasó y el
-  médico no lo cerró (programado/confirmado): administración apura al médico. Faltó = su último
-  turno no cancelado quedó ausente y no tiene otro dado: hay que darle turno, no apurar al médico.
-  Administración ve el contador por médico («pasados sin cerrar») y el filtro en la lista.
+- **LOS TRES ESTADOS DEL PACIENTE** (18 y 19-oct-2026, Germán; reemplaza «pendiente de entrevista
+  sale de los turnos» del 6-oct). Tres ejes, una sola regla (`Pacientes::Situacion`, viaja como
+  `situacion` en la lista, la ficha y la del médico; los contadores usan la misma cuenta):
+  1. **Vínculo**: adherente (REPROCANN vigente con otra organización, retira) o vinculado. Sin dato
+     cuenta como vinculado.
+  2. **REPROCANN**: el del adherente es el que se cargó, y no pide entrevista. El del vinculado lo
+     calcula el sistema: pendiente de entrevista (sin número ni vencimiento) → «Inicié el trámite» →
+     pendiente de aprobación → «Llegó aprobado» (número y vencimiento) → activo → a 30 días de vencer
+     pide entrevista otra vez → vencido (muestra los dos). Hay REPROCANN si hay número O vencimiento.
+  3. **Paciente**: activo · suspendido (90 días, solo) · inactivo (baja) · sin aprobar (mostrador).
+  **«No indicado»** (la médica no lo pide, sólo desde pendiente de entrevista) y **«Rechazado»** (el
+  Ministerio, sólo desde un trámite en curso) llevan motivo (cifrado) y fecha, y dejan al paciente
+  **inactivo**: no retira (Germán: «no debería poder dispensar»). Se sale con «Volver a entrevistar»,
+  sólo administración. No se ponen ni se sacan desde la edición. Cada paso valida desde dónde se da
+  (`Paciente::PasoInvalido`) y la pantalla ofrece sólo `situacion.acciones`.
+  Los turnos agregan datos chicos: próximo turno, «faltó al turno del 12/10» (último no cancelado
+  ausente y sin otro después) y «turno pasado sin cerrar» (aviso para médico y administración).
+- **EL ALTA ES POR PASOS Y LA EDICIÓN POR SOLAPAS, CON EL MISMO FORMULARIO** (19-oct-2026):
+  Persona → Domicilio → REPROCANN → Turno y confirmar (`components/pacientes/formulario/`). El DNI
+  repetido se avisa en el paso 1. El turno es opcional, lo da administración y viaja en el mismo
+  `POST /pacientes` (`turno: {medico_id, fecha_hora}`): si no entra, no queda un alta a medias.
+  El alta y la ficha existen también bajo `/m` (la PWA las rebotaba al inicio).
 - **EL TOTAL NO SE TIPEA** (7-oct-2026, Germán; reemplaza la primera mitad de la regla de abajo):
   es la suma del carrito menos los descuentos, y lo calcula el backend (un `aporte_socio_ars`
   mandado a mano se ignora, también del admin). Para cobrar menos hay UN camino: el descuento de la
@@ -864,6 +891,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   confirmar/enviar/reajustar/quitar van con candado; el destino es un frasco de flor seca del lote;
   reajustar después del cierre recalcula el rendimiento del lote. `rake manicura:diagnostico`
   encuentra lo que haya quedado mal de antes.
+- **«EN REVISIÓN POR X»** (16-oct-2026, Javi: «al abrir para confirmar se debería bloquear al
+  manicura»): abrir «Confirmar» toma el pesaje (`POST …/revisar`, `revisando_por`/`revisando_at`);
+  mientras dure nadie más lo reabre, lo borra, lo devuelve a cosecha ni lo confirma. Se libera al
+  cerrar el modal (`DELETE …/revisar`, sólo quien lo tiene), al confirmar, al reabrirlo quien lo
+  tiene, o solo a los 15 minutos (`PesajeManicura::REVISION_DURA`). Aun vencido, confirmar manda
+  la versión que vio (`version` = `enviado_at`) y se rechaza (409, `cambio: true`) si se reenvió.
 - **EL FRASCO SE CIERRA CUANDO EL ADMIN LO CIERRA** (Germán, 1-oct-2026). Dispensar lo último
   pregunta «¿cerrás el frasco?»; si no, queda abierto y vacío (Stock → Vacíos) y el lote NO se
   finaliza hasta que se cierre su último frasco abierto. Cerrar uno vacío no pide motivo.

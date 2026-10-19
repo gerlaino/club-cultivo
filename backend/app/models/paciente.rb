@@ -10,7 +10,7 @@ class Paciente < ApplicationRecord
   # rompería el cifrado at-rest (ENC-01) + la privacidad de la historia clínica (fix AZ).
   # Lo valioso y seguro: identidad básica + vencimiento/estado REPROCANN (los críticos de la organización).
   auditar_solo :nombre, :apellido, :apodo, :fecha_nacimiento, :reprocann_vencimiento, :reprocann_estado,
-               :reprocann_vinculo, :reprocann_tramite_iniciado_el
+               :reprocann_vinculo, :reprocann_tramite_iniciado_el, :reprocann_resultado_el, :es_paciente
   acts_as_paranoid
   belongs_to :club
   acts_as_tenant(:club)
@@ -61,8 +61,12 @@ class Paciente < ApplicationRecord
   encrypts :alergias
   encrypts :medicacion_habitual
   encrypts :grupo_sanguineo
+  # Por qué la médica no lo indicó o por qué lo rechazaron: puede ser clínico.
+  encrypts :reprocann_resultado_motivo
 
   before_validation :normalize_dni!
+  # Un número en blanco es «sin número»: cifrado, '' deja de ser nulo y se contaba como que tenía.
+  before_validation { self.reprocann_numero = reprocann_numero.presence }
   before_create     :assign_carnet_token
   # TODO PACIENTE NACE CON CUENTA CORRIENTE (decisión de Germán, 18-sep-2026). Es la cuenta donde
   # cae el vuelto que no se pudo dar y lo que pagó de más, y se descuenta sola en la próxima. Nace
@@ -80,7 +84,12 @@ class Paciente < ApplicationRecord
   # «Inactivo» se ofrecía y no es un estado del REPROCANN —activo/inactivo es el PACIENTE en la
   # organización, `es_paciente`—: ya no se puede guardar. Sólo se valida al CAMBIAR, así los que lo
   # tienen de antes no se traban hasta pasar `rake reprocann:sin_inactivo`.
-  REPROCANN_ESTADOS = %w[sin_registro pendiente activo vencido].freeze
+  #
+  # «No indicado» y «Rechazado» (Germán, 19-oct-2026): la médica decide no pedirlo, o el Ministerio
+  # rechaza el trámite. Sólo se llega con su acción (`marcar_no_indicado!` / `marcar_rechazado!`,
+  # que guardan el motivo) y el paciente queda inactivo. El ciclo completo, en `Pacientes::Situacion`.
+  REPROCANN_ESTADOS  = %w[sin_registro pendiente activo vencido no_indicado rechazado].freeze
+  REPROCANN_CERRADOS = Pacientes::Situacion::CERRADOS
 
   # DE QUIÉN ES SU REPROCANN (6-oct-2026), otro eje distinto del estado: `organizacion` = Vinculado
   # (el REPROCANN está con esta organización) · `otra_organizacion` = Adherente (paciente nuevo con
@@ -104,6 +113,7 @@ class Paciente < ApplicationRecord
     uniqueness: { scope: :club_id, message: "ya está registrado en esta organización." },
     format:     { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
   validate :fecha_nacimiento_pasada
+  validate :cerrado_no_retira
 
   scope :for_club,          ->(club_id) { where(club_id: club_id) }
   scope :con_seguimiento,   -> { where(con_seguimiento_medico: true) }
@@ -236,6 +246,7 @@ class Paciente < ApplicationRecord
 
   def self.reprocann_categoria(estado:, numero:, vencimiento:, hoy: Time.zone.today)
     return 'pendiente' if estado.to_s == 'pendiente'
+    return 'sin_reprocann' if REPROCANN_CERRADOS.include?(estado.to_s) # no indicado / rechazado: no lo tiene
     return 'vencido'   if estado.to_s == 'vencido' # guardado a mano: lo saben aunque no haya fecha
     return 'sin_reprocann' if numero.blank?
     return 'vigente'    if vencimiento.blank? # certificado sin fecha cargada: existe igual
@@ -249,21 +260,83 @@ class Paciente < ApplicationRecord
                                    vencimiento: reprocann_vencimiento)
   end
 
+  # ── El ciclo del REPROCANN de un vinculado (19-oct-2026) ──────────────────────────────────────
+  # Cada paso valida que se pueda dar DESDE el estado actual, con la misma regla que arma las
+  # acciones de la pantalla (`Pacientes::Situacion.acciones`): lo que la pantalla no ofrece, esto
+  # lo rechaza con el motivo.
+  class PasoInvalido < StandardError; end
+
+  def situacion(ultima_dispensacion: nil, agenda: nil, usuario: nil)
+    Pacientes::Situacion.de(self, ultima_dispensacion: ultima_dispensacion, agenda: agenda, usuario: usuario)
+  end
+
+  def reprocann_situacion
+    Pacientes::Situacion.reprocann(estado: reprocann_estado, numero: reprocann_numero,
+                                   vencimiento: reprocann_vencimiento, vinculo: reprocann_vinculo)
+  end
+
+  def adherente? = Pacientes::Situacion.adherente?(reprocann_vinculo)
+
+  def pendiente_entrevista?
+    Pacientes::Situacion.pendiente_entrevista?(reprocann_situacion, vencimiento: reprocann_vencimiento,
+                                               vinculo: reprocann_vinculo)
+  end
+
   # «Inicié el trámite» (Javi, 6-oct): lo marca el médico o administración. Pasa a pendiente (en
   # trámite), guarda el día y avisa a administración. Como es el mismo campo que leen la lista,
   # la ficha, el mostrador y los informes, el cambio se ve en todos lados (y `Transmite` avisa a
-  # las pantallas abiertas).
+  # las pantallas abiertas). Sólo desde «pendiente de entrevista» (19-oct): un adherente lo tramita
+  # en su organización, y un trámite ya iniciado no se vuelve a iniciar.
   def iniciar_tramite_reprocann!(por:, hoy: Time.zone.today)
-    update!(reprocann_estado: 'pendiente', reprocann_tramite_iniciado_el: hoy, updated_by: por)
-    return if por&.admin?
+    raise PasoInvalido, 'Es adherente: su REPROCANN lo tramita su organización.' if adherente?
+    raise PasoInvalido, 'El trámite ya está iniciado.' if reprocann_situacion == 'pendiente_aprobacion'
+    unless pendiente_entrevista?
+      raise PasoInvalido, 'Su REPROCANN no necesita trámite ahora (está vigente o cerrado).'
+    end
 
-    AlertaInterna.create!(
-      club: club, tipo: 'reprocann_tramite_iniciado', severidad: 'info', destinada_a_role: 'admin',
-      creada_por: por,
-      mensaje: "#{por&.nombre_completo || 'Alguien'} inició el trámite del REPROCANN de #{nombre_completo}.",
-      contexto: { paciente_id: id }
-    )
+    update!(reprocann_estado: 'pendiente', reprocann_tramite_iniciado_el: hoy, updated_by: por)
+    avisar_a_administracion(por, 'reprocann_tramite_iniciado', "inició el trámite del REPROCANN de #{nombre_completo}.")
   end
+
+  # Llegó aprobado: número y vencimiento, y queda activo.
+  def cargar_reprocann_aprobado!(por:, numero:, vencimiento:)
+    raise PasoInvalido, 'Sólo se carga el REPROCANN aprobado de un trámite en curso.' unless reprocann_situacion == 'pendiente_aprobacion'
+    raise PasoInvalido, 'Falta el número del REPROCANN.' if numero.blank?
+    venc = vencimiento.is_a?(Date) ? vencimiento : (Date.parse(vencimiento.to_s) rescue nil)
+    raise PasoInvalido, 'Falta la fecha de vencimiento.' unless venc
+    raise PasoInvalido, 'La fecha de vencimiento ya pasó.' if venc < Time.zone.today
+
+    update!(reprocann_estado: 'activo', reprocann_numero: numero, reprocann_vencimiento: venc, updated_by: por)
+  end
+
+  # La médica decide no pedirlo. Queda inactivo (no retira) y se guarda por qué.
+  def marcar_no_indicado!(por:, motivo:, hoy: Time.zone.today)
+    raise PasoInvalido, 'Es adherente: su REPROCANN lo tramita su organización.' if adherente?
+    raise PasoInvalido, 'Sólo se marca «No indicado» a quien está pendiente de entrevista.' unless pendiente_entrevista?
+
+    cerrar_reprocann!('no_indicado', por: por, motivo: motivo, hoy: hoy)
+    avisar_a_administracion(por, 'reprocann_no_indicado',
+                            "marcó el REPROCANN de #{nombre_completo} como «No indicado». Quedó inactivo.")
+  end
+
+  # El Ministerio rechazó el trámite. Queda inactivo y se guarda por qué.
+  def marcar_rechazado!(por:, motivo:, hoy: Time.zone.today)
+    raise PasoInvalido, 'Sólo se marca «Rechazado» a un trámite en curso.' unless reprocann_situacion == 'pendiente_aprobacion'
+
+    cerrar_reprocann!('rechazado', por: por, motivo: motivo, hoy: hoy)
+    avisar_a_administracion(por, 'reprocann_rechazado',
+                            "marcó el trámite del REPROCANN de #{nombre_completo} como «Rechazado». Quedó inactivo.")
+  end
+
+  # Volver al ciclo: entrevista nueva y otra vez activo. Si tenía un REPROCANN de antes, queda con
+  # sus datos (y la fecha dice si está vencido); el motivo queda guardado como antecedente.
+  def volver_a_entrevistar!(por:)
+    raise PasoInvalido, 'Sólo vuelve a entrevista un REPROCANN «No indicado» o «Rechazado».' unless REPROCANN_CERRADOS.include?(reprocann_estado)
+
+    update!(reprocann_estado: reprocann_numero.present? ? 'activo' : 'sin_registro', es_paciente: true, updated_by: por)
+  end
+
+  def reprocann_cerrado? = REPROCANN_CERRADOS.include?(reprocann_estado.to_s)
 
   def saldo_cc
     cuenta_corriente&.saldo_disponible&.to_f
@@ -331,6 +404,32 @@ class Paciente < ApplicationRecord
 
   def assign_carnet_token
     self.carnet_token ||= SecureRandom.uuid
+  end
+
+  def cerrar_reprocann!(estado, por:, motivo:, hoy:)
+    raise PasoInvalido, 'Contá el motivo: es lo que se lee al volver a entrevistarlo.' if motivo.to_s.strip.blank?
+
+    update!(reprocann_estado: estado, reprocann_resultado_motivo: motivo.to_s.strip, reprocann_resultado_el: hoy,
+            es_paciente: false, updated_by: por)
+  end
+
+  # Lo hizo el médico: administración se entera. Si lo hizo administración, no hace falta avisarse.
+  def avisar_a_administracion(por, tipo, texto)
+    return if por&.admin? || por&.super_admin?
+
+    AlertaInterna.create!(
+      club: club, tipo: tipo, severidad: 'info', destinada_a_role: 'admin', creada_por: por,
+      mensaje: "#{por&.nombre_completo || 'Alguien'} #{texto}", contexto: { paciente_id: id }
+    )
+  end
+
+  # «No indicado» o «Rechazado» = inactivo (Germán, 19-oct-2026: «no debería poder dispensar»).
+  # Para reactivarlo hay que volver a entrevistarlo, no destildar «inactivo».
+  def cerrado_no_retira
+    return unless es_paciente && reprocann_cerrado?
+
+    errors.add(:base, "Con el REPROCANN «#{reprocann_estado == 'rechazado' ? 'Rechazado' : 'No indicado'}» " \
+                      'el paciente queda inactivo. Para reactivarlo, «Volver a entrevistar».')
   end
 
   def fecha_nacimiento_pasada

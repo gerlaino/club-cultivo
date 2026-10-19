@@ -116,15 +116,16 @@
                 <span>{{ p.plantas_count || p.plantas_registradas || 0 }} plantas</span>
                 <span>{{ formatG((p.peso_total_g || p.peso_calculado_g || 0), 1) }}</span>
               </div>
-              <span class="mpv__badge" :class="badgeClass(p.estado)">
-                {{ estadoLabel(p.estado) }}
+              <!-- El admin lo está confirmando: no se reabre ni se borra hasta que termine (o 15 min). -->
+              <span class="mpv__badge" :class="badgeClass(p.estado)" :data-testid="p.en_revision ? 'pesaje-en-revision' : null">
+                {{ p.en_revision ? `En revisión por ${p.revisando_por || 'administración'}` : estadoLabel(p.estado) }}
               </span>
               <div v-if="p.estado === 'confirmado'" class="mpv__hist-confirmado">
                 <CheckCircle :size="12" :stroke-width="2" />
                 {{ formatG((p.peso_confirmado_g || 0), 1) }} confirmados
               </div>
               <button
-                v-if="p.estado === 'enviado'"
+                v-if="p.estado === 'enviado' && !p.en_revision"
                 class="mpv__hist-act"
                 :disabled="reabriendo === p.id"
                 title="Reabrir para corregir"
@@ -133,7 +134,7 @@
                 <Undo2 :size="14" :stroke-width="2" />
               </button>
               <button
-                v-if="p.estado !== 'confirmado'"
+                v-if="p.estado !== 'confirmado' && !p.en_revision"
                 class="mpv__hist-del"
                 :disabled="borrando === p.id"
                 title="Borrar jornada"

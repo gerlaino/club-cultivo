@@ -10,9 +10,12 @@ RSpec.describe 'Auditable — Fase 2 (Paciente / User / Reserva)', type: :model 
     it 'Paciente audita solo campos administrativos; nunca cifrados ni clínicos' do
       solo = Paciente.campos_auditables_solo
       # Apodo, vínculo REPROCANN y fecha de inicio del trámite (6-oct-2026): administrativos, en claro.
+      # Y desde el 19-oct-2026 la fecha de «No indicado»/«Rechazado» y la baja (`es_paciente`): quién
+      # dejó inactivo a alguien es lo primero que se pregunta. El MOTIVO no (va cifrado, puede ser clínico).
       expect(solo).to contain_exactly('nombre', 'apellido', 'apodo', 'fecha_nacimiento', 'reprocann_vencimiento',
-                                      'reprocann_estado', 'reprocann_vinculo', 'reprocann_tramite_iniciado_el')
-      %w[dni reprocann_numero email telefono anamnesis notas_clinicas diagnostico_principal medicacion_habitual grupo_sanguineo].each do |prohibido|
+                                      'reprocann_estado', 'reprocann_vinculo', 'reprocann_tramite_iniciado_el',
+                                      'reprocann_resultado_el', 'es_paciente')
+      %w[dni reprocann_numero reprocann_resultado_motivo email telefono anamnesis notas_clinicas diagnostico_principal medicacion_habitual grupo_sanguineo].each do |prohibido|
         expect(solo).not_to include(prohibido)
       end
     end

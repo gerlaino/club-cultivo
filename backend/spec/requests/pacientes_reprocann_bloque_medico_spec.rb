@@ -28,12 +28,12 @@ RSpec.describe 'Pacientes: REPROCANN vencido, trámite, vínculo y apodo', type:
       expect(data['reprocann_categoria']).to eq('vencido')
     end
 
-    it 'cuenta en «vencidos» del padrón, y no en «sin REPROCANN»' do
+    it 'cuenta en «vencidos» del padrón, y también pide entrevista (vencido muestra los dos)' do
       paciente.update!(reprocann_estado: 'vencido')
       get '/api/pacientes'
       kpis = JSON.parse(response.body)['meta']['kpis']
       expect(kpis['vencidos']).to eq(1)
-      expect(kpis['sin_rep']).to eq(0)
+      expect(kpis['entrevista_pendiente']).to eq(1)
     end
 
     it 'también se ve vencido en la lista del médico' do

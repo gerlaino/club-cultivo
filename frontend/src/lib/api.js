@@ -300,8 +300,9 @@ export const borrarDireccionPaciente  = (id, dId)         => api.delete(`/pacien
 export const direccionPorDefecto      = (id, dId)         => api.patch(`/pacientes/${id}/direcciones/${dId}/por_defecto`);
 // `enviar_bienvenida` va al lado de `paciente`, no adentro: no es un campo de la persona sino
 // una instrucción sobre el alta. El backend igual ignora el parámetro si el rol no puede aprobar.
-export const createPaciente     = (payload, { enviarBienvenida = false } = {}) =>
-  api.post("/pacientes", { paciente: payload, enviar_bienvenida: enviarBienvenida });
+// `turno` (opcional, 19-oct-2026): { medico_id, fecha_hora } — el alta y su primer turno en un paso.
+export const createPaciente     = (payload, { enviarBienvenida = false, turno = null } = {}) =>
+  api.post("/pacientes", { paciente: payload, enviar_bienvenida: enviarBienvenida, ...(turno ? { turno } : {}) });
 // Admitir a alguien cargado desde el mostrador. Sólo admin y médico (lo valida el backend).
 export const aprobarPaciente    = (id, { enviarBienvenida = false } = {}) =>
   api.post(`/pacientes/${id}/aprobar`, { enviar_bienvenida: enviarBienvenida });
@@ -967,6 +968,9 @@ export const enviarPesajeManicura     = (loteId, id)       => api.post(`/lotes/$
 export const deletePesajeManicura      = (loteId, id)       => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const reabrirPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/reabrir`)
 export const confirmarPesajeManicura  = (loteId, id, payload) => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/confirmar`, payload)
+// «En revisión por X»: el admin abre «Confirmar» (nadie más lo reabre ni lo borra) y lo suelta al cerrar.
+export const revisarPesajeManicura    = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/revisar`)
+export const soltarRevisionPesajeManicura = (loteId, id)   => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}/revisar`)
 // Saca UNA planta de la jornada abierta (se pesó la que no era): vuelve a quedar sin pesar.
 export const quitarPlantaPesajeManicura = (loteId, id, plantId) => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}/plantas/${plantId}`)
 // `stockId`: el frasco que se corrige (si el pesaje se repartió en varios, el backend lo exige).
@@ -1082,6 +1086,11 @@ export const vincularMedico               = (pacienteId, medicoId) => api.post(`
 export const desvincularMedico            = (pacienteId, medicoId) => api.delete(`/pacientes/${pacienteId}/medicos/${medicoId}`)
 // «Inicié el trámite» del REPROCANN: el médico o administración.
 export const iniciarTramiteReprocann      = (pacienteId)           => api.post(`/pacientes/${pacienteId}/iniciar_tramite_reprocann`)
+// El resto del ciclo (19-oct-2026). El backend valida que el paso se pueda dar desde el estado actual.
+export const reprocannAprobado            = (pacienteId, { numero, vencimiento }) => api.post(`/pacientes/${pacienteId}/reprocann_aprobado`, { numero, vencimiento })
+export const reprocannNoIndicado          = (pacienteId, motivo)   => api.post(`/pacientes/${pacienteId}/reprocann_no_indicado`, { motivo })
+export const reprocannRechazado           = (pacienteId, motivo)   => api.post(`/pacientes/${pacienteId}/reprocann_rechazado`, { motivo })
+export const volverAEntrevistar           = (pacienteId)           => api.post(`/pacientes/${pacienteId}/volver_a_entrevistar`)
 export const updateAdminTurno             = (id, payload) => api.patch(`/admin/turnos/${id}`, { turno: payload })
 export const deleteAdminTurno             = (id)      => api.delete(`/admin/turnos/${id}`)
 

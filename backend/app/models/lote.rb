@@ -677,6 +677,10 @@ class Lote < ApplicationRecord
     if pesajes_manicura.where(estado: 'confirmado').exists?
       raise "El lote ya tiene un pesaje confirmado: no se puede devolver a cosecha"
     end
+    # Devolver borra los pesajes enviados: tampoco mientras administración está confirmando uno.
+    if (rev = pesajes_manicura.enviados.detect { |p| p.en_revision_por_otro?(devuelto_por) })
+      raise "No se puede devolver a cosecha ahora: #{rev.motivo_en_revision}"
+    end
 
     quien = devuelto_por.first_name.presence || devuelto_por.email
     manicurador_previo = manicurador

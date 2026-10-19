@@ -1,578 +1,443 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+// EL ALTA DE UN PACIENTE, POR PASOS (19-oct-2026). Persona → Domicilio → REPROCANN → Turno y
+// confirmar. Pasos y no solapas porque el alta se hace una vez y en orden; la edición usa las MISMAS
+// secciones en solapas (`SocioEditarModal`). Cada paso valida lo suyo antes de seguir, y el DNI
+// repetido se avisa en el primero, no al final.
+import { ref, computed, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
-import { useToast } from '../composables/useToast.js'
 import { useClubStore } from '../stores/club'
+import { useToast } from '../composables/useToast.js'
+import { listPacientes } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
-import { toISO } from '../utils/dates.js'
-import { REPROCANN_ESTADOS, REPROCANN_VINCULOS } from '../composables/useSocioEditar.js'
+import SeccionPersona   from '../components/pacientes/formulario/SeccionPersona.vue'
+import SeccionDomicilio from '../components/pacientes/formulario/SeccionDomicilio.vue'
+import SeccionReprocann from '../components/pacientes/formulario/SeccionReprocann.vue'
+import SeccionTurno     from '../components/pacientes/formulario/SeccionTurno.vue'
+import {
+  formVacio, aPayload, validarPersona, validarReprocann, edad, dniLegible,
+  OPCIONES_VINCULADO, ESTADOS_ADHERENTE, esAdherente,
+} from '../components/pacientes/formulario/pacienteForm.js'
+import '../components/pacientes/formulario/formulario.css'
 
 const router = useRouter()
+const route  = useRoute()
+// Dentro del shell del teléfono (`/m`) la barra de botones va arriba de su barra de solapas.
+const enShell = computed(() => route.path.startsWith('/m/'))
 const store  = usePacientesStore()
+const auth   = useAuthStore()
 const club   = useClubStore()
+const toast  = useToast()
 
-const auth = useAuthStore()
-const { warning: toastWarn } = useToast()
-const sendWelcomeMail = ref(false)
+const form  = ref(formVacio())
+const turno = ref(null)
+const errores = ref({})
+const duplicado = ref(null)
+const errorGeneral = ref(null)
+const mandarBienvenida = ref(false)
 
-// El checkbox es sólo para quien ADMITE. El mostrador (dispensador, supervisor) carga un alta
-// que queda pendiente: darle la bienvenida a alguien que todavía puede no ser admitido sería
-// anunciarle algo que no pasó. Esa bienvenida sale al aprobar, desde la ficha.
-// Y hace falta el módulo de correo: sin él no hay plantilla ni casilla.
-const puedeMandarBienvenida = computed(() =>
-  ['admin', 'medico'].includes(auth.user?.role) && club.data?.features?.mailer === true
-)
-// La cuenta del portal recién creada, y a dónde ir cuando el admin termine de anotarla.
+const esAdmin = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+// El turno lo da administración (la agenda de los médicos es suya) y sólo con el módulo médico.
+const ofreceTurno = computed(() => esAdmin.value && club.data?.features?.medico === true)
+const puedeMandarBienvenida = computed(() => esAdmin.value && club.data?.features?.mailer === true)
+
+const PASOS = computed(() => [
+  { key: 'persona',   titulo: 'Persona',   sub: 'Identidad y contacto',     icono: 'bi-person-vcard' },
+  { key: 'domicilio', titulo: 'Domicilio', sub: 'Opcional',                 icono: 'bi-geo-alt' },
+  { key: 'reprocann', titulo: 'REPROCANN', sub: 'Vínculo y estado',         icono: 'bi-patch-check' },
+  { key: 'cierre',    titulo: ofreceTurno.value ? 'Turno y confirmar' : 'Confirmar',
+    sub: ofreceTurno.value ? 'Entrevista opcional' : 'Revisá y creá', icono: 'bi-check2-circle' },
+])
+const paso = ref(0)
+const visitado = ref(0)
+const actual = computed(() => PASOS.value[paso.value])
+const esUltimo = computed(() => paso.value === PASOS.value.length - 1)
+
+// ── Validación de cada paso ────────────────────────────────────────────────────
+const verificandoDni = ref(false)
+let dniVerificado = null
+let enCurso = null // { dni, promesa }: el blur del campo y el «Siguiente» piden lo mismo una sola vez
+
+// Al salir del campo arranca la consulta; el clic en «Siguiente» que viene justo después la ESPERA
+// (si apagara el botón, el clic caería sobre un botón apagado y parecería que no hace nada).
+function verificarDni() {
+  const dni = (form.value.dni || '').replace(/\D/g, '')
+  if (!/^\d{7,9}$/.test(dni)) { duplicado.value = null; return Promise.resolve(true) }
+  if (dniVerificado === dni) return Promise.resolve(!duplicado.value)
+  if (enCurso?.dni === dni) return enCurso.promesa
+  verificandoDni.value = true
+  const promesa = listPacientes({ dni, limite: 1 })
+    .then(({ data }) => {
+      const p = (data?.data || [])[0]
+      duplicado.value = p ? { id: p.id, nombre: `${p.nombre} ${p.apellido}`.trim() } : null
+      dniVerificado = dni
+      return !duplicado.value
+    })
+    .catch(() => { duplicado.value = null; return true }) // si no se pudo mirar, el backend igual lo frena al crear
+    .finally(() => { verificandoDni.value = false; enCurso = null })
+  enCurso = { dni, promesa }
+  return promesa
+}
+
+async function pasoValido(i) {
+  const key = PASOS.value[i].key
+  let e = {}
+  if (key === 'persona') e = validarPersona(form.value)
+  if (key === 'reprocann') e = validarReprocann(form.value)
+  errores.value = e
+  if (Object.keys(e).length) return false
+  if (key === 'persona') return verificarDni()
+  return true
+}
+
+// Un doble clic mientras se mira el DNI no salta dos pasos.
+let avanzando = false
+async function siguiente() {
+  if (avanzando) return
+  avanzando = true
+  try {
+    if (!(await pasoValido(paso.value))) { enfocarError(); return }
+    if (esUltimo.value) return await crear()
+    paso.value += 1
+    visitado.value = Math.max(visitado.value, paso.value)
+    arriba()
+  } finally {
+    avanzando = false
+  }
+}
+function atras() { if (paso.value > 0) { paso.value -= 1; errores.value = {}; arriba() } }
+async function irA(i) {
+  if (i === paso.value || i > visitado.value) return
+  if (i > paso.value && !(await pasoValido(paso.value))) return
+  paso.value = i; arriba()
+}
+
+const cuerpo = ref(null)
+function arriba() {
+  nextTick(() => {
+    cuerpo.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    cuerpo.value?.querySelector('input:not([type=checkbox]), button[role=radio]')?.focus({ preventScroll: true })
+  })
+}
+function enfocarError() {
+  nextTick(() => cuerpo.value?.querySelector('.pf-input--err')?.focus())
+}
+
+// ── El resumen (lo que se va a crear, dicho en palabras) ───────────────────────────
+const opcionVinc = computed(() => OPCIONES_VINCULADO.find(o => o.value === form.value.opcion_reprocann))
+const resumenReprocann = computed(() => {
+  if (esAdherente(form.value)) {
+    const e = ESTADOS_ADHERENTE.find(x => x.value === form.value.reprocann_estado)?.label || 'Vigente'
+    return { titulo: `Adherente · ${e}`, detalle: 'Su REPROCANN lo tramita su organización. Puede retirar.' }
+  }
+  return { titulo: `Vinculado · ${opcionVinc.value?.label}`, detalle: opcionVinc.value?.ayuda }
+})
+const domicilioTexto = computed(() => {
+  const f = form.value
+  const l1 = [f.domicilio_calle, f.domicilio_altura].filter(Boolean).join(' ')
+  const pd = [f.domicilio_piso && `Piso ${f.domicilio_piso}`, f.domicilio_depto && `Depto ${f.domicilio_depto}`].filter(Boolean).join(' ')
+  return [l1, pd, f.domicilio_barrio, f.domicilio_ciudad].filter(Boolean).join(', ')
+})
+const turnoTexto = computed(() => {
+  if (!turno.value) return null
+  const d = new Date(turno.value.fecha_hora)
+  return `${d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}, ${turno.value.fecha_hora.slice(11, 16)} · ${turno.value.medico_nombre}`
+})
+const nombreCompleto = computed(() => `${form.value.nombre} ${form.value.apellido}`.trim())
+const iniciales = computed(() => ((form.value.nombre?.[0] || '') + (form.value.apellido?.[0] || '')).toUpperCase() || '?')
+const anios = computed(() => edad(form.value.fecha_nacimiento))
+
+// Lo que el riel muestra debajo de cada paso ya hecho.
+function resumenPaso(key) {
+  if (key === 'persona' && form.value.nombre) return [nombreCompleto.value, form.value.dni && `DNI ${dniLegible(form.value.dni)}`].filter(Boolean).join(' · ')
+  if (key === 'domicilio') return domicilioTexto.value || 'Sin cargar'
+  if (key === 'reprocann') return resumenReprocann.value.titulo
+  return ''
+}
+
+// ── Crear ─────────────────────────────────────────────────────────────────────────
 const credenciales = ref(null)
-const irA          = ref(null)
+const irAlFinal    = ref(null)
 function cerrarCredenciales() {
   credenciales.value = null
-  if (irA.value) router.push(irA.value)
+  if (irAlFinal.value) router.push(irAlFinal.value)
 }
 
-const formError       = ref(null)
-const formErrors      = ref({})
-const todayISO        = new Date().toLocaleDateString('en-CA') // yyyy-mm-dd local
-
-const form = ref({
-  nombre:               '',
-  apellido:             '',
-  apodo:                '',
-  dni:                  '',
-  fecha_nacimiento:     '',
-  telefono:             '',
-  email:                '',
-  domicilio_calle:      '',
-  domicilio_altura:     '',
-  domicilio_piso:       '',
-  domicilio_depto:      '',
-  domicilio_barrio:     '',
-  domicilio_ciudad:     '',
-  envio_calle:          '',
-  envio_altura:         '',
-  envio_piso:           '',
-  envio_depto:          '',
-  envio_barrio:         '',
-  envio_ciudad:         '',
-  envio_etiqueta:       '',
-  reprocann_numero:     '',
-  reprocann_vencimiento:'',
-  reprocann_estado:     'sin_registro',
-  reprocann_vinculo:    '',
-  es_paciente:          true,
-})
-
-// Una sola lista para el alta, la ficha y el editor (antes había una copia acá).
-// REPROCANN_ESTADOS / REPROCANN_VINCULOS vienen de useSocioEditar.
-
-const reprocannVencimientoSugerido = computed(() => {
-  const d = new Date()
-  d.setFullYear(d.getFullYear() + 3)
-  return toISO(d)
-})
-
-function sugerirVencimiento() {
-  if (!form.value.reprocann_vencimiento && form.value.reprocann_numero) {
-    form.value.reprocann_vencimiento = reprocannVencimientoSugerido.value
-  }
-}
-
-function validate() {
-  const e = {}
-  if (!form.value.nombre.trim())    e.nombre          = 'Requerido'
-  if (!form.value.apellido.trim())  e.apellido         = 'Requerido'
-  if (!form.value.dni.trim())       e.dni              = 'Requerido'
-  if (form.value.dni && !/^\d{7,9}$/.test(form.value.dni.replace(/\D/g, '')))
-    e.dni = 'DNI inválido (7 a 9 dígitos)'
-  if (!form.value.fecha_nacimiento) e.fecha_nacimiento = 'Requerida'
-  if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email))
-    e.email = 'Email inválido'
-  // El domicilio NO frena el alta: en el mostrador se anota a la persona con lo que tiene a mano
-  // y la dirección aparece después. Donde sí hace falta es al despachar un envío, y ahí se pide.
-  formErrors.value = e
-  return !Object.keys(e).length
-}
-
-async function handleSubmit() {
-  if (!validate()) return
-  formError.value = null
+async function crear() {
+  errorGeneral.value = null
+  const payload = aPayload(form.value)
+  Object.keys(payload).forEach(k => { if (payload[k] === '' || payload[k] === null) delete payload[k] })
+  delete payload.es_paciente
+  delete payload.descuento_porcentaje
   try {
-    const payload = { ...form.value }
-    Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
-    // El mail viaja EN el alta, no como un segundo request. Antes se mandaba después con el
-    // texto escrito acá a mano y un `.catch(() => {})` que se comía cualquier error: si Gmail
-    // rechazaba, nadie se enteraba. Ahora el cuerpo sale de la plantilla de la organización
-    // —editable en Configuración → Correo electrónico— y el backend devuelve un `aviso` si no
-    // pudo mandarlo.
-    const { paciente: socio, aviso, acceso } = await store.create(payload, { enviarBienvenida: puedeMandarBienvenida.value && sendWelcomeMail.value })
-    if (aviso) toastWarn(aviso)
-
-    // La cuenta del portal se muestra ANTES de navegar: la contraseña no se puede volver a ver,
-    // así que irse de la pantalla sin haberla pasado la pierde. Si la organización no tiene el
-    // módulo, no viene nada y el alta sigue de largo como siempre.
+    const { paciente, aviso, acceso } = await store.create(payload, {
+      enviarBienvenida: puedeMandarBienvenida.value && mandarBienvenida.value && !!form.value.email,
+      turno: turno.value ? { medico_id: turno.value.medico_id, fecha_hora: turno.value.fecha_hora,
+                             duracion_minutos: turno.value.duracion_minutos, tipo: turno.value.tipo } : null,
+    })
+    toast.success(turno.value ? `${nombreCompleto.value} quedó dado de alta, con su turno.` : `${nombreCompleto.value} quedó dado de alta.`)
+    if (aviso) toast.warning(aviso)
+    const destino = { name: 'paciente-detail', params: { id: paciente.id } }
+    // La contraseña del portal se muestra ANTES de irse: no se puede volver a ver.
     if (acceso?.password_inicial) {
-      credenciales.value = { ...acceso, nombre: `${form.value.nombre} ${form.value.apellido}`.trim() }
-      irA.value = { name: 'paciente-detail', params: { id: socio.id } }
+      credenciales.value = { ...acceso, nombre: nombreCompleto.value }
+      irAlFinal.value = destino
       return
     }
-    if (acceso?.error) toastWarn(`El paciente se creó, pero su cuenta del portal no: ${acceso.error}`)
-
-    router.push({ name: 'paciente-detail', params: { id: socio.id } })
+    if (acceso?.error) toast.warning(`El paciente se creó, pero su cuenta del portal no: ${acceso.error}`)
+    router.push(destino)
   } catch (e) {
-    if (e.response?.status === 402) {
-      formError.value = e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo para actualizar.'
-    } else {
-      formError.value = store.error || 'Error al crear el paciente'
-    }
+    errorGeneral.value = e.response?.status === 402
+      ? (e.response.data?.mensaje || 'Llegaron al límite de pacientes del plan.')
+      : (store.error || 'No se pudo crear el paciente.')
   }
+}
+
+function onEnter(ev) {
+  if (ev.target?.tagName === 'TEXTAREA' || ev.isComposing) return
+  if (ev.target?.closest?.('.dp')) return // el calendario maneja su Enter
+  ev.preventDefault()
+  siguiente()
 }
 </script>
 
 <template>
-  <div class="snv">
-
+  <div class="alta" :class="{ 'alta--shell': enShell }">
     <CredencialesNuevas :datos="credenciales" @cerrar="cerrarCredenciales" />
 
-    <div class="snv__header">
-      <RouterLink to="/pacientes" class="snv__back">
-        <i class="bi bi-arrow-left"></i> Pacientes
-      </RouterLink>
-      <h1 class="snv__title">Nuevo paciente</h1>
-      <p class="snv__subtitle">Completá los datos básicos — podés agregar más información desde el perfil del paciente</p>
-    </div>
-
-    <div v-if="formError" class="snv__alert">
-      <i class="bi bi-exclamation-triangle-fill"></i>
-      {{ formError }}
-    </div>
-
-    <div class="snv__form">
-
-      <!-- ── Datos personales ── -->
-      <div class="snv__section">
-        <div class="snv__section-header">
-          <div class="snv__section-icon" style="background:rgba(3,105,161,.1);color:#0369a1">
-            <i class="bi bi-person-vcard"></i>
-          </div>
-          <div>
-            <div class="snv__section-title">Datos personales</div>
-            <div class="snv__section-sub">Información de identidad</div>
-          </div>
-        </div>
-
-        <div class="snv__grid snv__grid--2">
-          <div class="snv__field">
-            <label class="snv__label">Nombre <span class="snv__req">*</span></label>
-            <input v-model.trim="form.nombre" class="snv__input" :class="{ 'snv__input--err': formErrors.nombre }"
-              placeholder="Ej: Juan Martín" autofocus />
-            <span v-if="formErrors.nombre" class="snv__err">{{ formErrors.nombre }}</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Apellido <span class="snv__req">*</span></label>
-            <input v-model.trim="form.apellido" class="snv__input" :class="{ 'snv__input--err': formErrors.apellido }"
-              placeholder="Ej: García" />
-            <span v-if="formErrors.apellido" class="snv__err">{{ formErrors.apellido }}</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Apodo <span class="snv__opt">opcional</span></label>
-            <input v-model.trim="form.apodo" class="snv__input" maxlength="60" placeholder="¿Cómo le dicen?" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">DNI <span class="snv__req">*</span></label>
-            <input v-model.trim="form.dni" class="snv__input" :class="{ 'snv__input--err': formErrors.dni }"
-              placeholder="Sin puntos" />
-            <span v-if="formErrors.dni" class="snv__err">{{ formErrors.dni }}</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Fecha de nacimiento <span class="snv__req">*</span></label>
-            <AppDatePicker v-model="form.fecha_nacimiento" :max="todayISO" />
-            <span v-if="formErrors.fecha_nacimiento" class="snv__err">{{ formErrors.fecha_nacimiento }}</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Teléfono</label>
-            <input v-model.trim="form.telefono" class="snv__input" placeholder="+54 9 11 1234-5678" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Email</label>
-            <input v-model.trim="form.email" type="email" class="snv__input"
-              :class="{ 'snv__input--err': formErrors.email }" placeholder="paciente@email.com" />
-            <span v-if="formErrors.email" class="snv__err">{{ formErrors.email }}</span>
-          </div>
-        </div>
+    <header class="alta__head">
+      <RouterLink to="/pacientes" class="alta__back"><i class="bi bi-arrow-left"></i> Pacientes</RouterLink>
+      <h1 class="alta__title">Nuevo paciente</h1>
+      <!-- En el teléfono el riel no entra: paso, título y una barra. -->
+      <div class="alta__movil" aria-hidden="true">
+        <span class="alta__movil-n">Paso {{ paso + 1 }} de {{ PASOS.length }}</span>
+        <span class="alta__movil-t">{{ actual.titulo }}</span>
+        <div class="alta__barra"><div class="alta__barra-in" :style="{ width: `${((paso + 1) / PASOS.length) * 100}%` }"></div></div>
       </div>
+    </header>
 
-      <!-- ── Domicilio ── -->
-      <div class="snv__section">
-        <div class="snv__section-header">
-          <div class="snv__section-icon" style="background:rgba(180,83,9,.1);color:#b45309">
-            <i class="bi bi-geo-alt"></i>
-          </div>
-          <div>
-            <div class="snv__section-title">Domicilio del paciente</div>
-            <div class="snv__section-sub">Dirección del paciente · se usa como entrega por defecto</div>
-          </div>
-        </div>
-
-        <div class="snv__grid snv__grid--2">
-          <div class="snv__field">
-            <label class="snv__label">Calle</label>
-            <input v-model.trim="form.domicilio_calle" class="snv__input" :class="{ 'snv__input--err': formErrors.domicilio_calle }" placeholder="Ej: Av. Corrientes" />
-            <span v-if="formErrors.domicilio_calle" class="snv__err">{{ formErrors.domicilio_calle }}</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Altura</label>
-            <input v-model.trim="form.domicilio_altura" class="snv__input" placeholder="Ej: 1234" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Piso</label>
-            <input v-model.trim="form.domicilio_piso" class="snv__input" placeholder="Ej: 3" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Depto</label>
-            <input v-model.trim="form.domicilio_depto" class="snv__input" placeholder="Ej: B" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Barrio</label>
-            <input v-model.trim="form.domicilio_barrio" class="snv__input" placeholder="Ej: Almagro" />
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Ciudad</label>
-            <input v-model.trim="form.domicilio_ciudad" class="snv__input" placeholder="Ej: CABA" />
-          </div>
-        </div>
-
-        <!-- Dirección de entrega (opcional, si es distinta del domicilio) -->
-        <details class="snv__envio">
-          <summary class="snv__envio-sum">Dirección de entrega distinta <span class="snv__opt">opcional</span></summary>
-          <div class="snv__grid snv__grid--2" style="margin-top:.75rem">
-            <div class="snv__field" style="grid-column: 1 / -1">
-              <label class="snv__label">Nombre de la dirección <span class="snv__opt">ej. Trabajo</span></label>
-              <input v-model.trim="form.envio_etiqueta" class="snv__input" placeholder="Trabajo, casa de la madre…" />
+    <div class="alta__layout">
+      <!-- Riel de pasos (compu). Los hechos muestran lo cargado y se puede volver a ellos. -->
+      <nav class="alta__riel" aria-label="Pasos del alta">
+        <ol>
+          <li v-for="(p, i) in PASOS" :key="p.key">
+            <button type="button" class="riel__paso"
+                    :class="{ 'riel__paso--on': i === paso, 'riel__paso--hecho': i < paso || (i <= visitado && i !== paso) }"
+                    :disabled="i > visitado" :aria-current="i === paso ? 'step' : undefined" @click="irA(i)">
+              <span class="riel__n">
+                <i v-if="i < paso" class="bi bi-check-lg"></i>
+                <template v-else>{{ i + 1 }}</template>
+              </span>
+              <span class="riel__txt">
+                <span class="riel__t">{{ p.titulo }}</span>
+                <span class="riel__d">{{ i < paso && resumenPaso(p.key) ? resumenPaso(p.key) : p.sub }}</span>
+              </span>
+            </button>
+          </li>
+        </ol>
+        <!-- Así va a quedar: la tarjeta del paciente, que se arma mientras se carga. -->
+        <div class="riel__ficha" :class="{ 'riel__ficha--vacia': !form.nombre && !form.apellido }">
+          <div class="riel__avatar">{{ iniciales }}</div>
+          <div class="riel__ficha-txt">
+            <div class="riel__nombre">{{ nombreCompleto || 'Paciente nuevo' }}</div>
+            <div class="riel__meta">
+              <span v-if="form.dni">DNI {{ dniLegible(form.dni) }}</span>
+              <span v-if="anios !== null"> · {{ anios }} años</span>
             </div>
-            <div class="snv__field">
-              <label class="snv__label">Calle</label>
-              <input v-model.trim="form.envio_calle" class="snv__input" placeholder="Calle de entrega" />
-            </div>
-            <div class="snv__field">
-              <label class="snv__label">Altura</label>
-              <input v-model.trim="form.envio_altura" class="snv__input" placeholder="Altura" />
-            </div>
-            <div class="snv__field">
-              <label class="snv__label">Piso</label>
-              <input v-model.trim="form.envio_piso" class="snv__input" placeholder="Piso" />
-            </div>
-            <div class="snv__field">
-              <label class="snv__label">Depto</label>
-              <input v-model.trim="form.envio_depto" class="snv__input" placeholder="Depto" />
-            </div>
-            <div class="snv__field">
-              <label class="snv__label">Barrio</label>
-              <input v-model.trim="form.envio_barrio" class="snv__input" placeholder="Barrio" />
-            </div>
-            <div class="snv__field">
-              <label class="snv__label">Ciudad</label>
-              <input v-model.trim="form.envio_ciudad" class="snv__input" placeholder="Ciudad" />
+            <div v-if="paso >= 2" class="riel__pills">
+              <span class="pf-pill pf-pill--ok">Activo</span>
+              <span class="pf-pill pf-pill--off">{{ esAdherente(form) ? 'Adherente' : 'Vinculado' }}</span>
             </div>
           </div>
-        </details>
-      </div>
-
-      <!-- ── REPROCANN ── -->
-      <div class="snv__section">
-        <div class="snv__section-header">
-          <div class="snv__section-icon" style="background:rgba(21,128,61,.1);color:#15803d">
-            <i class="bi bi-patch-check-fill"></i>
-          </div>
-          <div>
-            <div class="snv__section-title">Autorización REPROCANN</div>
-            <div class="snv__section-sub">Res. 1780/2025 — vigencia 3 años desde emisión</div>
-          </div>
         </div>
+      </nav>
 
-        <div class="snv__field" style="margin-bottom:1rem">
-          <label class="snv__label">Estado del certificado</label>
-          <div class="snv__repro-estados">
-            <button
-              v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
-              type="button"
-              class="snv__repro-btn"
-              :class="{ 'snv__repro-btn--active': form.reprocann_estado === opt.value }"
-              :style="form.reprocann_estado === opt.value ? { background: opt.bg, borderColor: opt.color, color: opt.color } : {}"
-              @click="form.reprocann_estado = opt.value"
-            >{{ opt.label }}</button>
-          </div>
-        </div>
-
-        <div class="snv__field" style="margin-bottom:1rem">
-          <label class="snv__label">De quién es su REPROCANN</label>
-          <div class="snv__repro-estados">
-            <button type="button" class="snv__repro-btn" :class="{ 'snv__repro-btn--active': !form.reprocann_vinculo }"
-                    @click="form.reprocann_vinculo = ''">Sin dato</button>
-            <button v-for="v in REPROCANN_VINCULOS" :key="v.value" type="button" class="snv__repro-btn"
-                    :class="{ 'snv__repro-btn--active': form.reprocann_vinculo === v.value }" :title="v.ayuda"
-                    @click="form.reprocann_vinculo = v.value">{{ v.label }}</button>
-          </div>
-          <span class="snv__hint">Vinculado: su REPROCANN está con la organización. Adherente: paciente nuevo con REPROCANN vigente, vinculado a otra organización por ahora.</span>
-        </div>
-
-        <div class="snv__grid snv__grid--2">
-          <div class="snv__field">
-            <label class="snv__label">Número de certificado</label>
-            <input v-model.trim="form.reprocann_numero" class="snv__input"
-              placeholder="Ej: REP-2024-001234" @input="sugerirVencimiento" />
-            <span class="snv__hint">Número de matrícula del profesional que firma</span>
-          </div>
-          <div class="snv__field">
-            <label class="snv__label">Fecha de vencimiento</label>
-            <AppDatePicker v-model="form.reprocann_vencimiento" />
-            <span class="snv__hint">El sistema alertará a 90, 60 y 30 días</span>
-          </div>
-        </div>
-
-        <div class="snv__infobox">
-          <i class="bi bi-info-circle-fill snv__infobox-icon"></i>
-          <div class="snv__infobox-text">
-            Sin REPROCANN activo el paciente no podrá recibir dispensaciones.
-            Podés completar o actualizar el certificado desde el perfil del paciente.
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Estado clínico ── -->
-      <div class="snv__section">
-        <div class="snv__section-header">
-          <div class="snv__section-icon" style="background:rgba(124,58,237,.1);color:#7c3aed">
-            <i class="bi bi-heart-pulse"></i>
-          </div>
-          <div>
-            <div class="snv__section-title">Estado clínico</div>
-            <div class="snv__section-sub">Configuración del tratamiento activo</div>
-          </div>
-        </div>
-
-        <label class="snv__toggle">
-          <input v-model="form.es_paciente" type="checkbox" class="snv__toggle__input" />
-          <div class="snv__toggle__track">
-            <div class="snv__toggle__thumb"></div>
-          </div>
-          <div>
-            <div class="snv__toggle__label">Paciente activo en tratamiento</div>
-            <div class="snv__toggle__hint">
-              Activá para incluirlo en el panel de seguimiento y habilitarlo para dispensaciones
+      <main class="alta__main">
+        <form class="alta__card" novalidate @submit.prevent="siguiente" @keydown.enter="onEnter">
+          <div ref="cuerpo" class="alta__card-head">
+            <span class="alta__card-ico"><i class="bi" :class="actual.icono"></i></span>
+            <div>
+              <h2 class="alta__card-t">{{ actual.titulo }}</h2>
+              <p class="alta__card-d">
+                <template v-if="actual.key === 'persona'">Los datos del documento. Con esto ya se lo puede encontrar en la lista y en el mostrador.</template>
+                <template v-else-if="actual.key === 'domicilio'">Si no lo tenés a mano, seguí: se completa después desde su ficha.</template>
+                <template v-else-if="actual.key === 'reprocann'">De esto depende qué sigue: si hay que darle entrevista, si está en trámite o si ya puede retirar.</template>
+                <template v-else>Revisá que esté todo bien antes de crearlo.</template>
+              </p>
             </div>
           </div>
-        </label>
-      </div>
 
-      <!-- ── Mail de bienvenida ── -->
-      <label v-if="puedeMandarBienvenida" class="snv__welcome-mail" :class="{ 'snv__welcome-mail--disabled': !form.email }">
-        <div class="snv__welcome-mail-check">
-          <input v-model="sendWelcomeMail" type="checkbox" class="snv__welcome-mail-input" :disabled="!form.email" />
-          <div class="snv__welcome-mail-box">
-            <i v-if="sendWelcomeMail && form.email" class="bi bi-check2" style="font-size:.75rem;line-height:1"></i>
+          <div class="alta__card-body">
+            <SeccionPersona v-if="actual.key === 'persona'" :form="form" :errores="errores" :duplicado="duplicado"
+                            autofocus @dni-listo="verificarDni" />
+            <SeccionDomicilio v-else-if="actual.key === 'domicilio'" :form="form" con-entrega />
+            <SeccionReprocann v-else-if="actual.key === 'reprocann'" :form="form" :errores="errores" />
+            <div v-else class="pf-seccion">
+              <SeccionTurno v-if="ofreceTurno" v-model="turno" />
+
+              <div class="resumen">
+                <p class="pf-sub">Resumen</p>
+                <dl class="resumen__lista">
+                  <div class="resumen__fila">
+                    <dt><i class="bi bi-person-vcard"></i> Persona</dt>
+                    <dd>
+                      <strong>{{ nombreCompleto }}</strong><template v-if="form.apodo"> «{{ form.apodo }}»</template>
+                      <span class="resumen__sec">DNI {{ dniLegible(form.dni) }}<template v-if="anios !== null"> · {{ anios }} años</template></span>
+                      <span v-if="form.telefono || form.email" class="resumen__sec">{{ [form.telefono, form.email].filter(Boolean).join(' · ') }}</span>
+                    </dd>
+                    <button type="button" class="resumen__editar" @click="irA(0)">Cambiar</button>
+                  </div>
+                  <div class="resumen__fila">
+                    <dt><i class="bi bi-geo-alt"></i> Domicilio</dt>
+                    <dd>{{ domicilioTexto || 'Sin cargar' }}</dd>
+                    <button type="button" class="resumen__editar" @click="irA(1)">Cambiar</button>
+                  </div>
+                  <div class="resumen__fila">
+                    <dt><i class="bi bi-patch-check"></i> REPROCANN</dt>
+                    <dd>
+                      <strong>{{ resumenReprocann.titulo }}</strong>
+                      <span v-if="form.reprocann_numero && (esAdherente(form) || ['aprobado','vencido'].includes(form.opcion_reprocann))" class="resumen__sec">
+                        N° {{ form.reprocann_numero }}<template v-if="form.reprocann_vencimiento"> · vence {{ form.reprocann_vencimiento.split('-').reverse().join('/') }}</template>
+                      </span>
+                      <span class="resumen__sec">{{ resumenReprocann.detalle }}</span>
+                    </dd>
+                    <button type="button" class="resumen__editar" @click="irA(2)">Cambiar</button>
+                  </div>
+                  <div v-if="ofreceTurno" class="resumen__fila">
+                    <dt><i class="bi bi-calendar-event"></i> Turno</dt>
+                    <dd>{{ turnoTexto || 'Sin turno por ahora' }}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <label v-if="puedeMandarBienvenida" class="pf-switch">
+                <input v-model="mandarBienvenida" type="checkbox" :disabled="!form.email" />
+                <span class="pf-switch__track"></span>
+                <span>
+                  <span class="pf-switch__t">Mandarle el mail de bienvenida</span>
+                  <span class="pf-switch__d">{{ form.email ? `A ${form.email}, con la plantilla de la organización.` : 'Hace falta su mail (paso 1).' }}</span>
+                </span>
+              </label>
+            </div>
+
+            <div v-if="errorGeneral" class="pf-aviso pf-aviso--danger" role="alert" style="margin-top:1.25rem">
+              <i class="bi bi-exclamation-triangle"></i><div>{{ errorGeneral }}</div>
+            </div>
           </div>
-        </div>
-        <div class="snv__welcome-mail-text">
-          <span class="snv__welcome-mail-label">Enviar mail de bienvenida al crear</span>
-          <span class="snv__welcome-mail-hint">{{ form.email ? form.email : 'Requiere email del paciente' }}</span>
-        </div>
-      </label>
 
-      <!-- ── Acciones ── -->
-      <div class="snv__actions">
-        <RouterLink to="/pacientes" class="snv__btn-ghost">Cancelar</RouterLink>
-        <button class="snv__btn-primary" :disabled="store.saving" @click="handleSubmit">
-          <DsSpinner v-if="store.saving" :size="16" />
-          <i v-else class="bi bi-person-plus-fill"></i>
-          {{ store.saving ? 'Creando…' : 'Crear paciente' }}
-        </button>
-      </div>
-
+          <footer class="alta__acciones">
+            <button v-if="paso > 0" type="button" class="btn-sec" @click="atras"><i class="bi bi-arrow-left"></i> Atrás</button>
+            <RouterLink v-else to="/pacientes" class="btn-sec">Cancelar</RouterLink>
+            <button v-if="actual.key === 'domicilio' && !domicilioTexto" type="button" class="btn-link" @click="siguiente">Saltear</button>
+            <button type="submit" class="btn-pri" :disabled="store.saving">
+              <DsSpinner v-if="store.saving" :size="15" />
+              <template v-if="esUltimo">
+                <i v-if="!store.saving" class="bi bi-person-check"></i>
+                {{ store.saving ? 'Creando…' : turno ? 'Crear con su turno' : 'Crear paciente' }}
+              </template>
+              <template v-else>Siguiente <i class="bi bi-arrow-right"></i></template>
+            </button>
+          </footer>
+        </form>
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
-.snv {
-  padding: 2rem 1.5rem;
-  max-width: 700px;
-  margin: 0 auto;
-}
-@media (max-width: 768px) { .snv { padding: 1.25rem 1rem; } }
+.alta { max-width: 1080px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+.alta__head { margin-bottom: 1.5rem; }
+.alta__back { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); text-decoration: none; }
+.alta__back:hover { color: var(--c-slate-900); }
+.alta__title { font-family: var(--font-display); font-size: 2rem; font-weight: 700; letter-spacing: -.03em; color: var(--c-slate-900); margin: .5rem 0 0; line-height: 1.1; }
+.alta__movil { display: none; }
 
-/* Header */
-.snv__header { margin-bottom: 2rem; }
-.snv__back {
-  display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .8rem; font-weight: 600; color: var(--c-slate-500);
-  text-decoration: none; margin-bottom: .75rem; transition: color .15s;
-}
-.snv__back:hover { color: var(--c-slate-900); }
-.snv__title { font-size: 1.75rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .25rem; letter-spacing: -.03em; line-height: 1.1; }
-.snv__subtitle { font-size: .82rem; color: var(--c-slate-500); margin: 0; line-height: 1.5; }
+.alta__main { min-width: 0; }
+.alta__layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 2rem; align-items: start; }
 
-/* Alert */
-.snv__alert {
-  background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
-  padding: .875rem 1rem; border-radius: 10px; font-size: .875rem;
-  margin-bottom: 1.5rem; display: flex; gap: .5rem; align-items: flex-start;
-}
+/* ── Riel ── */
+.alta__riel { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.alta__riel ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; position: relative; }
+.alta__riel li { position: relative; }
+.alta__riel li:not(:last-child)::after { content: ''; position: absolute; left: 17px; top: 44px; bottom: -6px; width: 2px; background: var(--c-slate-200); }
+.riel__paso { display: flex; gap: .85rem; align-items: flex-start; width: 100%; text-align: left; padding: .45rem .5rem .9rem 0; background: none; border: 0; cursor: pointer; font: inherit; color: inherit; border-radius: var(--r-md); }
+.riel__paso:disabled { cursor: default; }
+.riel__n { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .88rem;
+  background: var(--c-paper, #fff); border: 2px solid var(--c-slate-200); color: var(--c-slate-400); position: relative; z-index: 1; transition: all var(--t-base); }
+.riel__paso--hecho .riel__n { background: var(--c-leaf-100); border-color: var(--c-leaf-600); color: var(--c-leaf-800); }
+.riel__paso--on .riel__n { background: var(--c-leaf-800); border-color: var(--c-leaf-800); color: #fff; box-shadow: 0 0 0 4px var(--c-leaf-100); }
+.riel__txt { display: flex; flex-direction: column; min-width: 0; padding-top: .35rem; }
+.riel__t { font-weight: 700; font-size: .92rem; color: var(--c-slate-400); }
+.riel__paso--on .riel__t, .riel__paso--hecho .riel__t { color: var(--c-slate-900); }
+.riel__d { font-size: .76rem; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.riel__paso:not(:disabled):not(.riel__paso--on):hover .riel__t { text-decoration: underline; }
 
-/* Form container */
-.snv__form { display: flex; flex-direction: column; gap: 1rem; }
+.riel__ficha { display: flex; gap: .75rem; padding: 1rem; border-radius: var(--r-lg); background: var(--c-paper, #fff); border: 1px solid var(--c-slate-200); box-shadow: var(--sh-1); transition: opacity var(--t-base); }
+.riel__ficha--vacia { opacity: .55; }
+.riel__avatar { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--c-leaf-800); color: #fff; font-weight: 700; letter-spacing: .02em; }
+.riel__ficha-txt { min-width: 0; }
+.riel__nombre { font-weight: 700; color: var(--c-slate-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.riel__meta { font-size: .76rem; color: var(--c-slate-500); font-family: var(--font-mono); }
+.riel__pills { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .45rem; }
 
-/* Sections */
-.snv__section {
-  background: #fff;
-  border: 1px solid var(--c-slate-200);
-  border-radius: 16px;
-  overflow: hidden;
-}
-.snv__section-header {
-  display: flex; align-items: center; gap: .875rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--c-slate-100);
-  background: #fafbfc;
-}
-.snv__section-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .9rem; flex-shrink: 0;
-}
-.snv__section-title { font-size: .88rem; font-weight: 800; color: var(--c-slate-900); }
-.snv__section-sub   { font-size: .72rem; color: var(--c-slate-400); margin-top: .1rem; }
+/* ── Tarjeta del paso ── */
+.alta__card { background: var(--c-paper, #fff); border: 1px solid var(--c-slate-200); border-radius: var(--r-xl); box-shadow: var(--sh-1); overflow: hidden; }
+.alta__card-head { display: flex; gap: 1rem; align-items: flex-start; padding: 1.5rem 1.75rem 0; scroll-margin-top: 1rem; }
+.alta__card-ico { flex-shrink: 0; width: 44px; height: 44px; border-radius: var(--r-lg); display: grid; place-items: center; background: var(--c-leaf-50); color: var(--c-leaf-800); font-size: 1.2rem; }
+.alta__card-t { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--c-slate-900); letter-spacing: -.01em; }
+.alta__card-d { margin: .25rem 0 0; font-size: .86rem; color: var(--c-slate-500); line-height: 1.5; }
+.alta__card-body { padding: 1.5rem 1.75rem 1.75rem; }
 
-/* Section body (padding) */
-.snv__section > .snv__grid,
-.snv__section > .snv__field,
-.snv__section > .snv__repro-estados,
-.snv__section > .snv__toggle,
-.snv__section > .snv__infobox {
-  margin: 1.1rem 1.25rem;
-}
-.snv__section > .snv__field { margin-bottom: 0; }
-.snv__section > .snv__infobox { margin-top: .75rem; margin-bottom: 1.1rem; }
-.snv__section > .snv__toggle { margin: 1rem 1.25rem; }
+.alta__acciones { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.75rem; border-top: 1px solid var(--c-slate-100); background: var(--c-slate-50); }
+.alta__acciones .btn-pri { margin-left: auto; }
 
-/* Grid */
-.snv__grid { display: grid; gap: .875rem; }
-.snv__grid--2 { grid-template-columns: 1fr 1fr; }
-@media (max-width: 540px) { .snv__grid--2 { grid-template-columns: 1fr; } }
+.btn-pri, .btn-sec, .btn-link { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 44px; padding: 0 1.25rem;
+  border-radius: var(--r-md); font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer; text-decoration: none; transition: all var(--t-fast); }
+.btn-pri { background: var(--c-leaf-800); color: #fff; border: 0; min-width: 150px; }
+.btn-pri:hover:not(:disabled) { background: var(--c-leaf-900); }
+.btn-pri:disabled { opacity: .6; cursor: not-allowed; }
+.btn-sec { background: var(--c-paper, #fff); color: var(--c-slate-700); border: 1px solid var(--c-slate-300); }
+.btn-sec:hover { border-color: var(--c-slate-500); color: var(--c-slate-900); }
+.btn-link { background: none; border: 0; color: var(--c-slate-500); padding: 0 .5rem; font-weight: 600; }
+.btn-link:hover { color: var(--c-slate-900); text-decoration: underline; }
 
-/* Fields */
-.snv__field { display: flex; flex-direction: column; gap: .3rem; }
-.snv__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.snv__req   { color: #dc2626; }
-.snv__err   { font-size: .72rem; color: #dc2626; font-weight: 600; }
-.snv__opt   { font-size: .72rem; font-weight: 500; color: var(--c-slate-400); }
-.snv__envio { margin-top: 1rem; border-top: 1px dashed var(--c-slate-200); padding-top: .75rem; }
-.snv__envio-sum { cursor: pointer; font-size: .85rem; font-weight: 700; color: #b45309; list-style: none; display: flex; align-items: center; gap: .4rem; }
-.snv__envio-sum::before { content: '+'; font-weight: 800; }
-.snv__envio[open] .snv__envio-sum::before { content: '−'; }
-.snv__hint  { font-size: .7rem; color: var(--c-slate-400); }
+/* ── Resumen ── */
+.resumen { border: 1px solid var(--c-slate-200); border-radius: var(--r-lg); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .75rem; }
+.resumen__lista { margin: 0; display: flex; flex-direction: column; }
+.resumen__fila { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: .75rem; padding: .7rem 0; border-top: 1px solid var(--c-slate-100); align-items: start; }
+.resumen__fila:first-child { border-top: 0; padding-top: 0; }
+.resumen__fila dt { font-size: .78rem; font-weight: 700; color: var(--c-slate-500); display: flex; gap: .4rem; align-items: center; }
+.resumen__fila dd { margin: 0; font-size: .9rem; color: var(--c-slate-900); display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.resumen__sec { font-size: .8rem; color: var(--c-slate-500); line-height: 1.4; }
+.resumen__editar { background: none; border: 0; color: var(--c-leaf-700); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; padding: 0; }
+.resumen__editar:hover { text-decoration: underline; }
 
-.snv__input {
-  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px;
-  padding: .65rem .875rem; font-size: .9rem; color: var(--c-slate-900);
-  width: 100%; box-sizing: border-box; transition: border .15s, box-shadow .15s, background .15s;
+/* ── Teléfono ── */
+@media (max-width: 860px) {
+  .alta { padding: 1rem 1rem 6.5rem; }
+  .alta__title { font-size: 1.5rem; }
+  .alta__layout { grid-template-columns: 1fr; gap: 0; }
+  .alta__riel { display: none; }
+  .alta__movil { display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; margin-top: .85rem; align-items: baseline; }
+  .alta__movil-n { font-size: .75rem; font-weight: 700; color: var(--c-leaf-700); text-transform: uppercase; letter-spacing: .05em; }
+  .alta__movil-t { font-size: .9rem; font-weight: 700; color: var(--c-slate-900); }
+  .alta__barra { grid-column: 1 / -1; height: 4px; border-radius: var(--r-pill); background: var(--c-slate-200); overflow: hidden; margin-top: .45rem; }
+  .alta__barra-in { height: 100%; background: var(--c-leaf-700); border-radius: inherit; transition: width var(--t-base); }
+  .alta__card { border-radius: var(--r-lg); }
+  .alta__card-head { padding: 1.1rem 1.1rem 0; }
+  .alta__card-ico { width: 38px; height: 38px; font-size: 1rem; }
+  .alta__card-t { font-size: 1.1rem; }
+  .alta__card-body { padding: 1.1rem; }
+  /* Los botones quedan al alcance del pulgar, siempre visibles. */
+  .alta__acciones { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom));
+    background: var(--c-paper, #fff); border-top: 1px solid var(--c-slate-200); box-shadow: 0 -4px 16px rgba(15, 23, 42, .06); }
+  .alta--shell .alta__acciones { bottom: var(--oi-bottom, 72px); padding-bottom: .75rem; }
+  .alta--shell { padding-bottom: 6rem; }
+  .alta__acciones .btn-pri { flex: 1; }
+  .resumen__fila { grid-template-columns: 1fr auto; }
+  .resumen__fila dt { grid-column: 1 / -1; }
+  .resumen__fila dd { grid-column: 1; }
 }
-.snv__input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
-.snv__input--err { border-color: #dc2626; }
-.snv__input--err:focus { box-shadow: 0 0 0 3px rgba(220,38,38,.1); }
-
-/* REPROCANN estados */
-.snv__repro-estados { display: flex; gap: .5rem; flex-wrap: wrap; }
-.snv__repro-btn {
-  padding: .4rem .85rem; border-radius: 8px;
-  border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500);
-  font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .15s;
-}
-.snv__repro-btn:hover { border-color: var(--c-slate-400); color: #374151; }
-.snv__repro-btn--active { font-weight: 700; }
-
-/* Infobox */
-.snv__infobox {
-  display: flex; gap: .6rem; padding: .75rem .9rem;
-  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
-}
-.snv__infobox-icon { color: #0369a1; font-size: .9rem; flex-shrink: 0; margin-top: .15rem; }
-.snv__infobox-text { font-size: .75rem; color: #1e40af; line-height: 1.5; }
-
-/* Toggle */
-.snv__toggle {
-  display: flex; align-items: flex-start; gap: .875rem; cursor: pointer;
-  padding: .9rem 1rem; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200);
-  border-radius: 10px; transition: border .15s;
-}
-.snv__toggle:hover { border-color: #1b5e20; }
-.snv__toggle__input { display: none; }
-.snv__toggle__track {
-  width: 44px; height: 24px; background: var(--c-slate-300); border-radius: 999px;
-  position: relative; transition: background .2s; flex-shrink: 0; margin-top: .15rem;
-}
-.snv__toggle__input:checked + .snv__toggle__track { background: #1b5e20; }
-.snv__toggle__thumb {
-  position: absolute; width: 18px; height: 18px; background: #fff;
-  border-radius: 50%; top: 3px; left: 3px; transition: left .2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.2);
-}
-.snv__toggle__input:checked + .snv__toggle__track .snv__toggle__thumb { left: 22px; }
-.snv__toggle__label { font-size: .88rem; font-weight: 700; color: var(--c-slate-900); margin-bottom: .25rem; }
-.snv__toggle__hint  { font-size: .75rem; color: var(--c-slate-500); line-height: 1.4; }
-
-/* Mail bienvenida */
-.snv__welcome-mail {
-  display: flex; align-items: flex-start; gap: .625rem;
-  padding: .875rem 1rem; background: #f0fdf4;
-  border: 1.5px solid #bbf7d0; border-radius: 12px;
-  cursor: pointer; transition: all .15s; user-select: none;
-}
-.snv__welcome-mail:hover:not(.snv__welcome-mail--disabled) { border-color: #4ade80; }
-.snv__welcome-mail--disabled { background: var(--c-slate-50); border-color: var(--c-slate-200); opacity: .6; cursor: not-allowed; }
-.snv__welcome-mail-check { flex-shrink: 0; margin-top: .15rem; }
-.snv__welcome-mail-input { display: none; }
-.snv__welcome-mail-box {
-  width: 18px; height: 18px; border-radius: 5px;
-  border: 2px solid #d1d5db; background: #fff;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .15s; color: #fff;
-}
-.snv__welcome-mail-input:checked + .snv__welcome-mail-box { background: #1b5e20; border-color: #1b5e20; }
-.snv__welcome-mail-text { flex: 1; min-width: 0; }
-.snv__welcome-mail-label { display: block; font-size: .85rem; font-weight: 700; color: #14532d; }
-.snv__welcome-mail-hint  { display: block; font-size: .72rem; color: #16a34a; margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.snv__welcome-mail--disabled .snv__welcome-mail-label,
-.snv__welcome-mail--disabled .snv__welcome-mail-hint { color: var(--c-slate-400); }
-
-/* Acciones */
-.snv__actions {
-  display: flex; gap: .75rem; justify-content: flex-end;
-  padding-top: .5rem;
-}
-@media (max-width: 480px) {
-  .snv__actions { flex-direction: column-reverse; }
-  .snv__btn-primary, .snv__btn-ghost { width: 100%; justify-content: center; }
-}
-
-.snv__btn-primary {
-  display: inline-flex; align-items: center; gap: .5rem;
-  background: #1b5e20; color: #fff; border: none;
-  padding: .8rem 1.5rem; border-radius: 10px;
-  font-size: .9rem; font-weight: 700; cursor: pointer; transition: background .15s;
-}
-.snv__btn-primary:hover:not(:disabled) { background: #144a18; }
-.snv__btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-
-.snv__btn-ghost {
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; color: var(--c-slate-500);
-  border: 1.5px solid var(--c-slate-200); padding: .8rem 1.25rem; border-radius: 10px;
-  font-size: .875rem; font-weight: 600; cursor: pointer;
-  text-decoration: none; transition: all .15s;
-}
-.snv__btn-ghost:hover { background: var(--c-slate-50); color: var(--c-slate-900); }
 </style>

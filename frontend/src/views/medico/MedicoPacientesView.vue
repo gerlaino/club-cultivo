@@ -99,20 +99,13 @@
           </div>
         </div>
 
+        <!-- Los tres estados (19-oct-2026), con los mismos nombres que administración. -->
         <div class="mpv__repro">
-          <template v-if="reproStatus(p)">
-            <div class="mpv__rep-badge"
-              :class="{
-                'mpv__rep-badge--danger':  reproStatus(p)?.level === 'danger',
-                'mpv__rep-badge--warning': reproStatus(p)?.level === 'warning',
-                'mpv__rep-badge--caution': reproStatus(p)?.level === 'caution',
-                'mpv__rep-badge--ok':      reproStatus(p)?.level === 'ok',
-              }"
-            >{{ reproStatus(p)?.label }}</div>
-            <div class="mpv__rep-fecha">{{ formatDate(p.reprocann_vencimiento) }}</div>
-          </template>
-          <span v-else class="mpv__rep-none">Sin REPROCANN</span>
-          <div v-if="vinculoLabel(p.reprocann_vinculo)" class="mpv__vinculo">{{ vinculoLabel(p.reprocann_vinculo) }}</div>
+          <span v-if="reprocannSit(p.situacion)" class="pf-pill" :class="`pf-pill--${reprocannSit(p.situacion).nivel}`">
+            {{ reprocannSit(p.situacion).label }}
+          </span>
+          <div v-for="d in datosChicos(p.situacion).filter(x => !x.icono)" :key="d.texto" class="mpv__dato">{{ d.texto }}</div>
+          <div v-if="p.situacion?.vinculo === 'adherente'" class="mpv__vinculo">Adherente</div>
         </div>
 
       </RouterLink>
@@ -137,8 +130,9 @@ import { useToast } from '../../composables/useToast.js'
 import { getMedicoPacientes } from '../../lib/api.js'
 import { logger } from '../../utils/logger.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { reprocannBadge, reprocannDias } from '../../composables/useReprocann.js'
-import { vinculoLabel } from '../../composables/useSocioEditar.js'
+import { reprocannDias } from '../../composables/useReprocann.js'
+import { reprocannSit, datosChicos } from '../../composables/useSituacionPaciente.js'
+import '../../components/pacientes/formulario/formulario.css'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const LIMITE = 30
@@ -198,7 +192,9 @@ function safeDate(d) {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
 }
 const reproDias   = reprocannDias
-const reproStatus = reprocannBadge
+// El color de la fila sale del REPROCANN, como en la lista de administración.
+const NIVEL_A_LEVEL = { danger: 'danger', warn: 'warning', info: 'caution', ok: 'ok' }
+const reproStatus = (p) => ({ level: NIVEL_A_LEVEL[reprocannSit(p.situacion)?.nivel] || null })
 function formatDate(d) {
   if (!d) return '—'
   return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -217,8 +213,9 @@ const hayMas = computed(() => !!meta.value && pacientes.value.length < meta.valu
 // Lo que puso a este paciente arriba en la lista, dicho en la fila. Primero lo que está atrasado:
 // un turno que ya pasó y no cerró (6-oct-2026), o que faltó y hay que darle otro.
 function motivo(p) {
-  if (p.entrevista === 'pendiente_entrevista') return { texto: 'Turno pasado sin cerrar', tipo: 'atrasado' }
-  if (p.entrevista === 'falto_turno')          return { texto: 'Faltó al turno', tipo: 'falto' }
+  const sit = p.situacion || {}
+  if (sit.turno_sin_cerrar) return { texto: 'Turno pasado sin cerrar', tipo: 'atrasado' }
+  if (sit.falto_turno_el)   return { texto: `Faltó al turno del ${formatDate(sit.falto_turno_el)}`, tipo: 'falto' }
   if (p.proximo_turno_at) {
     return { texto: `Turno ${formatDate(p.proximo_turno_at)}`, tipo: 'turno' }
   }
@@ -364,6 +361,7 @@ onMounted(() => cargar({ reset: true }))
 .mpv__motivo--atrasado   { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px solid var(--c-amber-500); }
 .mpv__motivo--falto      { background: var(--c-slate-100); color: var(--c-slate-600); }
 .mpv__apodo   { font-weight: 500; color: var(--c-slate-500); margin-left: .25rem; }
+.mpv__dato { margin-top: 3px; font-size: .72rem; font-weight: 600; color: var(--c-slate-600); }
 .mpv__vinculo { margin-top: 2px; font-size: .7rem; font-weight: 600; color: var(--c-leaf-800); }
 
 /* Paginación */

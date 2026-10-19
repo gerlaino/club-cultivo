@@ -8,7 +8,7 @@ module Admin
     def index
       medicos = club.users.where(role: 'medico').order(:last_name, :first_name)
       # Turnos que ya pasaron y el médico no cerró: a quién apurar (6-oct-2026).
-      @sin_cerrar = Pacientes::Entrevista.sin_cerrar_por_medico(club)
+      @sin_cerrar = Pacientes::Agenda.sin_cerrar_por_medico(club)
       render json: medicos.map { |m| serialize_medico(m) }
     end
 

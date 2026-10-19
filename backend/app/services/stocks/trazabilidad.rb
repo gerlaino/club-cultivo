@@ -279,7 +279,8 @@ module Stocks
     # Los únicos `produccion` positivos son los del pesaje (el derivado nace con su cantidad y el
     # movimiento del origen es negativo); el reajuste de un pesaje se reconoce por su nota.
     def ya_en_la_inicial?(m)
-      # La vuelta de un derivado eliminado lleva el derivado: esa SÍ es una entrada (15-oct-2026).
+      # La vuelta de un derivado eliminado lleva el derivado: esa SÍ es una entrada. Sólo quedan las
+      # de (fn), 15/16-oct-2026: desde (fo) eliminar un derivado borra la producción y no deja vuelta.
       (m.tipo == 'produccion' && m.gramos.to_d.positive? && m.stock_resultante_id.nil?) ||
         (m.tipo == 'ajuste' && m.notas.to_s.start_with?(PesajeManicura::NOTA_REAJUSTE))
     end

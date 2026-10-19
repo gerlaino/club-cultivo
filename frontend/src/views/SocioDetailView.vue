@@ -11,14 +11,12 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente, aprobarPaciente, iniciarTramiteReprocann } from '../lib/api.js'
+import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, aprobarPaciente } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
   CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin
 } from 'lucide-vue-next'
-import DsDropdown from '../design-system/components/Dropdown.vue'
-import { REPROCANN_ESTADOS, REPROCANN_VINCULOS, vinculoLabel } from '../composables/useSocioEditar.js'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import SocioMedicos from '../components/pacientes/SocioMedicos.vue'
 import { reprocannCategoria, reprocannDias, reprocannPlazo } from '../composables/useReprocann.js'
@@ -32,6 +30,9 @@ import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
 import SocioTabPortal          from '../components/pacientes/SocioTabPortal.vue'
 import SocioTabDirecciones     from '../components/pacientes/SocioTabDirecciones.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
+import ProximoPasoReprocann      from '../components/pacientes/ProximoPasoReprocann.vue'
+import { reprocannSit, pacienteSit, vinculoSit } from '../composables/useSituacionPaciente.js'
+import '../components/pacientes/formulario/formulario.css'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
 import { hoyISO, yaPaso } from '../utils/dates.js'
@@ -53,15 +54,12 @@ const canEditDatos = computed(() => ['admin', 'super_admin'].includes(auth.user?
 const s          = computed(() => store.current)
 const edadSocio  = computed(() => s.value ? edad(s.value.fecha_nacimiento) : null)
 
-const reprocannEstadoMeta = computed(() => {
-  // estado_efectivo viene del backend cruzado con la fecha de vencimiento;
-  // si está vencido pisa al campo manual (que puede haber quedado en "activo")
-  const estado = s.value?.reprocann_estado_efectivo || s.value?.reprocann_estado || 'sin_registro'
-  if (estado === 'vencido') return { value: 'vencido', label: 'Vencido', color: '#dc2626', bg: '#fef2f2' }
-  return REPROCANN_ESTADOS.find(e => e.value === estado)
-})
-
 const editarOpen     = ref(false)
+const editarSolapa   = ref('persona')
+function abrirEditar(solapa = 'persona') { editarSolapa.value = solapa; editarOpen.value = true }
+// Los tres estados (19-oct-2026): los calcula el backend (`situacion`), la ficha los muestra.
+const sit = computed(() => s.value?.situacion || null)
+function darTurno() { activeTab.value = 'turnos'; agendarTurnoOpen.value = true }
 const agendarTurnoOpen = ref(false)
 const isAdmin    = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 const isMedico   = computed(() => auth.user?.role === 'medico')
@@ -104,69 +102,6 @@ const ccRefreshKey = ref(0)
 function onDispensacionCreada() {
   ccRefreshKey.value++
   store.fetchOne(socioId)
-}
-
-// ── Cambio rápido de estado REPROCANN (sin abrir el modal de edición) ──
-const cambiandoEstado    = ref(false)
-const estadoDropdownOpen = ref(false)
-const activarModalOpen   = ref(false)
-const nuevaVencimiento   = ref('')
-
-async function cambiarEstadoReprocann(nuevo) {
-  estadoDropdownOpen.value = false
-  // Activar exige (re)cargar la fecha de vencimiento → mini-modal
-  if (nuevo === 'activo') {
-    nuevaVencimiento.value = (s.value?.reprocann_vencimiento || '').toString().slice(0, 10)
-    activarModalOpen.value = true
-    return
-  }
-  if (s.value?.reprocann_estado === nuevo) return
-  await guardarEstadoReprocann({ reprocann_estado: nuevo })
-}
-
-async function confirmarActivacion() {
-  if (!nuevaVencimiento.value) { toast.error('Ingresá la fecha de vencimiento'); return }
-  await guardarEstadoReprocann({ reprocann_estado: 'activo', reprocann_vencimiento: nuevaVencimiento.value })
-  activarModalOpen.value = false
-}
-
-async function guardarEstadoReprocann(payload) {
-  cambiandoEstado.value = true
-  try {
-    await updatePaciente(socioId, payload)
-    await store.fetchOne(socioId)
-    toast.success('REPROCANN actualizado')
-  } catch (e) {
-    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo actualizar')
-  } finally {
-    cambiandoEstado.value = false
-  }
-}
-
-// ── De quién es su REPROCANN (Vinculado / Adherente) y «Inicié el trámite» (6-oct-2026) ──
-async function cambiarVinculo(valor) {
-  if ((s.value?.reprocann_vinculo || '') === valor) return
-  await guardarEstadoReprocann({ reprocann_vinculo: valor })
-}
-
-const iniciandoTramite = ref(false)
-async function iniciarTramite() {
-  iniciandoTramite.value = true
-  try {
-    await iniciarTramiteReprocann(socioId)
-    await store.refrescarActual(socioId)
-    toast.success(isAdmin.value ? 'Trámite marcado como iniciado' : 'Trámite iniciado: administración ya está avisada')
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo marcar el trámite')
-  } finally {
-    iniciandoTramite.value = false
-  }
-}
-
-// Pendiente de entrevista / faltó al turno: lo calcula el backend de los turnos (6-oct-2026).
-const ENTREVISTA = {
-  pendiente_entrevista: { label: 'Pendiente de entrevista', ayuda: 'Tiene un turno que ya pasó y el médico no lo cerró.' },
-  falto_turno:          { label: 'Faltó al turno',          ayuda: 'Su último turno quedó ausente y no tiene otro dado: hay que darle turno de nuevo.' },
 }
 
 // «Que se replique»: si otra pantalla cambia a este paciente (el médico inicia el trámite, alguien
@@ -443,31 +378,21 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <span v-if="edadSocio">{{ edadSocio }} años</span>
             </div>
             <div class="sd__hero-badges">
-              <span v-if="reprocannStatus"
-                    class="sd__repro-badge"
-                    :style="{ background: reprocannStatus.bg, color: reprocannStatus.color }">
-                {{ reprocannStatus.label }}
-              </span>
-              <span v-else class="sd__repro-badge sd__repro-badge--none">Sin REPROCANN</span>
-              <!-- «Sin aprobar», como en la lista: «Pendiente de aprobación» es el REPROCANN (23-sep-2026). -->
-              <span v-if="pendienteAprobacion" class="sd__repro-badge sd__repro-badge--pend">
-                Sin aprobar
-              </span>
-              <!-- Activo · Suspendido (poco movimiento, lo dice el backend) · Inactivo (baja). -->
-              <span v-if="!s.es_paciente" class="sd__status-badge">Inactivo</span>
-              <span v-else-if="s.suspendido" class="sd__status-badge sd__status-badge--susp"
-                    title="Suspendido por poco movimiento: hace más de 90 días que no retira. Puede retirar igual, y vuelve a activo solo cuando lo haga.">
-                <i class="bi bi-hourglass-split"></i> Suspendido
-              </span>
-              <span v-else class="sd__status-badge sd__status-badge--active">Activo</span>
-              <span v-if="ENTREVISTA[s.entrevista]" class="sd__status-badge"
-                    :class="s.entrevista === 'pendiente_entrevista' ? 'sd__status-badge--entrevista' : 'sd__status-badge--falto'"
-                    :title="ENTREVISTA[s.entrevista].ayuda">
-                {{ ENTREVISTA[s.entrevista].label }}
-              </span>
-              <span v-if="vinculoLabel(s.reprocann_vinculo)" class="sd__status-badge sd__status-badge--vinculo">
-                {{ vinculoLabel(s.reprocann_vinculo) }}
-              </span>
+              <template v-if="sit">
+                <span v-if="reprocannSit(sit)" class="pf-pill" :class="`pf-pill--${reprocannSit(sit).nivel}`" :title="reprocannSit(sit).ayuda">
+                  <i class="bi bi-patch-check"></i> REPROCANN · {{ reprocannSit(sit).label }}
+                </span>
+                <span v-if="pacienteSit(sit)" class="pf-pill" :class="`pf-pill--${pacienteSit(sit).nivel}`" :title="pacienteSit(sit).ayuda">
+                  {{ pacienteSit(sit).label }}
+                </span>
+                <span v-if="vinculoSit(sit)" class="pf-pill pf-pill--off" :title="vinculoSit(sit).ayuda">{{ vinculoSit(sit).label }}</span>
+              </template>
+              <!-- El mostrador no recibe la situación (el REPROCANN no es asunto suyo): sólo activo/inactivo. -->
+              <template v-else>
+                <span v-if="pendienteAprobacion" class="pf-pill pf-pill--warn">Sin aprobar</span>
+                <span v-else-if="!s.es_paciente" class="pf-pill pf-pill--off">Inactivo</span>
+                <span v-else class="pf-pill pf-pill--ok">Activo</span>
+              </template>
             </div>
           </div>
         </div>
@@ -475,25 +400,15 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <RouterLink v-if="s?.carnet_token" :to="`/c/${s.carnet_token}`" target="_blank" class="sd__btn-carnet">
             <CreditCard :size="14" :stroke-width="1.75" /> Carnet
           </RouterLink>
-          <button v-if="canEditDatos" class="sd__btn-edit" @click="editarOpen = true">
+          <button v-if="canEditDatos" class="sd__btn-edit" @click="abrirEditar()">
             <Pencil :size="14" :stroke-width="1.75" /> Editar
           </button>
         </div>
       </div>
 
-      <!-- Alerta REPROCANN -->
-      <div v-if="reprocannStatus?.key === 'danger'" class="sd__alerta sd__alerta--danger">
-        <AlertTriangle :size="16" />
-        <div><strong>REPROCANN vencido</strong> — El certificado venció el {{ formatDate(s.reprocann_vencimiento) }}.</div>
-      </div>
-      <div v-else-if="reprocannStatus?.key === 'pendiente'" class="sd__alerta sd__alerta--warning">
-        <AlertTriangle :size="16" />
-        <div><strong>REPROCANN vencido — trámite pendiente</strong> — El certificado venció el {{ formatDate(s.reprocann_vencimiento) }}, con renovación en trámite.</div>
-      </div>
-      <div v-else-if="reprocannStatus?.key === 'warning'" class="sd__alerta sd__alerta--warning">
-        <AlertTriangle :size="16" />
-        <div><strong>REPROCANN por vencer</strong> — El certificado vence el {{ formatDate(s.reprocann_vencimiento) }}.</div>
-      </div>
+      <!-- Qué sigue con su REPROCANN, con las acciones de ese paso (19-oct-2026). -->
+      <ProximoPasoReprocann v-if="sit" :paciente="s" :es-admin="isAdmin"
+                            @cambio="store.refrescarActual(socioId)" @dar-turno="darTurno" />
 
       <!-- Alta cargada en el mostrador y todavía sin admitir. Va arriba de las tabs porque
            condiciona todo lo demás: se puede completar la ficha, pero no entregarle nada. -->
@@ -614,40 +529,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             <div class="sd__info-item">
               <div class="sd__info-label">Estado REPROCANN</div>
               <div class="sd__info-val">
-                <!-- Editable: el badge es un menú discreto. Limpio por defecto. -->
-                <DsDropdown v-if="canEdit" v-model="estadoDropdownOpen" align="left">
-                  <template #anchor>
-                    <button
-                      type="button"
-                      class="sd__estado-trigger"
-                      :disabled="cambiandoEstado"
-                      :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }"
-                      @click="estadoDropdownOpen = !estadoDropdownOpen"
-                    >
-                      {{ reprocannEstadoMeta?.label || 'Sin estado' }}
-                      <ChevronDown :size="13" :stroke-width="2.5" />
-                    </button>
-                  </template>
-                  <template #panel>
-                    <div class="sd__estado-menu">
-                      <button
-                        v-for="opt in REPROCANN_ESTADOS" :key="opt.value"
-                        type="button"
-                        class="sd__estado-opt"
-                        @click="cambiarEstadoReprocann(opt.value)"
-                      >
-                        <span class="sd__estado-dot" :style="{ background: opt.color }"></span>
-                        <span class="sd__estado-opt-label">{{ opt.label }}</span>
-                        <Check v-if="s.reprocann_estado === opt.value" :size="14" class="sd__estado-check" />
-                      </button>
-                    </div>
-                  </template>
-                </DsDropdown>
-                <!-- Solo lectura -->
-                <span v-else class="sd__inline-badge"
-                      :style="{ background: reprocannEstadoMeta?.bg, color: reprocannEstadoMeta?.color, borderColor: reprocannEstadoMeta?.color }">
-                  {{ reprocannEstadoMeta?.label || '—' }}
-                </span>
+                <span v-if="reprocannSit(sit)" class="pf-pill" :class="`pf-pill--${reprocannSit(sit).nivel}`">{{ reprocannSit(sit).label }}</span>
+                <span v-else class="sd__val-empty">—</span>
               </div>
             </div>
             <div class="sd__info-item">
@@ -669,37 +552,27 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             </div>
             <div class="sd__info-item">
               <div class="sd__info-label">De quién es su REPROCANN</div>
-              <div class="sd__info-val">
-                <select v-if="canEdit" class="sd__vinculo-select" :value="s.reprocann_vinculo || ''"
-                        :disabled="cambiandoEstado" aria-label="De quién es su REPROCANN"
-                        @change="cambiarVinculo($event.target.value)">
-                  <option value="">Sin dato</option>
-                  <option v-for="v in REPROCANN_VINCULOS" :key="v.value" :value="v.value">{{ v.label }} — {{ v.ayuda }}</option>
-                </select>
-                <span v-else>{{ vinculoLabel(s.reprocann_vinculo) || 'Sin dato' }}</span>
-              </div>
+              <div class="sd__info-val" :title="vinculoSit(sit)?.ayuda">{{ vinculoSit(sit)?.label || 'Sin dato' }}</div>
             </div>
             <div class="sd__info-item">
               <div class="sd__info-label">Trámite</div>
-              <div class="sd__info-val sd__tramite">
+              <div class="sd__info-val">
                 <span v-if="s.reprocann_tramite_iniciado_el">Iniciado el {{ formatDate(s.reprocann_tramite_iniciado_el) }}</span>
                 <span v-else class="sd__val-empty">Sin trámite registrado</span>
-                <!-- «Inicié el trámite» (Javi): el médico o administración. Pasa a «en trámite» con la
-                     fecha, y el cambio se ve en toda la app. -->
-                <button v-if="canEdit && s.reprocann_estado !== 'pendiente'" type="button" class="sd__btn-tramite"
-                        :disabled="iniciandoTramite" @click="iniciarTramite">
-                  Inicié el trámite
-                </button>
               </div>
             </div>
             <div class="sd__info-item">
               <div class="sd__info-label">Estado del paciente</div>
               <div class="sd__info-val">
-                <span v-if="!s.es_paciente" class="sd__val-empty">Inactivo — no puede retirar</span>
-                <span v-else-if="s.suspendido" class="sd__val-susp">Suspendido por poco movimiento (+90 días sin retirar)</span>
-                <span v-else style="color:#15803d;font-weight:600">✓ Activo</span>
+                <span v-if="pacienteSit(sit)" class="pf-pill" :class="`pf-pill--${pacienteSit(sit).nivel}`" :title="pacienteSit(sit).ayuda">{{ pacienteSit(sit).label }}</span>
               </div>
             </div>
+          </div>
+          <div v-if="canEdit" class="sd__rep-editar">
+            <button type="button" class="sd__btn-edit" @click="abrirEditar('reprocann')">
+              <Pencil :size="14" :stroke-width="1.75" /> Corregir datos del REPROCANN
+            </button>
+            <span>Los pasos del trámite (iniciarlo, aprobado, no indicado…) se dan desde el recuadro de arriba.</span>
           </div>
           <div class="sd__card-note">
             <Info :size="12" />
@@ -906,27 +779,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
     </template>
-  </div>
 
-  <SocioEditarModal v-if="canEditDatos" v-model:open="editarOpen" :socio-id="socioId" @saved="store.fetchOne(socioId)" />
-
-  <!-- Mini-modal: activar REPROCANN con nueva fecha de vencimiento -->
-  <Teleport to="body">
-    <div v-if="activarModalOpen" class="sd__rep-modal-overlay" @click.self="activarModalOpen = false">
-      <div class="sd__rep-modal">
-        <h3 class="sd__rep-modal-title">Activar REPROCANN</h3>
-        <p class="sd__rep-modal-sub">Ingresá la fecha de vencimiento del certificado aprobado.</p>
-        <label class="sd__rep-modal-label">Vencimiento</label>
-        <AppDatePicker v-model="nuevaVencimiento" />
-        <div class="sd__rep-modal-actions">
-          <button class="sd__rep-modal-cancel" :disabled="cambiandoEstado" @click="activarModalOpen = false">Cancelar</button>
-          <button class="sd__rep-modal-ok" :disabled="cambiandoEstado || !nuevaVencimiento" @click="confirmarActivacion">
-            {{ cambiandoEstado ? 'Guardando…' : 'Activar' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <SocioEditarModal v-if="canEdit" v-model:open="editarOpen" :socio-id="socioId" :solapa="editarSolapa" @saved="store.fetchOne(socioId)" />
 
   <ModalAgendarTurnoMedico
     v-if="agendarTurnoOpen && s"
@@ -944,6 +798,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
     @close="turnoSeleccionado = null"
     @updated="onTurnoUpdated"
   />
+  </div>
 </template>
 
 <style scoped>
@@ -1051,6 +906,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__estado-check { color: #15803d; }
 /* Mini-modal activar REPROCANN */
 .sd__rep-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 900; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.sd__rep-editar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .9rem 1.25rem; border-top: 1px solid var(--c-slate-100); font-size: .78rem; color: var(--c-slate-500); }
 .sd__rep-modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .sd__rep-modal-title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .4rem; }
 .sd__rep-modal-sub { font-size: .8rem; color: var(--c-slate-500); margin: 0 0 1rem; }

@@ -76,8 +76,8 @@ RSpec.describe 'POST /stocks/:id/producir (transformación)', type: :request do
     expect(nuevo.unidad).to eq('un')
   end
 
-  # 15-oct-2026: la producción ya no se borra del historial; la vuelta queda como movimiento.
-  it 'borrar el derivado devuelve los gramos y deja escrita la vuelta en el historial del origen' do
+  # 16-oct-2026 (Germán): eliminar un derivado es un error de carga y no queda en el historial.
+  it 'borrar el derivado devuelve los gramos y quita la producción del historial del origen' do
     origen = create(:stock, :externo, club: club, sede: sede, forma_producto: 'flor_seca', cantidad: 200, costo_unitario_ars: 3)
     post "/stocks/#{origen.id}/producir",
          params: { gramos_usados: 80, forma_producto: 'prensado', cantidad_producida: 8, unidad: 'un' },
@@ -89,6 +89,6 @@ RSpec.describe 'POST /stocks/:id/producir (transformación)', type: :request do
     delete "/stocks/#{derivado.id}", headers: auth_headers, as: :json
     expect(response).to have_http_status(:no_content).or have_http_status(:ok)
     expect(origen.reload.cantidad.to_f).to eq(200.0)                          # 80g devueltos
-    expect(origen.stock_movimientos.where(tipo: 'produccion').sum(:gramos).to_f).to eq(0.0) # −80 y +80
+    expect(origen.stock_movimientos.where(tipo: 'produccion').count).to eq(0) # quitado del historial
   end
 end

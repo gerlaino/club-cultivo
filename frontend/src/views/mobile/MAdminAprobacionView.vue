@@ -133,8 +133,10 @@ import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicur
 import { useToast } from '../../composables/useToast.js'
 import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
+import { useRevisionPesaje } from '../../composables/useRevisionPesaje.js'
 
 const toast   = useToast()
+const revision = useRevisionPesaje()
 const pesajes = ref([])
 const loading = ref(true)
 
@@ -193,7 +195,15 @@ async function cargar({ silencioso = false } = {}) {
 // Lo que manda la manicura aparece solo, y lo que confirma otro admin desaparece solo.
 useRecargaEnCambios('pesajes', () => cargar({ silencioso: true }))
 
-function abrirConfirmacion(p) {
+async function abrirConfirmacion(p) {
+  // Primero se toma: si lo está revisando otro (o la manicura lo reabrió), no se abre.
+  try {
+    p = { ...p, ...(await revision.tomar(p)) }
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo abrir el pesaje')
+    cargar({ silencioso: true })
+    return
+  }
   pesajeActivo.value   = p
   pesoConfirmado.value = p.peso_total_g || p.peso_calculado_g || null
   errorMsg.value       = ''
@@ -204,6 +214,7 @@ function abrirConfirmacion(p) {
 function cerrarConfirmacion() {
   sheetConfirmar.value = false
   pesajeActivo.value   = null
+  revision.soltar()
 }
 
 async function confirmar() {
@@ -216,6 +227,7 @@ async function confirmar() {
   try {
     await confirmarPesajeManicura(pesajeActivo.value.lote_id, pesajeActivo.value.id, {
       peso_confirmado_g: pesoConfirmado.value,
+      version:           revision.version(),
       ...(repartir.value
         ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
         : { stock_id: stockDestino.value || undefined }),
@@ -226,12 +238,20 @@ async function confirmar() {
         ? `sumado a ${contenedores.value.find(s => s.id === stockDestino.value)?.numero_lote_producto || 'el frasco'}`
         : 'frasco nuevo'
     toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${pesoConfirmado.value}g · ${destino}`)
+    revision.olvidar()
     cerrarConfirmacion()
     cargar()
   } catch (e) {
     // Ya lo confirmó otra persona: no es un error de quien está acá, se saca de la lista.
     if (e.response?.data?.ya_confirmado) {
       toast.info(e.response.data.error)
+      cerrarConfirmacion()
+      cargar()
+      return
+    }
+    // Cambió mientras se revisaba: no se confirma a ciegas; se cierra y se ve lo nuevo.
+    if (e.response?.data?.cambio) {
+      toast.error(e.response.data.error)
       cerrarConfirmacion()
       cargar()
       return

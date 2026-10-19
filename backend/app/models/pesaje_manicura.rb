@@ -12,6 +12,7 @@ class PesajeManicura < ApplicationRecord
   acts_as_tenant(:club)
   belongs_to :stock,           optional: true
   belongs_to :confirmado_por,  class_name: 'User', optional: true, foreign_key: :confirmado_por_id
+  belongs_to :revisando_por,   class_name: 'User', optional: true
   # class_name explícito: el nombre de la asociación inferiría 'PesadasPlanta' (con 's'),
   # pero el modelo real es PesadaPlanta. Sin esto, cualquier acceso a pesadas_plantas rompe.
   has_many   :pesadas_plantas,  class_name: 'PesadaPlanta', dependent: :nullify
@@ -88,6 +89,55 @@ class PesajeManicura < ApplicationRecord
         .where.not(id: otras.select(:plant_id))
   end
 
+  # «EN REVISIÓN POR X» (16-oct-2026, Javi): el admin abrió «Confirmar» y está armando los frascos.
+  # Mientras tanto nadie más reabre ni borra el pesaje: la manicura cambiaba el peso en el medio y
+  # el admin confirmaba con los pesajes nuevos sin verlos. Se libera al cerrar, al confirmar o solo
+  # a los 15 minutos (un teléfono que se quedó sin batería no lo traba para siempre). Aun liberado,
+  # confirmar manda la versión que vio (`enviado_at`) y se rechaza si cambió.
+  REVISION_DURA = 15.minutes
+
+  # Un pesaje en revisión que alguien quiere tocar, o una confirmación sobre algo que cambió.
+  class Conflicto < StandardError; end
+
+  def en_revision?
+    revisando_por_id.present? && revisando_at.present? && revisando_at > REVISION_DURA.ago
+  end
+
+  def en_revision_por_otro?(usuario) = en_revision? && revisando_por_id != usuario&.id
+
+  def motivo_en_revision
+    "#{revisando_por&.first_name || 'Administración'} lo está revisando para confirmarlo. " \
+      "Se libera cuando termine o en #{REVISION_DURA.in_minutes.to_i} minutos."
+  end
+
+  def empezar_revision!(usuario)
+    with_lock do
+      raise Conflicto, 'Sólo se revisa un pesaje enviado' unless enviado?
+      raise Conflicto, motivo_en_revision if en_revision_por_otro?(usuario)
+
+      update!(revisando_por: usuario, revisando_at: Time.current)
+    end
+    self
+  end
+
+  # Sólo quien lo tiene lo suelta: cerrar el modal de otro admin no le saca el candado.
+  def soltar_revision!(usuario)
+    with_lock do
+      update!(revisando_por: nil, revisando_at: nil) if revisando_por_id == usuario&.id
+    end
+    self
+  end
+
+  # La versión que vio quien confirma: cambia cada vez que se reenvía (reabrir y reenviar es la
+  # única forma de cambiar un pesaje enviado). Viaja como `enviado_at` en el serializer.
+  def misma_version?(version)
+    return true if version.blank? # pantalla vieja todavía en caché: queda el candado
+    visto = Time.zone.parse(version.to_s)
+    visto.present? && enviado_at.present? && (visto.to_f - enviado_at.to_f).abs < 0.001
+  rescue ArgumentError
+    false
+  end
+
   def borrador?   = estado == 'borrador'
   def enviado?    = estado == 'enviado'
   def confirmado? = estado == 'confirmado'
@@ -103,6 +153,8 @@ class PesajeManicura < ApplicationRecord
       update!(
         estado:        'enviado',
         enviado_at:    Time.current,
+        revisando_por: nil,
+        revisando_at:  nil,
         peso_total_g:  peso,
         plantas_count: plantas_registradas_count,
       )
@@ -138,14 +190,18 @@ class PesajeManicura < ApplicationRecord
   # tiene que ser el peso confirmado. Sin `destinos`, todo va a `stock_id` (o a un frasco nuevo).
   MAX_DESTINOS = 10
 
-  def confirmar!(confirmado_por:, peso_confirmado_g:, stock_id: nil, destinos: nil)
+  def confirmar!(confirmado_por:, peso_confirmado_g:, stock_id: nil, destinos: nil, version: nil)
     peso = peso_confirmado_g.to_d
     raise ArgumentError, "El peso confirmado debe ser mayor a 0" unless peso > 0
     reparto = normalizar_destinos(destinos, peso, stock_id)
 
     with_lock do
       raise "Este pesaje ya fue confirmado" if confirmado?
-      raise "Solo un pesaje enviado puede confirmarse" unless enviado?
+      raise Conflicto, 'La manicura reabrió este pesaje mientras lo revisabas: volvé a mirarlo cuando lo reenvíe' unless enviado?
+      raise Conflicto, motivo_en_revision if en_revision_por_otro?(confirmado_por)
+      unless misma_version?(version)
+        raise Conflicto, 'El pesaje cambió mientras lo revisabas (se reabrió y se volvió a enviar). Miralo de nuevo antes de confirmar'
+      end
 
       frascos = reparto.map do |d|
         st = d[:stock_id].present? ? contenedor_elegido!(d[:stock_id]) : crear_stock_contenedor!(descripcion: d[:descripcion])
@@ -160,6 +216,8 @@ class PesajeManicura < ApplicationRecord
         confirmado_at:     Time.current,
         peso_confirmado_g: peso,
         stock:             stock_destino,
+        revisando_por:     nil,
+        revisando_at:      nil,
       )
 
       AlertaInterna.create!(

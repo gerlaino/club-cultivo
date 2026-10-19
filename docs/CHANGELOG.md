@@ -1,5 +1,49 @@
 # Changelog
 
+## Octubre 2026 (fq) — Los tres estados del paciente; alta por pasos y edición por solapas (19-oct)
+
+- **Tres ejes** (Germán): vínculo, REPROCANN y paciente, calculados en `Pacientes::Situacion` y
+  mostrados igual en la lista, la ficha, la del médico y los contadores. «Pendiente de entrevista»
+  deja de salir de los turnos: es el paso del REPROCANN de un vinculado nuevo, por vencer o vencido.
+  `Pacientes::Entrevista` pasa a `Pacientes::Agenda` (próximo turno, faltó con fecha, sin cerrar).
+- **«No indicado» y «Rechazado»**, con motivo y fecha; el paciente queda inactivo y vuelve con
+  «Volver a entrevistar». Migración `AgregarResultadoReprocannAPacientes` (`reprocann_resultado_motivo`
+  cifrado, `reprocann_resultado_el`). Acciones nuevas: `reprocann_aprobado`, `reprocann_no_indicado`,
+  `reprocann_rechazado`, `volver_a_entrevistar`; «Inicié el trámite» ahora valida desde dónde se da.
+- **Alta en 4 pasos** con riel, tarjeta del paciente que se arma mientras se carga, DNI repetido en el
+  paso 1, turno opcional con días y horarios libres del médico, y resumen. En el teléfono, barra de
+  progreso y botones fijos. **Edición** con las mismas secciones en solapas (pantalla completa en el
+  teléfono). La ficha tiene el recuadro «qué sigue» con las acciones del paso. La lista: Estado y
+  REPROCANN con datos chicos, tarjetas en el teléfono. `/m/pacientes/nuevo` y `/m/pacientes/:id`.
+- `rake pacientes:estados_nuevos` (sólo lee): quiénes se ven distinto con los tres ejes.
+
+## Octubre 2026 (fp) — Manicura: lo que se reabre se ve en el teléfono, y «en revisión por X» (16-oct)
+
+- **«Devolví y no actualizó en manicura»** (Javi): reproducido. Producción acepta el WebSocket y en la
+  compu se ve al instante; en el teléfono, con la pantalla apagada o la app atrás, la conexión se corta
+  y los avisos de ese rato se perdían: la pantalla quedaba «Enviado» hasta recargar a mano. Ahora, al
+  reconectar o al volver a la app, toda pantalla abierta re-pide lo suyo (`lib/cambios.js`,
+  `resincronizar`). Probado con Playwright cortando la señal: sin el arreglo queda «Enviado», con el
+  arreglo pasa a «Jornada en curso». Vale para todas las pantallas, no sólo manicura.
+- **«En revisión por X»** (Javi: el admin confirmaba con los pesos que la manicura cambió en el
+  medio). Migración `AgregarRevisionAPesajesManicura` (`revisando_por_id`, `revisando_at`). Abrir
+  «Confirmar» toma el pesaje; la manicura lo ve («En revisión por Germán») y no puede reabrirlo,
+  borrarlo ni devolver el lote a cosecha; otro admin tampoco lo toma. Se libera al cerrar, al
+  confirmar o a los 15 minutos, y confirmar se rechaza si el pesaje se reenvió mientras tanto.
+- La ficha del lote de la manicura, si el lote deja de estar a su alcance con la pantalla abierta
+  (lo confirmaron y pasó a curado), lo dice y la lleva a Pendientes en vez de quedarse con lo viejo.
+
+## Octubre 2026 (fo) — Un stock con dispensas no se elimina; el derivado eliminado no deja rastro (16-oct)
+
+- **Eliminar stock** (Germán: «si se hicieron dispensas no se debería poder eliminar el stock, sólo
+  dar de baja/finalizar»): bloqueado si el stock o un derivado tiene alguna dispensa, anulada
+  incluida. Antes las deshacía (borraba historia de pacientes). Se mira también la segunda línea
+  de una dispensa de varios productos, que la columna `stock_id` no espeja. La ficha apaga el botón
+  y dice por qué (`eliminar_bloqueo` en `GET /stocks/:id`). Sale el código que revertía dispensas.
+- **Eliminar un derivado** vuelve a ser deshacer un error de carga: gramos al origen y la producción
+  fuera del historial, sin movimiento de vuelta (revierte lo de (fn)). El informe y la trazabilidad
+  siguen reconociendo las vueltas que se hayan creado entre (fn) y (fo).
+
 ## Octubre 2026 (fn) — El médico sólo la salud, derivados con rastro, mails con lo justo (15/16-oct)
 
 - **Médico** (Germán: «ni altas ni bajas ni editar, nada, sólo se ocupa de la salud»): no aprueba

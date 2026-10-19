@@ -8,7 +8,7 @@ class AlertaInterna < ApplicationRecord
 
   TIPOS_OPERATIVOS = %w[
     paciente_creado_por_dispensador paciente_pendiente_aprobacion modulo_dado_de_baja documento_vencido reprocann_vencido reprocann_por_vencer
-    reprocann_tramite_iniciado
+    reprocann_tramite_iniciado reprocann_no_indicado reprocann_rechazado
     indicacion_vencida indicacion_por_vencer
     manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo merma_mostrador cierre_mostrador_pendiente reposicion_mostrador
@@ -60,7 +60,7 @@ class AlertaInterna < ApplicationRecord
     'manicura_aprobacion_pendiente' => 'manicura',
     'stock_bajo' => 'stock', 'stock_vencimiento' => 'stock',
     'reserva_por_entregar' => 'reserva', 'reserva_vencida' => 'reserva',
-    'reprocann_vencido' => 'paciente', 'reprocann_por_vencer' => 'paciente', 'reprocann_tramite_iniciado' => 'paciente',
+    'reprocann_vencido' => 'paciente', 'reprocann_por_vencer' => 'paciente', 'reprocann_tramite_iniciado' => 'paciente', 'reprocann_no_indicado' => 'paciente', 'reprocann_rechazado' => 'paciente',
     'documento_vencido' => 'paciente', 'saldo_cc_bajo' => 'paciente', 'saldo_gramos_bajo' => 'paciente',
     'indicacion_vencida' => 'paciente', 'indicacion_por_vencer' => 'paciente',
     'paciente_creado_por_dispensador' => 'paciente', 'paciente_pendiente_aprobacion' => 'paciente',

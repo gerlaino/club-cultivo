@@ -4,7 +4,9 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :crear_acceso_portal, :restablecer_acceso_portal, :iniciar_tramite_reprocann]
+                                          :crear_acceso_portal, :restablecer_acceso_portal, :iniciar_tramite_reprocann,
+                                          :reprocann_aprobado, :reprocann_no_indicado, :reprocann_rechazado,
+                                          :volver_a_entrevistar]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
   # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
   # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
@@ -20,7 +22,7 @@ class PacientesController < ApplicationController
   CAMPOS_NO_CLINICOS = %w[
     id club_id nombre apellido apodo dni dni_normalizado fecha_nacimiento es_paciente
     email telefono reprocann_numero reprocann_vencimiento reprocann_estado
-    reprocann_vinculo reprocann_tramite_iniciado_el
+    reprocann_vinculo reprocann_tramite_iniciado_el reprocann_resultado_el
     con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
     aprobado_at
     domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
@@ -32,7 +34,7 @@ class PacientesController < ApplicationController
   # a decidir sobre un caso que no le toca —y a discutirlo en el mostrador con el paciente
   # enfrente—. Los casos especiales los mira admin/supervisor, que tienen la ficha completa.
   CAMPOS_REPROCANN = %w[reprocann_numero reprocann_vencimiento reprocann_estado
-                        reprocann_vinculo reprocann_tramite_iniciado_el].freeze
+                        reprocann_vinculo reprocann_tramite_iniciado_el reprocann_resultado_el].freeze
 
   # Campos CLÍNICOS / de salud: SÓLO se agregan si el rol puede ver la historia clínica
   # (allowlist medico/admin/supervisor, via PacientePolicy#ver_notas_clinicas?).
@@ -90,16 +92,19 @@ class PacientesController < ApplicationController
                           .where(paciente_id: pacientes.map(&:id))
                           .group(:paciente_id).maximum(:fecha_dispensacion)
 
-    # Pendiente de entrevista / faltó al turno (6-oct-2026): de los turnos, en una consulta. No es
-    # asunto del mostrador, como el REPROCANN.
-    entrevista = current_user.dispensador? ? {} : Pacientes::Entrevista.para(pacientes.map(&:id))
+    # Los tres estados del paciente (19-oct-2026, `Pacientes::Situacion`) con lo que dicen sus
+    # turnos al lado. No es asunto del mostrador, como el REPROCANN.
+    agenda = current_user.dispensador? ? {} : Pacientes::Agenda.para(pacientes.map(&:id))
 
     # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
-      p.as_json(only: campos_visibles, methods: metodos_lista)
-       .merge('ultima_dispensacion' => ultimas[p.id],
-              'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]),
-              'entrevista' => entrevista[p.id])
+      fila = p.as_json(only: campos_visibles, methods: metodos_lista)
+              .merge('ultima_dispensacion' => ultimas[p.id],
+                     'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]))
+      unless current_user.dispensador?
+        fila['situacion'] = p.situacion(ultima_dispensacion: ultimas[p.id], agenda: agenda[p.id], usuario: current_user)
+      end
+      fila
     end
 
     render json: {
@@ -130,7 +135,9 @@ class PacientesController < ApplicationController
     # Los médicos que lo atienden y si tiene una entrevista pendiente (6-oct-2026). Fuera del mostrador.
     unless current_user.dispensador?
       json['medicos'] = @paciente.medico_pacientes.includes(:medico).map { |v| { medico_id: v.medico_id, nombre: v.medico&.nombre_completo } }
-      json['entrevista'] = Pacientes::Entrevista.para([@paciente.id])[@paciente.id]
+      json['situacion'] = situacion_de(@paciente)
+      # El motivo de «No indicado» / «Rechazado» es de salud: lo ve quien ve el REPROCANN.
+      json['reprocann_resultado_motivo'] = @paciente.reprocann_resultado_motivo if @paciente.reprocann_cerrado?
     end
 
     # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
@@ -158,13 +165,33 @@ class PacientesController < ApplicationController
   # médico (de sus pacientes) o administración. El estado pasa a «en trámite» con la fecha, y como es
   # el mismo campo para toda la app, se ve en todos lados; administración recibe un aviso.
   def iniciar_tramite_reprocann
-    unless current_user.admin? || current_user.medico? || current_user.super_admin?
-      return render json: { error: 'Sólo el médico o administración.' }, status: :forbidden
-    end
+    paso_del_reprocann { @paciente.iniciar_tramite_reprocann!(por: current_user) }
+  end
 
-    @paciente.iniciar_tramite_reprocann!(por: current_user)
-    render json: { data: @paciente.as_json(only: campos_visibles,
-                                           methods: %i[nombre_completo reprocann_estado_efectivo reprocann_categoria]) }
+  # POST /pacientes/:id/reprocann_aprobado — llegó aprobado: número y vencimiento, y queda activo.
+  def reprocann_aprobado
+    paso_del_reprocann do
+      @paciente.cargar_reprocann_aprobado!(por: current_user, numero: params[:numero].to_s.strip,
+                                           vencimiento: params[:vencimiento])
+    end
+  end
+
+  # POST /pacientes/:id/reprocann_no_indicado — la médica decide no pedirlo (con motivo). Queda inactivo.
+  def reprocann_no_indicado
+    paso_del_reprocann { @paciente.marcar_no_indicado!(por: current_user, motivo: params[:motivo]) }
+  end
+
+  # POST /pacientes/:id/reprocann_rechazado — el Ministerio rechazó el trámite (con motivo). Queda inactivo.
+  def reprocann_rechazado
+    paso_del_reprocann { @paciente.marcar_rechazado!(por: current_user, motivo: params[:motivo]) }
+  end
+
+  # POST /pacientes/:id/volver_a_entrevistar — vuelve al ciclo y a estar activo. Reactivar es de
+  # administración, como toda alta (el médico se ocupa sólo de la salud).
+  def volver_a_entrevistar
+    return render json: { error: 'Sólo administración reactiva a un paciente.' }, status: :forbidden unless admin_de_la_org?
+
+    paso_del_reprocann { @paciente.volver_a_entrevistar!(por: current_user) }
   end
 
   # POST /pacientes/:id/acceso — crearle la cuenta del portal a alguien que no la tiene.
@@ -309,7 +336,27 @@ class PacientesController < ApplicationController
       paciente.desde_mostrador = true
     end
 
-    if paciente.save
+    if Paciente::REPROCANN_CERRADOS.include?(paciente.reprocann_estado)
+      return render json: { errors: ['Un alta no nace «No indicado» ni «Rechazado».'] }, status: :unprocessable_entity
+    end
+
+    turno = turno_del_alta(paciente)
+    return if performed?
+
+    guardado = Paciente.transaction do
+      next false unless paciente.save
+      next true unless turno
+
+      turno.paciente = paciente
+      next true if turno.save
+
+      # El turno no entró (horario ocupado, ya pasó…): no queda un alta a medias.
+      paciente.errors.add(:base, "El turno: #{turno.errors.full_messages.to_sentence}")
+      raise ActiveRecord::Rollback
+    end
+
+    if guardado
+      Turnos::AvisarMedico.call(turno, cambio: :nuevo, por: current_user) if turno
       # La «dirección de entrega distinta» del alta es la primera dirección guardada (con su
       # nombre y por defecto). Las columnas `envio_*` de `pacientes` ya no se escriben.
       guardar_direccion_de_entrega!(paciente)
@@ -364,6 +411,10 @@ class PacientesController < ApplicationController
     end
 
     attrs = paciente_params
+    if Paciente::REPROCANN_CERRADOS.include?(attrs[:reprocann_estado].to_s) && attrs[:reprocann_estado] != @paciente.reprocann_estado
+      return render json: { errors: ['«No indicado» y «Rechazado» se marcan desde la ficha, con el motivo.'] },
+                    status: :unprocessable_entity
+    end
 
     @paciente.assign_attributes(attrs)
     @paciente.updated_by = current_user
@@ -515,6 +566,52 @@ class PacientesController < ApplicationController
 
   private
 
+  def admin_de_la_org? = current_user.admin? || current_user.super_admin?
+
+  # Un paso del ciclo del REPROCANN: sólo salud (admin y médico; el médico, de sus vinculados —ya lo
+  # filtra `set_paciente`). El modelo valida que se pueda dar desde el estado actual.
+  def paso_del_reprocann
+    unless admin_de_la_org? || current_user.medico?
+      return render json: { error: 'Sólo el médico o administración.' }, status: :forbidden
+    end
+
+    yield
+    render json: { data: { id: @paciente.id, situacion: situacion_de(@paciente.reload) } }
+  rescue Paciente::PasoInvalido => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  end
+
+  def situacion_de(paciente)
+    paciente.situacion(ultima_dispensacion: paciente.dispensaciones.no_canceladas.maximum(:fecha_dispensacion),
+                       agenda: Pacientes::Agenda.para([paciente.id])[paciente.id], usuario: current_user)
+  end
+
+  # El turno opcional del alta (19-oct-2026): con quién y cuándo. Lo da administración —la agenda de
+  # los médicos es suya—; el turno vincula solo al paciente con el médico (`Turno`).
+  def turno_del_alta(paciente)
+    t = params[:turno]
+    return nil if t.blank? || t[:medico_id].blank?
+
+    unless admin_de_la_org?
+      render json: { errors: ['Sólo administración da turnos al dar el alta.'] }, status: :forbidden
+      return nil
+    end
+    medico = current_user.club.users.find_by(id: t[:medico_id], role: 'medico')
+    unless medico
+      render json: { errors: ['El médico elegido no es de esta organización.'] }, status: :unprocessable_entity
+      return nil
+    end
+
+    turno = current_user.club.turnos.new(
+      medico: medico, fecha_hora: t[:fecha_hora], duracion_minutos: (t[:duracion_minutos].presence || 30).to_i,
+      tipo: t[:tipo].presence_in(Turno::TIPOS) || 'primera_vez', motivo: t[:motivo].presence, estado: 'programado'
+    )
+    turno.agendando = true
+    turno
+  end
+
   # Los contadores de la cabecera se cuentan sobre TODO el padrón, no sobre la página.
   # Contarlos en el cliente sobre `store.items` hacía que una organización de 38 pacientes mostrara
   # "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos en la página 2 — el admin lee
@@ -523,52 +620,43 @@ class PacientesController < ApplicationController
   # Espeja la PRECEDENCIA de `reprocannCategoria` (frontend/src/composables/useReprocann.js):
   # primero el trámite pendiente, después la falta de certificado, y recién ahí la fecha. Si
   # las dos se separan, la tarjeta y la lista que esa tarjeta filtra dejan de coincidir.
-  def conteo_entrevista(nomina)
-    return { entrevista_pendiente: 0, falto_turno: 0 } if current_user.dispensador? # no es asunto del mostrador
-    estados = Pacientes::Entrevista.para(nomina.pluck(:id)).values
-    { entrevista_pendiente: estados.count('pendiente_entrevista'), falto_turno: estados.count('falto_turno') }
-  end
-
+  # Los contadores, con la MISMA cuenta que cada fila (`Pacientes::Situacion`): una tarjeta y la
+  # lista que filtra no pueden decir números distintos. Se cuentan sobre la nómina (los activos en la
+  # organización), salvo «dados de baja» y «no indicados / rechazados», que son justamente los que
+  # quedaron afuera.
   def kpis_padron(scope)
-    hoy    = Time.zone.today
-    nomina = scope.where(es_paciente: true)
+    hoy = Time.zone.today
+    filas = scope.select(:id, :es_paciente, :aprobado_at, :reprocann_estado, :reprocann_numero,
+                         :reprocann_vencimiento, :reprocann_vinculo).to_a
+    ultimas = Dispensacion.no_canceladas.where(paciente_id: scope.select(:id))
+                          .group(:paciente_id).maximum(:fecha_dispensacion)
+    agenda = current_user.dispensador? ? {} : Pacientes::Agenda.para(filas.select(&:es_paciente).map(&:id))
 
-    # «Vencido» guardado a mano (6-oct) va antes que la falta de número: lo saben aunque no
-    # tengan el certificado a mano, igual que `Paciente.reprocann_categoria`.
-    vencidos_a_mano = nomina.where(reprocann_estado: 'vencido')
-    resto = nomina.where.not(reprocann_estado: %w[pendiente vencido])
-    # `reprocann_numero` va cifrado (determinístico): admite IS NULL e igualdad, no LIKE.
-    # Se suma el estado 'sin_registro' porque una ficha puede quedar sin número cargado o con
-    # la baja declarada en el estado, y las dos cuentan como "sin REPROCANN".
-    sin_rep = resto.where(reprocann_numero: nil).or(resto.where(reprocann_estado: 'sin_registro'))
-    con_rep = resto.where.not(reprocann_numero: nil).where.not(reprocann_estado: 'sin_registro')
+    k = Hash.new(0)
+    filas.each do |p|
+      rep = Pacientes::Situacion.reprocann(estado: p.reprocann_estado, numero: p.reprocann_numero,
+                                           vencimiento: p.reprocann_vencimiento, vinculo: p.reprocann_vinculo, hoy: hoy)
+      k[:cerrados] += 1 if Pacientes::Situacion::CERRADOS.include?(rep)
+      next k[:baja] += 1 unless p.es_paciente
 
-    # "No viene hace tiempo": tratamiento abierto pero hace más de 90 días que no retira. El
-    # que nunca dispensó NO entra (es un alta reciente, no un abandono), y por eso se cuenta
-    # sobre las últimas dispensaciones y no sobre la nómina.
-    ultimas   = Dispensacion.no_canceladas
-                            .where(paciente_id: nomina.select(:id))
-                            .group(:paciente_id).maximum(:fecha_dispensacion)
-    inactivos = ultimas.count { |_id, fecha| Paciente.suspendido?(es_paciente: true, ultima_dispensacion: fecha, hoy: hoy) }
+      k[:total] += 1
+      k[:pendientes_aprobacion] += 1 if p.aprobado_at.nil?
+      k[:inactivos] += 1 if Paciente.suspendido?(es_paciente: true, ultima_dispensacion: ultimas[p.id], hoy: hoy)
+      if p.reprocann_vinculo == 'otra_organizacion'
+        k[:adherentes] += 1
+      else
+        k[:vinculados] += 1
+      end
+      k[:entrevista_pendiente] += 1 if Pacientes::Situacion.pendiente_entrevista?(rep, vencimiento: p.reprocann_vencimiento,
+                                                                                 vinculo: p.reprocann_vinculo, hoy: hoy)
+      k[:pendientes] += 1 if rep == 'pendiente_aprobacion'
+      k[:vencidos]   += 1 if rep == 'vencido'
+      k[:proximos]   += 1 if rep == 'activo' && Pacientes::Situacion.vence_en_dias(p.reprocann_vencimiento, hoy: hoy)
+      k[:falto_turno] += 1 if agenda.dig(p.id, :falto_turno_el)
+    end
 
-    {
-      total:      nomina.count,
-      baja:       scope.where(es_paciente: false).count,
-      # Cargados desde el mostrador y todavía sin admitir. Van aparte porque no es un problema
-      # del REPROCANN sino del alta, y porque cada uno es alguien que hoy NO puede retirar.
-      pendientes_aprobacion: nomina.pendientes_aprobacion.count,
-      pendientes: nomina.where(reprocann_estado: 'pendiente').count,
-      # Adherente / Vinculado y entrevista pendiente / faltó al turno (6-oct-2026), sobre la nómina.
-      adherentes: nomina.where(reprocann_vinculo: 'otra_organizacion').count,
-      vinculados: nomina.where(reprocann_vinculo: 'organizacion').count,
-      **conteo_entrevista(nomina),
-      sin_rep:    sin_rep.count,
-      vencidos:   vencidos_a_mano.count +
-                  con_rep.where.not(reprocann_vencimiento: nil)
-                         .where(reprocann_vencimiento: ...hoy).count,
-      proximos:   con_rep.where(reprocann_vencimiento: hoy..(hoy + 30)).count,
-      inactivos:  inactivos,
-    }
+    %i[total baja pendientes_aprobacion pendientes adherentes vinculados entrevista_pendiente falto_turno
+       vencidos proximos inactivos cerrados].index_with { |key| k[key] }
   end
 
   def campos_visibles

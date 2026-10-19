@@ -80,10 +80,10 @@ export const usePacientesStore = defineStore("pacientes", {
     // paciente se creó igual, así que no es un error: es algo que el usuario tiene que saber.
     // `acceso` trae la cuenta del portal recién creada (usuario y contraseña inicial), y sólo
     // viene si la organización tiene el módulo y el alta quedó aprobada.
-    async create(payload, { enviarBienvenida = false } = {}) {
+    async create(payload, { enviarBienvenida = false, turno = null } = {}) {
       this.saving = true; this.error = null
       try {
-        const { data } = await createPaciente(payload, { enviarBienvenida })
+        const { data } = await createPaciente(payload, { enviarBienvenida, turno })
         const paciente = data?.data || data
         this.items = [paciente, ...this.items]
         return { paciente, aviso: data?.aviso || null, acceso: data?.acceso || null }

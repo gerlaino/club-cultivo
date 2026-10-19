@@ -2,6 +2,9 @@ import { ref, toValue } from 'vue'
 import { useToast } from './useToast.js'
 import { usePacientesStore } from '../stores/pacientes'
 import { updatePaciente } from '../lib/api.js'
+import {
+  desdePaciente, aPayload, validarPersona, validarReprocann,
+} from '../components/pacientes/formulario/pacienteForm.js'
 
 export const REPROCANN_ESTADOS = [
   { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
@@ -18,64 +21,68 @@ export const REPROCANN_ESTADOS = [
 // DE QUIÉN ES SU REPROCANN (6-oct-2026), aparte del estado. Vacío = sin dato.
 export const REPROCANN_VINCULOS = [
   { value: 'organizacion',      label: 'Vinculado', ayuda: 'Su REPROCANN está con la organización.' },
-  { value: 'otra_organizacion', label: 'Adherente', ayuda: 'Paciente nuevo con REPROCANN vigente, vinculado a otra organización por ahora.' },
+  { value: 'otra_organizacion', label: 'Adherente', ayuda: 'Tiene su REPROCANN vigente con otra organización.' },
 ]
 export const vinculoLabel = (v) => REPROCANN_VINCULOS.find(x => x.value === v)?.label || null
 
+// Lo que el médico puede escribir (espeja `Paciente::CAMPOS_SALUD` en lo que este formulario toca).
+const CAMPOS_MEDICO = ['reprocann_numero', 'reprocann_vencimiento', 'reprocann_estado', 'reprocann_vinculo']
+const CAMPOS_SOLO_ADMIN = ['es_paciente', 'descuento_porcentaje']
+// Las direcciones de entrega viven en la solapa «Direcciones» de la ficha: la edición no las manda.
+const CAMPOS_ENVIO = ['envio_etiqueta', 'envio_calle', 'envio_altura', 'envio_piso', 'envio_depto', 'envio_barrio', 'envio_ciudad']
+
+// La edición usa el MISMO formulario que el alta (`pacienteForm.js`, 19-oct-2026).
 // `socioIdRef` puede ser un número o un getter/ref: desde la LISTA de pacientes el id cambia
 // según a quién se edite, y capturarlo por valor guardaba los cambios en el paciente anterior.
-export function useSocioEditar(socioIdRef) {
+export function useSocioEditar(socioIdRef, { rol = () => 'admin' } = {}) {
   const socioIdActual = () => toValue(socioIdRef)
-  const { success: toastOk, error: toastErr } = useToast()
+  const { success: toastOk } = useToast()
   const store = usePacientesStore()
 
-  const editOpen   = ref(false)
-  const editForm   = ref({})
-  const editSaving = ref(false)
-  const editError  = ref(null)
+  const editOpen    = ref(false)
+  const editForm    = ref({})
+  const editSaving  = ref(false)
+  const editError   = ref(null)
+  const editErrores = ref({ persona: {}, reprocann: {} })
 
   function openEdit() {
-    const s = store.current
-    editForm.value = {
-      nombre:                         s?.nombre               || '',
-      apellido:                       s?.apellido             || '',
-      apodo:                          s?.apodo                || '',
-      dni:                            s?.dni                  || '',
-      fecha_nacimiento:               s?.fecha_nacimiento     || '',
-      email:                          s?.email                || '',
-      telefono:                       s?.telefono             || '',
-      reprocann_numero:               s?.reprocann_numero     || '',
-      reprocann_vencimiento:          s?.reprocann_vencimiento || '',
-      reprocann_estado:               s?.reprocann_estado     || 'sin_registro',
-      reprocann_vinculo:              s?.reprocann_vinculo    || '',
-      es_paciente:                    s?.es_paciente          ?? true,
-      descuento_porcentaje:           s?.descuento_porcentaje ?? 0,
-      domicilio_calle:                s?.domicilio_calle      || '',
-      domicilio_altura:               s?.domicilio_altura     || '',
-      domicilio_piso:                 s?.domicilio_piso       || '',
-      domicilio_depto:                s?.domicilio_depto      || '',
-      domicilio_barrio:               s?.domicilio_barrio     || '',
-      domicilio_ciudad:               s?.domicilio_ciudad     || '',
-    }
+    editForm.value = desdePaciente(store.current)
     editError.value = null
+    editErrores.value = { persona: {}, reprocann: {} }
     editOpen.value  = true
   }
 
+  // Valida todo; devuelve la primera solapa con algo mal (o null).
+  function validar() {
+    const r = toValue(rol)
+    const persona = r === 'medico' ? {} : validarPersona(editForm.value)
+    const reprocann = validarReprocann(editForm.value)
+    editErrores.value = { persona, reprocann }
+    if (Object.keys(persona).length) return 'persona'
+    if (Object.keys(reprocann).length) return 'reprocann'
+    return null
+  }
+
   async function saveEdit() {
-    // El domicilio NO frena la edición, igual que no frena el alta: se anota a la persona con lo
-    // que hay y la dirección aparece después. Donde sí hace falta es al despachar un envío, y
-    // ahí se pide. (Se sacó del alta y quedó acá, que es otra validación distinta.)
     editError.value = null
+    if (validar()) return false
     editSaving.value = true
     try {
+      const r = toValue(rol)
+      const campos = r === 'medico' ? CAMPOS_MEDICO : null
+      const payload = aPayload(editForm.value, { campos })
+      CAMPOS_ENVIO.forEach(k => delete payload[k])
+      if (!['admin', 'super_admin'].includes(r)) CAMPOS_SOLO_ADMIN.forEach(k => delete payload[k])
       const id = socioIdActual()
-      await updatePaciente(id, editForm.value)
+      await updatePaciente(id, payload)
       await store.fetchOne(id)
       editOpen.value = false
       toastOk('Paciente actualizado')
+      return true
     } catch (e) {
       const msgs = e?.response?.data?.errors
-      editError.value = Array.isArray(msgs) ? msgs.join(', ') : 'Error al guardar'
+      editError.value = Array.isArray(msgs) ? msgs.join(', ') : (e?.response?.data?.error || 'No se pudo guardar')
+      return false
     } finally {
       editSaving.value = false
     }
@@ -83,7 +90,7 @@ export function useSocioEditar(socioIdRef) {
 
   return {
     REPROCANN_ESTADOS, REPROCANN_VINCULOS,
-    editOpen, editForm, editSaving, editError,
-    openEdit, saveEdit,
+    editOpen, editForm, editSaving, editError, editErrores,
+    openEdit, saveEdit, validar,
   }
 }

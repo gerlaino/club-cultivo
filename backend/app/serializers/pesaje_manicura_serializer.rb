@@ -29,7 +29,12 @@ class PesajeManicuraSerializer
       # Qué plantas tiene esta jornada (la pantalla ofrece «Quitar» en las de la jornada abierta).
       plant_ids:         pesaje.pesadas_plantas.loaded? ? pesaje.pesadas_plantas.map(&:plant_id) : pesaje.pesadas_plantas.pluck(:plant_id),
       notas:             pesaje.notas,
-      enviado_at:        pesaje.enviado_at,
+      # La versión que confirma el admin: cambia cada vez que se reenvía.
+      enviado_at:        pesaje.enviado_at&.iso8601(6),
+      # «En revisión por X»: la manicura ve quién y no ofrece reabrir ni borrar.
+      en_revision:       pesaje.en_revision?,
+      revisando_por_id:  pesaje.en_revision? ? pesaje.revisando_por_id : nil,
+      revisando_por:     pesaje.en_revision? ? pesaje.revisando_por&.first_name : nil,
       confirmado_at:     pesaje.confirmado_at,
       confirmado_por:    pesaje.confirmado_por&.nombre_completo,
       created_at:        pesaje.created_at,

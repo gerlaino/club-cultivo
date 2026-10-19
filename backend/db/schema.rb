@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_19_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1785,6 +1785,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
     t.string "reprocann_vinculo"
     t.date "reprocann_tramite_iniciado_el"
     t.string "apodo"
+    t.text "reprocann_resultado_motivo"
+    t.date "reprocann_resultado_el"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"
@@ -1913,6 +1915,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "revisando_por_id"
+    t.datetime "revisando_at"
     t.index ["club_id", "estado"], name: "index_pesajes_manicura_on_club_id_and_estado"
     t.index ["club_id"], name: "index_pesajes_manicura_on_club_id"
     t.index ["confirmado_por_id"], name: "index_pesajes_manicura_on_confirmado_por_id"
@@ -1922,6 +1926,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
     t.index ["lote_id", "estado"], name: "index_pesajes_manicura_on_lote_id_and_estado"
     t.index ["lote_id"], name: "index_pesajes_manicura_on_lote_id"
     t.index ["manicurador_id"], name: "index_pesajes_manicura_on_manicurador_id"
+    t.index ["revisando_por_id"], name: "index_pesajes_manicura_on_revisando_por_id"
     t.index ["stock_id"], name: "index_pesajes_manicura_on_stock_id"
   end
 
@@ -3087,6 +3092,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_15_210000) do
   add_foreign_key "pesajes_manicura", "users", column: "confirmado_por_id"
   add_foreign_key "pesajes_manicura", "users", column: "deleted_by_id"
   add_foreign_key "pesajes_manicura", "users", column: "manicurador_id"
+  add_foreign_key "pesajes_manicura", "users", column: "revisando_por_id"
   add_foreign_key "plan_tareas", "plan_trabajos"
   add_foreign_key "plan_tareas", "salas"
   add_foreign_key "plan_tareas", "tareas", column: "tarea_generada_id"

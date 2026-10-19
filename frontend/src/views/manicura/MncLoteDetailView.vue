@@ -187,8 +187,11 @@
           <div v-for="p in pesajesHistorial" :key="p.id" class="mnl__hist-row">
             <span class="mnl__hist-date">{{ fmtDate(p.fecha_pesaje) }}</span>
             <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} {{ (p.plantas_count || p.plantas_registradas) === 1 ? 'planta' : 'plantas' }} · {{ formatG((p.peso_total_g || p.peso_calculado_g || 0), 1) }}</span>
-            <span class="mnl__badge" :class="badgeClass(p.estado)">{{ pesajeEstadoLabel(p.estado) }}</span>
-            <button v-if="p.estado === 'enviado'" class="mnl__hist-act" :disabled="reabriendo === p.id" title="Reabrir para corregir" @click="reabrirPesaje(p)">
+            <!-- El admin lo está confirmando: no se reabre hasta que termine (o pasen 15 min). -->
+            <span class="mnl__badge" :class="badgeClass(p.estado)" :data-testid="p.en_revision ? 'pesaje-en-revision' : null">
+              {{ p.en_revision ? `En revisión por ${p.revisando_por || 'administración'}` : pesajeEstadoLabel(p.estado) }}
+            </span>
+            <button v-if="p.estado === 'enviado' && !p.en_revision" class="mnl__hist-act" :disabled="reabriendo === p.id" title="Reabrir para corregir" @click="reabrirPesaje(p)">
               <Undo2 :size="13" />
             </button>
           </div>
@@ -662,7 +665,14 @@ async function cargar({ silencioso = false } = {}) {
     lote.value    = lr.data
     plantas.value = pr.data || []
     pesajes.value = psj.data || []
-  } catch {
+  } catch (e) {
+    // El lote dejó de estar a su alcance con la pantalla abierta: administración confirmó el último
+    // pesaje y pasó a curado (o lo devolvieron a cosecha). Quedarse mostraba lo viejo como si nada.
+    if (silencioso && e?.response?.status === 404) {
+      toast.info('Este lote ya no está en manicura: administración lo confirmó o lo devolvió')
+      router.push('/mnc/pendientes')
+      return
+    }
     if (silencioso) return
     toast.error('Error al cargar el lote')
     router.push('/mnc/pendientes')

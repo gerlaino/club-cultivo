@@ -6,10 +6,12 @@ import { createPinia, setActivePinia } from 'pinia'
 // suspendidos… con un tooltip que diga suspendido por poco movimiento o algo así, bien
 // distintivo». Lo decide el backend (`suspendido`); la lista lo muestra, distinto de Inactivo.
 const hace = (d) => { const f = new Date(); f.setDate(f.getDate() - d); return f.toISOString().slice(0, 10) }
+// Desde el 19-oct-2026 el estado viaja en `situacion.paciente` (`Pacientes::Situacion`).
+const sit = (paciente) => ({ paciente, reprocann: 'activo', vinculo: 'vinculado', acciones: [] })
 const FILAS = [
-  { id: 1, nombre: 'Ana',  apellido: 'Activa',     dni: '1', es_paciente: true,  aprobado_at: '2026-01-01', suspendido: false, ultima_dispensacion: hace(5) },
-  { id: 2, nombre: 'Beto', apellido: 'Suspendido', dni: '2', es_paciente: true,  aprobado_at: '2026-01-01', suspendido: true,  ultima_dispensacion: hace(120) },
-  { id: 3, nombre: 'Caro', apellido: 'Inactiva',   dni: '3', es_paciente: false, aprobado_at: '2026-01-01', suspendido: false, ultima_dispensacion: hace(300) },
+  { id: 1, nombre: 'Ana',  apellido: 'Activa',     dni: '1', es_paciente: true,  aprobado_at: '2026-01-01', suspendido: false, ultima_dispensacion: hace(5),   situacion: sit('activo') },
+  { id: 2, nombre: 'Beto', apellido: 'Suspendido', dni: '2', es_paciente: true,  aprobado_at: '2026-01-01', suspendido: true,  ultima_dispensacion: hace(120), situacion: sit('suspendido') },
+  { id: 3, nombre: 'Caro', apellido: 'Inactiva',   dni: '3', es_paciente: false, aprobado_at: '2026-01-01', suspendido: false, ultima_dispensacion: hace(300), situacion: sit('inactivo') },
 ]
 vi.mock('../lib/api.js', () => ({
   listPacientes: vi.fn(() => Promise.resolve({ data: { data: FILAS, meta: { total: 3, kpis: { total: 2, baja: 1, inactivos: 1, vencidos: 0, proximos: 0, pendientes: 0, sin_rep: 0, pendientes_aprobacion: 0 } } } })),
@@ -28,11 +30,14 @@ describe('Pacientes › suspendido por poco movimiento', () => {
     const w = mount(V, { global: { stubs: { RouterLink: true, SocioEditarModal: true, AppDatePicker: true, DsSpinner: true } } })
     await flushPromises()
 
-    const susp = w.find('.sv-estado--susp')
-    expect(susp.exists()).toBe(true)
-    expect(susp.text()).toContain('Suspendido')
+    // La columna Estado de la tabla: una pastilla por fila.
+    const estados = w.findAll('.sv-table tbody td:nth-child(3) .pf-pill')
+    const susp = estados.find(e => e.text() === 'Suspendido')
+    expect(susp).toBeTruthy()
     expect(susp.attributes('title')).toMatch(/poco movimiento/)
+    // Bien distintivo: no tiene el color de Activo ni el de Inactivo.
+    expect(susp.classes()).toContain('pf-pill--warn')
+    expect(estados.filter(e => e.text() === 'Activo').map(e => e.classes())).toEqual([['pf-pill', 'pf-pill--ok']])
     expect(w.text()).toContain('Suspendidos')
-    expect(w.findAll('.sv-estado--on').map(e => e.text())).toEqual(['Activo'])
   })
 })

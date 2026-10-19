@@ -356,11 +356,12 @@
                   <div class="sd__action-sub">Cierra el stock diciendo qué pasó con lo que queda</div>
                 </div>
               </button>
-              <button class="sd__action sd__action--danger" @click="eliminarStock" :disabled="eliminando">
+              <button class="sd__action sd__action--danger" @click="eliminarStock" :disabled="eliminando || !!stock.eliminar_bloqueo"
+                      :title="stock.eliminar_bloqueo || ''">
                 <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-x-octagon"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Eliminar stock</div>
-                  <div class="sd__action-sub">Borra el stock y revierte reservas/dispensas pendientes</div>
+                  <div class="sd__action-sub">{{ stock.eliminar_bloqueo || 'Para un error de carga: borra el stock como si no hubiera existido' }}</div>
                 </div>
               </button>
             </div>
@@ -859,7 +860,7 @@ const eliminando = ref(false)
 async function eliminarStock() {
   const ok = await confirm({
     title:       'Eliminar stock',
-    message:     'Se borra este stock Y los productos elaborados a partir de él (derivados), revirtiendo las reservas y dispensaciones PENDIENTES (vuelve el producto, se ajusta la cuenta corriente y la contabilidad). Si este stock o alguno de sus derivados tiene despachos en camino o entregados, o asientos en un período cerrado, no se podrá borrar.',
+    message:     'Se borra este stock y los productos elaborados a partir de él, como si nunca se hubieran cargado. Si salió de otro stock, los gramos vuelven a ese stock. Es para un error de carga: un stock que se entregó se finaliza.',
     confirmText: 'Sí, eliminar',
     variant:     'danger',
   })

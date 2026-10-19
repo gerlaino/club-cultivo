@@ -227,6 +227,9 @@ class StocksController < ApplicationController
         dispensas_cerradas:  cerradas,
         # Cuánto se puede separar a otros frascos (lo guardado y libre: `Stock#separable`).
         separable:           @stock.agotado? ? 0.0 : @stock.separable.to_f,
+        # Por qué no se puede eliminar (ya tiene dispensas, una seña…), o nil. La pantalla apaga el
+        # botón y lo dice: no ofrece lo que el backend va a rechazar.
+        eliminar_bloqueo:    @stock.deleted? ? 'Ya está eliminado.' : EliminarStockService.new(stock: @stock, usuario: current_user).motivo_bloqueo,
       ),
     }
   end

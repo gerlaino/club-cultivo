@@ -213,6 +213,9 @@ Rails.application.routes.draw do
           post  :enviar
           post  :confirmar
           post  :reabrir
+          # «En revisión por X»: el admin abre «Confirmar» (post) y lo suelta al cerrar (delete).
+          post   :revisar
+          delete :revisar, action: :soltar_revision
           patch :reajustar_peso
           # Sacar una planta mal elegida de la jornada ABIERTA (vuelve a quedar sin pesar).
           delete 'plantas/:plant_id', action: :quitar_planta, as: :quitar_planta
@@ -301,6 +304,11 @@ Rails.application.routes.draw do
         post 'acceso/restablecer', action: :restablecer_acceso_portal
         # «Inicié el trámite» del REPROCANN: el médico o administración (6-oct-2026).
         post :iniciar_tramite_reprocann
+        # El ciclo del REPROCANN (19-oct-2026): llegó aprobado, no indicado, rechazado, volver a entrevistar.
+        post :reprocann_aprobado
+        post :reprocann_no_indicado
+        post :reprocann_rechazado
+        post :volver_a_entrevistar
       end
       # Los médicos que lo atienden: administración vincula y desvincula (6-oct-2026).
       resources :medicos, controller: "paciente_medicos", only: [:index, :create, :destroy]

@@ -276,10 +276,12 @@ import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 import CompletarManicuraModal from '../../components/lotes/CompletarManicuraModal.vue'
+import { useRevisionPesaje } from '../../composables/useRevisionPesaje.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
 const auth = useAuthStore()
+const revision = useRevisionPesaje()
 
 // Cosechas en manicura asignadas a este admin/supervisor: las pesa él mismo.
 const misCosechas     = ref([])
@@ -350,6 +352,14 @@ async function cargar() {
 }
 
 async function abrirConfirmacion(p) {
+  // Primero se toma: si lo está revisando otro (o la manicura lo reabrió), no se abre el modal.
+  try {
+    p = { ...p, ...(await revision.tomar(p)) }
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo abrir el pesaje')
+    cargar()
+    return
+  }
   pesajeActivo.value = p
   form.value = {
     peso_confirmado_g: p.peso_total_g || p.peso_calculado_g || null,
@@ -373,6 +383,7 @@ async function abrirConfirmacion(p) {
 function cerrarModal() {
   modalOpen.value    = false
   pesajeActivo.value = null
+  revision.soltar()
 }
 
 // Devuelve el pesaje a borrador para que el manicurista lo corrija y lo reenvíe.
@@ -431,6 +442,7 @@ async function confirmar() {
       pesajeActivo.value.id,
       {
         peso_confirmado_g: form.value.peso_confirmado_g,
+        version:           revision.version(),
         ...(repartir.value
           ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
           : { stock_id: form.value.stock_id || undefined }),
@@ -440,12 +452,20 @@ async function confirmar() {
       ? `repartido en ${reparto.value.length} frascos`
       : form.value.stock_id ? `sumado al stock existente` : `nuevo contenedor creado`
     toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${form.value.peso_confirmado_g}g · ${stockLabel}`)
+    revision.olvidar()
     cerrarModal()
     cargar()
   } catch (e) {
     // Ya lo confirmó otra persona: no es un error de quien está acá, se saca de la lista.
     if (e.response?.data?.ya_confirmado) {
       toast.info(e.response.data.error)
+      cerrarModal()
+      cargar()
+      return
+    }
+    // Cambió mientras se revisaba: no se confirma a ciegas; se cierra y se ve lo nuevo.
+    if (e.response?.data?.cambio) {
+      toast.error(e.response.data.error)
       cerrarModal()
       cargar()
       return

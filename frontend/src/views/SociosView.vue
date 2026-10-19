@@ -11,9 +11,9 @@ import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import SocioEditarModal from '../components/pacientes/SocioEditarModal.vue'
-import { reprocannBadge, reprocannCategoria } from '../composables/useReprocann.js'
 import { hoyISO } from '../utils/dates.js'
-import { vinculoLabel } from '../composables/useSocioEditar.js'
+import { reprocannSit, pacienteSit, vinculoSit, datosChicos, FILTROS } from '../composables/useSituacionPaciente.js'
+import '../components/pacientes/formulario/formulario.css'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 
 const store  = usePacientesStore()
@@ -40,15 +40,20 @@ const cargar = (extra = {}) => store.fetch({ limite: LIMITE_PADRON, ...extra })
 const REPRO_URL = {
   vencen_pronto: 'proximos',
   vencidos: 'vencidos',
-  sin_reprocann: 'sin_rep',
   pendientes: 'pendientes',
-  // ?reprocann=entrevista abre la lista filtrada (el contador de turnos sin cerrar lleva acá).
+  // ?reprocann=entrevista abre la lista filtrada.
   entrevista: 'entrevista',
+  // Los links viejos a «sin REPROCANN» caen en pendientes de entrevista (19-oct-2026).
+  sin_reprocann: 'entrevista',
   faltaron: 'falto',
   adherentes: 'adherentes',
+  suspendidos: 'inactivos',
+  sin_aprobar: 'pend_aprobacion',
+  no_indicados: 'cerrados',
+  baja: 'baja',
   todos: 'todos',
 }
-const REPRO_URL_REVERSE = Object.fromEntries(Object.entries(REPRO_URL).map(([k,v]) => [v,k]))
+const REPRO_URL_REVERSE = Object.fromEntries(Object.entries(REPRO_URL).filter(([k]) => k !== 'sin_reprocann').map(([k,v]) => [v,k]))
 
 const filterEstado = ref(REPRO_URL[route.query.reprocann] || 'todos')
 
@@ -102,8 +107,6 @@ function safeDate(d) {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
 }
 
-const reprocannStatus = reprocannBadge
-
 // "Apellido, Nombre" — el orden con que se busca en una lista alfabética. Si falta alguno de
 // los dos no se deja la coma colgando: hay pacientes cargados con un solo campo.
 function nombreListado(s) {
@@ -131,71 +134,43 @@ function iniciales(s) {
 }
 
 // ── El estado del padrón ─────────────────────────────────────────────────────────
-// Los conteos se hacen sobre LA NÓMINA (los que están en tratamiento), no sobre todas las
-// fichas: alguien dado de baja no cuenta como paciente de la organización. Antes "Total" los sumaba a
-// todos, así que el número no coincidía con nada y quedaba inflado.
+// Los conteos se hacen sobre LA NÓMINA (los activos en la organización), no sobre todas las
+// fichas: alguien dado de baja no cuenta como paciente de la organización.
 //
-// Esto vive acá y no en Informes a propósito: es la pantalla desde la que después hay que
-// ACTUAR sobre cada paciente, y cada KPI es además el filtro que lo aísla.
-const DIAS_INACTIVO = 90
-
+// Cada tarjeta es además el filtro que aísla a esos pacientes, y las dos cuentas son UNA: el backend
+// manda `meta.kpis` y la `situacion` de cada fila con la misma regla (`Pacientes::Situacion`).
 const nomina = computed(() => store.items.filter(s => s.es_paciente))
-
-const diasDesdeUltima = (s) => {
-  const f = s.ultima_dispensacion?.fecha || s.ultima_dispensacion
-  if (!f) return null
-  return Math.floor((Date.now() - new Date(f).getTime()) / 86400000)
-}
-// "No viene hace tiempo": tiene tratamiento abierto pero hace más de tres meses que no retira.
-// El que nunca dispensó no entra: ese es un alta reciente, no un abandono.
-// SUSPENDIDO POR POCO MOVIMIENTO (23-sep-2026): lo dice el backend fila por fila
-// (`Paciente.suspendido?`); el cálculo local queda de respaldo si la fila no lo trae.
-const esInactivo = (s) => {
-  if (typeof s.suspendido === 'boolean') return s.suspendido
-  const d = diasDesdeUltima(s)
-  return d !== null && d > DIAS_INACTIVO
-}
-const TIP_SUSPENDIDO = 'Suspendido por poco movimiento: hace más de 90 días que no retira. Puede retirar igual, y vuelve a activo solo cuando lo haga.'
-
-// Los números los cuenta el BACKEND sobre todo el padrón (`meta.kpis`). Contarlos acá sobre
-// `store.items` era contar la página: con el listado paginado de a 20, una organización de 38 pacientes
-// mostraba "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos más adelante.
-// El cálculo local queda de respaldo por si `meta.kpis` no viene.
-const kpisLocales = computed(() => {
-  const enNomina = nomina.value
-  return {
-    total:      enNomina.length,                                   // la nómina, no las fichas
-    baja:       store.items.length - enNomina.length,              // fuera de tratamiento
-    vencidos:   enNomina.filter(s => reprocannCategoria(s) === 'vencido').length,
-    proximos:   enNomina.filter(s => reprocannCategoria(s) === 'por_vencer').length,
-    pendientes: enNomina.filter(s => reprocannCategoria(s) === 'pendiente').length,
-    sin_rep:    enNomina.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
-    inactivos:  enNomina.filter(esInactivo).length,
-    pendientes_aprobacion: enNomina.filter(s => !s.aprobado_at).length,
-  }
-})
-
-const kpis = computed(() => store.kpis || kpisLocales.value)
+const kpis = computed(() => store.kpis || {})
 
 // Cuántas fichas quedaron fuera de lo cargado. Las tarjetas siguen diciendo la verdad (las
 // cuenta el servidor), pero la LISTA y sus filtros trabajan sobre lo que hay en memoria, así
 // que si el padrón no entra hay que decirlo en vez de mostrar un subconjunto en silencio.
 const sinCargar = computed(() => Math.max(0, (store.total || 0) - store.items.length))
 
+// Las tarjetas, en el orden en que se trabaja: lo que espera una acción primero.
+const TARJETAS = computed(() => [
+  { key: 'todos',      val: kpis.value.total,                 lbl: 'En la nómina',              tono: '',       siempre: true },
+  { key: 'entrevista', val: kpis.value.entrevista_pendiente,  lbl: 'Pendientes de entrevista',  tono: 'warn',   siempre: true },
+  { key: 'pendientes', val: kpis.value.pendientes,            lbl: 'Pendientes de aprobación',  tono: 'info' },
+  { key: 'proximos',   val: kpis.value.proximos,              lbl: 'Vencen en 30 días',         tono: 'warn',   siempre: true },
+  { key: 'vencidos',   val: kpis.value.vencidos,              lbl: 'REPROCANN vencido',         tono: 'danger', siempre: true },
+  { key: 'falto',      val: kpis.value.falto_turno,           lbl: 'Faltaron al turno',         tono: 'gray' },
+  { key: 'adherentes', val: kpis.value.adherentes,            lbl: 'Adherentes',                tono: 'gray' },
+  { key: 'inactivos',  val: kpis.value.inactivos,             lbl: 'Suspendidos · +90 días',    tono: 'warn' },
+  { key: 'pend_aprobacion', val: kpis.value.pendientes_aprobacion, lbl: 'Altas sin aprobar',    tono: 'warn' },
+  { key: 'cerrados',   val: kpis.value.cerrados,              lbl: 'No indicados / rechazados', tono: 'gray' },
+  { key: 'baja',       val: kpis.value.baja,                  lbl: 'Dados de baja',             tono: 'gray' },
+].filter(t => t.siempre || t.val))
+
 const filtrados = computed(() => {
-  // Por defecto se ve LA NÓMINA. Los dados de baja tienen su propio filtro: están, pero no
-  // ensucian el día a día ni los conteos.
-  let list = filterEstado.value === 'baja' ? store.items.filter(s => !s.es_paciente) : nomina.value
-  if (filterEstado.value === 'inactivos') list = list.filter(esInactivo)
-  if (filterEstado.value === 'vencidos')   list = list.filter(s => reprocannCategoria(s) === 'vencido')
-  if (filterEstado.value === 'proximos')   list = list.filter(s => reprocannCategoria(s) === 'por_vencer')
-  if (filterEstado.value === 'pendientes') list = list.filter(s => reprocannCategoria(s) === 'pendiente')
-  if (filterEstado.value === 'sin_rep')    list = list.filter(s => reprocannCategoria(s) === 'sin_reprocann')
-  if (filterEstado.value === 'pend_aprobacion') list = list.filter(s => !s.aprobado_at)
-  // Calculados por el backend (6-oct-2026): de los turnos y del vínculo del REPROCANN.
-  if (filterEstado.value === 'entrevista') list = list.filter(s => s.entrevista === 'pendiente_entrevista')
-  if (filterEstado.value === 'falto')      list = list.filter(s => s.entrevista === 'falto_turno')
-  if (filterEstado.value === 'adherentes') list = list.filter(s => s.reprocann_vinculo === 'otra_organizacion')
+  // Por defecto se ve LA NÓMINA. Los dados de baja (y los «No indicado» / «Rechazado», que quedan
+  // inactivos) tienen su propio filtro: están, pero no ensucian el día a día ni los conteos.
+  let list
+  if (filterEstado.value === 'baja') list = store.items.filter(s => !s.es_paciente)
+  else if (filterEstado.value === 'cerrados') list = store.items.filter(FILTROS.cerrados)
+  else list = nomina.value
+  const f = FILTROS[filterEstado.value]
+  if (f && filterEstado.value !== 'cerrados') list = list.filter(f)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     // El DNI se compara sin puntos ni espacios de los dos lados: se escribe "90.000.027" y se
@@ -210,6 +185,10 @@ const filtrados = computed(() => {
   }
   return list
 })
+
+// El color de la fila sale del REPROCANN: es lo que más cambia lo que se hace con esa persona.
+const nivelFila = (s) => reprocannSit(s.situacion)?.nivel || 'off'
+const dniLegible = (dni) => String(dni || '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
 const totalPagesSv  = computed(() => Math.max(1, Math.ceil(filtrados.value.length / perPage)))
 const paginadosSv   = computed(() => filtrados.value.slice((page.value-1)*perPage, page.value*perPage))
@@ -233,7 +212,7 @@ async function descargar(formato) {
   generando.value = formato
   try {
     const params = {}
-    if (['proximos', 'vencidos', 'sin_rep'].includes(filterEstado.value)) params.reprocann = filterEstado.value
+    if (['proximos', 'vencidos'].includes(filterEstado.value)) params.reprocann = filterEstado.value
     if (search.value.trim()) params.query = search.value.trim()
     await descargarListado('/pacientes/export_csv', formato, { params, nombre: `pacientes_${hoyISO()}` })
   } catch (e) {
@@ -261,60 +240,10 @@ async function descargar(formato) {
 
     <!-- KPIs como filtros -->
     <div class="sv__kpis">
-      <button class="sv__kpi" :class="{ 'sv__kpi--active': filterEstado === 'todos' }" @click="filterEstado = 'todos'">
-        <div class="sv__kpi-val">{{ kpis.total }}</div>
-        <div class="sv__kpi-lbl">En la nómina</div>
-      </button>
-      <!-- No viene hace más de tres meses: tiene tratamiento abierto pero dejó de retirar. Es
-           lo único de esta pantalla sobre lo que hay que hacer algo hoy. -->
-      <button v-if="kpis.inactivos" class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'inactivos' }" @click="filterEstado = 'inactivos'">
-        <div class="sv__kpi-val">{{ kpis.inactivos }}</div>
-        <div class="sv__kpi-lbl">Suspendidos · +90 días sin retirar</div>
-      </button>
-      <button class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'proximos' }" @click="filterEstado = 'proximos'">
-        <div class="sv__kpi-val">{{ kpis.proximos }}</div>
-        <div class="sv__kpi-lbl">Vencen en 30d</div>
-      </button>
-      <button class="sv__kpi sv__kpi--danger" :class="{ 'sv__kpi--active': filterEstado === 'vencidos' }" @click="filterEstado = 'vencidos'">
-        <div class="sv__kpi-val">{{ kpis.vencidos }}</div>
-        <div class="sv__kpi-lbl">REPROCANN vencido</div>
-      </button>
-      <button v-if="kpis.pendientes" class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'pendientes' }" @click="filterEstado = 'pendientes'">
-        <div class="sv__kpi-val">{{ kpis.pendientes }}</div>
-        <div class="sv__kpi-lbl">Trámite pendiente</div>
-      </button>
-      <button class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'sin_rep' }" @click="filterEstado = 'sin_rep'">
-        <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
-        <div class="sv__kpi-lbl">Sin REPROCANN</div>
-      </button>
-      <!-- Con turno que ya pasó y el médico no cerró: a quién apurar (6-oct-2026). -->
-      <button v-if="kpis.entrevista_pendiente" class="sv__kpi sv__kpi--warn"
-              :class="{ 'sv__kpi--active': filterEstado === 'entrevista' }" @click="filterEstado = 'entrevista'">
-        <div class="sv__kpi-val">{{ kpis.entrevista_pendiente }}</div>
-        <div class="sv__kpi-lbl">Pendientes de entrevista</div>
-      </button>
-      <button v-if="kpis.falto_turno" class="sv__kpi sv__kpi--gray"
-              :class="{ 'sv__kpi--active': filterEstado === 'falto' }" @click="filterEstado = 'falto'">
-        <div class="sv__kpi-val">{{ kpis.falto_turno }}</div>
-        <div class="sv__kpi-lbl">Faltaron al turno</div>
-      </button>
-      <button v-if="kpis.adherentes" class="sv__kpi sv__kpi--gray"
-              :class="{ 'sv__kpi--active': filterEstado === 'adherentes' }" @click="filterEstado = 'adherentes'">
-        <div class="sv__kpi-val">{{ kpis.adherentes }}</div>
-        <div class="sv__kpi-lbl">Adherentes</div>
-      </button>
-      <!-- Cargados en el mostrador y sin admitir. Va con acento propio y no en gris: cada uno es
-           alguien que hoy NO puede retirar, y depende de que alguien lo apruebe. -->
-      <button v-if="kpis.pendientes_aprobacion" class="sv__kpi sv__kpi--warn"
-              :class="{ 'sv__kpi--active': filterEstado === 'pend_aprobacion' }"
-              @click="filterEstado = 'pend_aprobacion'">
-        <div class="sv__kpi-val">{{ kpis.pendientes_aprobacion }}</div>
-        <div class="sv__kpi-lbl">Esperan aprobación</div>
-      </button>
-      <!-- Fuera de tratamiento: no cuentan como pacientes de la organización, pero siguen estando. -->
-      <button v-if="kpis.baja" class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'baja' }" @click="filterEstado = 'baja'">
-        <div class="sv__kpi-val">{{ kpis.baja }}</div>
-        <div class="sv__kpi-lbl">Dados de baja</div>
+      <button v-for="t in TARJETAS" :key="t.key" class="sv__kpi" :class="[t.tono && `sv__kpi--${t.tono}`, { 'sv__kpi--active': filterEstado === t.key }]"
+              @click="filterEstado = t.key">
+        <div class="sv__kpi-val">{{ t.val ?? 0 }}</div>
+        <div class="sv__kpi-lbl">{{ t.lbl }}</div>
       </button>
     </div>
 
@@ -365,128 +294,88 @@ async function descargar(formato) {
       </template>
     </EmptyState>
 
-    <!-- Tabla -->
+    <!-- Tabla (compu) y tarjetas (teléfono): los mismos datos, los tres estados con sus datos chicos. -->
     <div v-else class="sv__table-wrap">
       <table class="sv-table">
-        <!-- Anchos declarados con `table-layout: fixed`: el navegador reparte el sobrante entre
-             las columnas SIN ancho, y acá la única es Paciente. Así el nombre se queda con el
-             espacio libre en vez de que se lo lleve el email, que es lo que pasaba. -->
         <colgroup>
           <col class="sv-col--ind" />
           <col />
-          <col class="sv-col--dni" />
-          <col class="sv-col--edad" />
           <col class="sv-col--estado" />
           <col class="sv-col--rep" />
-          <col class="sv-col--vence" />
           <col class="sv-col--ultima" />
-          <col class="sv-col--email" />
           <col v-if="canEdit" class="sv-col--acc" />
         </colgroup>
         <thead>
           <tr>
             <th></th>
             <th>Paciente</th>
-            <th>DNI</th>
-            <th>Edad</th>
             <th>Estado</th>
             <th>REPROCANN</th>
-            <th>Vence</th>
             <th>Última dispensa</th>
-            <th>Email</th>
             <th v-if="canEdit"></th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="s in paginadosSv"
-            :key="s.id"
-            class="sv-table__row"
-            :class="{
-              'sv-table__row--danger':  reprocannStatus(s)?.level === 'danger',
-              'sv-table__row--warning': reprocannStatus(s)?.level === 'warning',
-            }"
-            @click="router.push(`/pacientes/${s.id}`)"
-          >
-            <td class="sv-td-ind">
-              <div class="sv-indicator"
-                :class="{
-                  'sv-ind--danger':  reprocannStatus(s)?.level === 'danger',
-                  'sv-ind--warning': reprocannStatus(s)?.level === 'warning',
-                  'sv-ind--caution': reprocannStatus(s)?.level === 'caution',
-                  'sv-ind--ok':      reprocannStatus(s)?.level === 'ok',
-                  'sv-ind--none':    !reprocannStatus(s),
-                }"
-              ></div>
+          <tr v-for="s in paginadosSv" :key="s.id" class="sv-table__row" :class="`sv-table__row--${nivelFila(s)}`"
+              @click="router.push(`/pacientes/${s.id}`)">
+            <td class="sv-td-ind"><div class="sv-indicator" :class="`sv-ind--${nivelFila(s)}`"></div></td>
+            <td>
+              <!-- "Apellido, Nombre": la lista se ordena por apellido. -->
+              <div class="sv-pac-nombre">{{ nombreListado(s) }}<span v-if="s.apodo" class="sv-pac-apodo"> «{{ s.apodo }}»</span></div>
+              <div class="sv-pac-sec">
+                <span class="sv-mono">DNI {{ dniLegible(s.dni) }}</span>
+                <span v-if="edad(s.fecha_nacimiento)"> · {{ edad(s.fecha_nacimiento) }} años</span>
+              </div>
             </td>
             <td>
-              <!-- "Apellido, Nombre": la lista se ordena por apellido, así que es el apellido
-                   lo que hay que poder recorrer con la vista para encontrar a alguien. -->
-              <div class="sv-pac-nombre">{{ nombreListado(s) }}</div>
-              <div v-if="s.apodo" class="sv-pac-apodo">«{{ s.apodo }}»</div>
-              <!-- Debajo del nombre (columna ancha): en Estado no entraba y pisaba al REPROCANN. -->
-              <div v-if="s.entrevista === 'pendiente_entrevista'" class="sv-estado sv-estado--entrevista"
-                   title="Tiene un turno que ya pasó y el médico no lo cerró.">Pendiente de entrevista</div>
-              <div v-else-if="s.entrevista === 'falto_turno'" class="sv-estado sv-estado--falto"
-                   title="Su último turno quedó ausente y no tiene otro dado.">Faltó al turno</div>
-            </td>
-            <td><span class="sv-mono">{{ s.dni }}</span></td>
-            <td>
-              <span v-if="edad(s.fecha_nacimiento)" class="sv-edad">{{ edad(s.fecha_nacimiento) }}a</span>
-              <span v-else class="sv-empty">—</span>
+              <span v-if="pacienteSit(s.situacion)" class="pf-pill" :class="`pf-pill--${pacienteSit(s.situacion).nivel}`"
+                    :title="pacienteSit(s.situacion).ayuda">{{ pacienteSit(s.situacion).label }}</span>
+              <div v-if="vinculoSit(s.situacion)" class="sv-vinculo" :title="vinculoSit(s.situacion).ayuda">{{ vinculoSit(s.situacion).label }}</div>
             </td>
             <td>
-              <!-- Pendiente de admisión gana sobre activo/inactivo: es la información que
-                   cambia lo que se puede hacer con esa persona hoy. -->
-              <span v-if="!s.aprobado_at" class="sv-estado sv-estado--pend">Sin aprobar</span>
-              <span v-else-if="!s.es_paciente" class="sv-estado sv-estado--off">Inactivo</span>
-              <span v-else-if="esInactivo(s)" class="sv-estado sv-estado--susp" :title="TIP_SUSPENDIDO">
-                <i class="bi bi-hourglass-split"></i> Suspendido
-              </span>
-              <span v-else class="sv-estado sv-estado--on">Activo</span>
-            </td>
-            <!-- El estado y la fecha van en columnas separadas: apilados en una sola, el badge
-                 y el vencimiento competían por el mismo ancho y ninguno se leía.
-                 El badge sale de `reprocannStatus`, NO de que haya fecha: un trámite pendiente
-                 todavía no tiene certificado ni vencimiento, y preguntando por la fecha caía en
-                 "Sin REPROCANN" — justo lo contrario de lo que pasa. (Mismo bug que ya se había
-                 corregido en la ficha del paciente; en la lista había quedado.) -->
-            <td>
-              <span v-if="reprocannStatus(s)" class="sv-rep-badge"
-                :class="{
-                  'sv-rep--danger':  reprocannStatus(s)?.level === 'danger',
-                  'sv-rep--warning': reprocannStatus(s)?.level === 'warning',
-                  'sv-rep--caution': reprocannStatus(s)?.level === 'caution',
-                  'sv-rep--ok':      reprocannStatus(s)?.level === 'ok',
-                }"
-              >{{ reprocannStatus(s)?.label }}</span>
-              <span v-else class="sv-empty">Sin registro</span>
-              <div v-if="vinculoLabel(s.reprocann_vinculo)" class="sv-vinculo">{{ vinculoLabel(s.reprocann_vinculo) }}</div>
-            </td>
-            <td>
-              <span v-if="s.reprocann_vencimiento" class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</span>
-              <span v-else class="sv-empty">—</span>
+              <span v-if="reprocannSit(s.situacion)" class="pf-pill" :class="`pf-pill--${reprocannSit(s.situacion).nivel}`"
+                    :title="reprocannSit(s.situacion).ayuda">{{ reprocannSit(s.situacion).label }}</span>
+              <div v-for="d in datosChicos(s.situacion)" :key="d.texto" class="sv-dato" :class="`sv-dato--${d.nivel}`">
+                <i v-if="d.icono" class="bi" :class="d.icono"></i>{{ d.texto }}
+              </div>
             </td>
             <td>
               <span v-if="s.ultima_dispensacion" class="sv-ultima">{{ formatDate(s.ultima_dispensacion) }}</span>
               <span v-else class="sv-empty">Nunca</span>
             </td>
-            <td>
-              <span class="sv-email-cell">{{ s.email || '—' }}</span>
-            </td>
             <td v-if="canEdit" @click.stop>
               <div class="sv-actions">
-                <button class="sv-action-btn" title="Editar" @click="openEdit(s)">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="sv-action-btn sv-action-btn--danger" title="Eliminar" @click="openDelete(s)">
-                  <i class="bi bi-trash"></i>
-                </button>
+                <button class="sv-action-btn" title="Editar" aria-label="Editar" @click="openEdit(s)"><i class="bi bi-pencil"></i></button>
+                <button class="sv-action-btn sv-action-btn--danger" title="Eliminar" aria-label="Eliminar" @click="openDelete(s)"><i class="bi bi-trash"></i></button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+
+      <ul class="sv-cards">
+        <li v-for="s in paginadosSv" :key="s.id" class="sv-card" :class="`sv-card--${nivelFila(s)}`" @click="router.push(`/pacientes/${s.id}`)">
+          <div class="sv-card__top">
+            <div class="sv-card__quien">
+              <div class="sv-pac-nombre">{{ nombreListado(s) }}<span v-if="s.apodo" class="sv-pac-apodo"> «{{ s.apodo }}»</span></div>
+              <div class="sv-pac-sec"><span class="sv-mono">DNI {{ dniLegible(s.dni) }}</span>
+                <span v-if="s.ultima_dispensacion"> · retiró {{ formatDate(s.ultima_dispensacion) }}</span></div>
+            </div>
+            <button v-if="canEdit" class="sv-action-btn" aria-label="Editar" @click.stop="openEdit(s)"><i class="bi bi-pencil"></i></button>
+          </div>
+          <div class="sv-card__pills">
+            <span v-if="reprocannSit(s.situacion)" class="pf-pill" :class="`pf-pill--${reprocannSit(s.situacion).nivel}`">{{ reprocannSit(s.situacion).label }}</span>
+            <span v-if="pacienteSit(s.situacion) && s.situacion.paciente !== 'activo'" class="pf-pill" :class="`pf-pill--${pacienteSit(s.situacion).nivel}`">{{ pacienteSit(s.situacion).label }}</span>
+            <span v-if="s.situacion?.vinculo === 'adherente'" class="pf-pill pf-pill--off">Adherente</span>
+          </div>
+          <div v-if="datosChicos(s.situacion).length" class="sv-card__datos">
+            <span v-for="d in datosChicos(s.situacion)" :key="d.texto" class="sv-dato" :class="`sv-dato--${d.nivel}`">
+              <i v-if="d.icono" class="bi" :class="d.icono"></i>{{ d.texto }}
+            </span>
+          </div>
+        </li>
+      </ul>
+
       <div class="sv__table-footer">
         <div class="sv__pagination" v-if="totalPagesSv > 1">
           <button class="sv__page-btn" :disabled="page <= 1" @click="page--">«</button>
@@ -519,7 +408,13 @@ async function descargar(formato) {
 .sv__resena--aviso { color: var(--c-amber-700, #b45309); font-weight: 500; }
 .sv__kpis { display: grid; grid-template-columns: repeat(5,1fr); gap: .75rem; margin-bottom: 1.5rem; }
 @media (max-width: 900px) { .sv__kpis { grid-template-columns: repeat(3,1fr); } }
-@media (max-width: 640px) { .sv__kpis { grid-template-columns: repeat(2,1fr); } }
+/* En el teléfono, una fila que se desliza: once tarjetas apiladas tapaban la lista. */
+@media (max-width: 640px) {
+  .sv__kpis { display: flex; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 1rem; margin: 0 -1rem 1.25rem; padding: 0 1rem .25rem; scrollbar-width: none; }
+  .sv__kpis::-webkit-scrollbar { display: none; }
+  .sv__kpi { flex: 0 0 132px; scroll-snap-align: start; padding: .75rem; }
+  .sv__kpi-val { font-size: 1.5rem; }
+}
 .sv__kpi { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 12px; padding: 1rem; text-align: left; cursor: pointer; transition: all .15s; }
 .sv__kpi:hover { border-color: var(--c-slate-400); }
 .sv__kpi--active { border-color: var(--c-slate-900) !important; box-shadow: 0 0 0 1px var(--c-slate-900); }
@@ -559,57 +454,58 @@ async function descargar(formato) {
 /* Los anchos van acá y no en el markup. Paciente NO tiene ancho a propósito: con
    `table-layout: fixed` es la única que se queda con lo que sobra. */
 .sv-col--ind    { width: 8px; }
-.sv-col--dni    { width: 92px; }
-.sv-col--edad   { width: 56px; }
-.sv-col--estado { width: 96px; }
-.sv-col--rep    { width: 112px; }
-.sv-col--vence  { width: 104px; }
-.sv-col--ultima { width: 144px; }
-/* El email era el que se comía el sobrante. Ancho fijo y lo que no entra se corta con "…";
-   la dirección completa se ve en la ficha, acá alcanza para reconocerla. */
-.sv-col--email  { width: 176px; }
-.sv-col--acc    { width: 72px; }
+.sv-col--estado { width: 130px; }
+.sv-col--rep    { width: 250px; }
+.sv-col--ultima { width: 130px; }
+.sv-col--acc    { width: 80px; }
 .sv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
 .sv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
 .sv-table tbody tr:last-child { border-bottom: none; }
 .sv-table tbody tr:hover { background: var(--c-slate-50); }
 .sv-table td { padding: 10px 12px; vertical-align: middle; }
 
-.sv-table__row--danger  { background: rgba(220,38,38,.02); }
-.sv-table__row--warning { background: rgba(180,83,9,.02); }
+.sv-table__row--danger  { background: color-mix(in srgb, var(--c-rust-100) 35%, transparent); }
+.sv-table__row--warn    { background: color-mix(in srgb, var(--c-amber-100) 30%, transparent); }
 
 .sv-td-ind { width: 8px; padding-right: 0 !important; }
-.sv-indicator { width: 3px; height: 32px; border-radius: 999px; }
-.sv-ind--danger  { background: #dc2626; }
-.sv-ind--warning { background: #f59e0b; }
-.sv-ind--caution { background: #93c5fd; }
-.sv-ind--ok      { background: #86efac; }
-.sv-ind--none    { background: var(--c-slate-200); }
+.sv-indicator { width: 3px; height: 36px; border-radius: 999px; }
+.sv-ind--danger { background: var(--c-rust-600); }
+.sv-ind--warn   { background: var(--c-amber-500); }
+.sv-ind--info   { background: var(--c-sky-600); }
+.sv-ind--ok     { background: var(--c-leaf-500); }
+.sv-ind--off    { background: var(--c-slate-200); }
 
-.sv-pac-nombre { font-weight: 700; color: var(--c-slate-900); font-size: .875rem; }
-.sv-pac-apodo { font-size: .76rem; color: var(--c-slate-500); }
-.sv-vinculo { margin-top: 3px; font-size: .7rem; font-weight: 600; color: var(--c-leaf-800); }
-.sv-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; white-space: nowrap; }
-.sv-estado--on  { background: #f0fdf4; color: #15803d; }
-.sv-estado--off { background: var(--c-slate-100); color: var(--c-slate-500); }
-/* Suspendido: un aviso, no una baja. Distinto de Inactivo a la vista (Germán: «bien distintivo»). */
-.sv-estado--susp { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px dashed var(--c-amber-500); cursor: help; }
-.sv-estado--entrevista { display: inline-block; margin-top: 4px; background: var(--c-amber-100); color: var(--c-amber-500); border: 1px solid var(--c-amber-500); cursor: help; }
-.sv-estado--falto { display: inline-block; margin-top: 4px; background: var(--c-slate-100); color: var(--c-slate-600); border: 1px dashed var(--c-slate-400); cursor: help; }
-/* Ámbar, el mismo tono que el KPI: es algo que espera una acción, no un estado estable. */
-.sv-estado--pend { background: #fffbeb; color: #b45309; }
-.sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }
-.sv-edad  { font-size: .82rem; color: var(--c-slate-500); }
+.sv-pac-nombre { font-weight: 700; color: var(--c-slate-900); font-size: .9rem; }
+.sv-pac-apodo { font-weight: 500; font-size: .8rem; color: var(--c-slate-500); }
+.sv-pac-sec { font-size: .76rem; color: var(--c-slate-500); margin-top: .1rem; }
+.sv-vinculo { margin-top: 4px; font-size: .72rem; font-weight: 600; color: var(--c-slate-500); }
+.sv-dato { display: flex; align-items: center; gap: .3rem; margin-top: 4px; font-size: .74rem; font-weight: 600; color: var(--c-slate-600); }
+.sv-dato i { font-size: .78rem; }
+.sv-dato--warn   { color: var(--c-slate-900); }
+.sv-dato--warn i { color: var(--c-amber-500); }
+.sv-dato--info   { color: var(--c-sky-600); }
+.sv-dato--off    { color: var(--c-slate-500); }
+.sv-mono  { font-family: var(--font-mono); font-size: .76rem; }
 .sv-empty { color: var(--c-slate-300); font-size: .82rem; }
-.sv-email-cell { display: block; font-size: .82rem; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-ultima { font-size: .82rem; color: var(--c-slate-600); }
 
-.sv-rep-badge { display: inline-block; font-size: .72rem; font-weight: 800; padding: 2px 8px; border-radius: 5px; }
-.sv-rep--danger  { background: #fef2f2; color: #dc2626; }
-.sv-rep--warning { background: #fffbeb; color: #b45309; }
-.sv-rep--caution { background: #eff6ff; color: #0369a1; }
-.sv-rep--ok      { background: #f0fdf4; color: #15803d; }
-/* En su propia columna ya no es un pie de badge: sube a tamaño de dato legible. */
-.sv-rep-fecha { font-size: .8rem; color: var(--c-slate-500); white-space: nowrap; }
+/* ── Teléfono: tarjetas en vez de tabla ── */
+.sv-cards { display: none; list-style: none; margin: 0; padding: 0; }
+@media (max-width: 760px) {
+  .sv-table { display: none; }
+  .sv-cards { display: flex; flex-direction: column; }
+  .sv__table-wrap { background: transparent; border: 0; }
+}
+.sv-card { background: var(--c-paper, #fff); border: 1px solid var(--c-slate-200); border-left: 4px solid var(--c-slate-200); border-radius: var(--r-lg);
+  padding: .85rem .9rem; margin-bottom: .6rem; cursor: pointer; }
+.sv-card--danger { border-left-color: var(--c-rust-600); }
+.sv-card--warn   { border-left-color: var(--c-amber-500); }
+.sv-card--info   { border-left-color: var(--c-sky-600); }
+.sv-card--ok     { border-left-color: var(--c-leaf-500); }
+.sv-card__top { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; }
+.sv-card__quien { min-width: 0; }
+.sv-card__pills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+.sv-card__datos { display: flex; flex-wrap: wrap; gap: .25rem .85rem; margin-top: .2rem; }
 
 .sv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
 .sv-table tbody tr:hover .sv-actions { opacity: 1; }

@@ -1147,6 +1147,19 @@ const routes = [
       { path: 'geneticas', component: () => import('../views/GeneticasView.vue') },
       { path: 'historial', component: () => import('../views/HistorialDispensacionesView.vue') },
       { path: 'pacientes', component: () => import('../views/PacientesDispatch.vue') },
+      // El alta y la ficha también dentro del shell (19-oct-2026): con la PWA instalada, «Nuevo
+      // paciente» y tocar una fila llevaban al inicio (el guard no encontraba `/m/pacientes/…`).
+      { path: 'pacientes/nuevo', component: () => import('../views/SocioNuevoView.vue'),
+        beforeEnter: requiresPermission('socios', 'create') },
+      {
+        path: 'pacientes/:id', component: () => import('../views/SocioDetailView.vue'),
+        props: () => ({ backPath: '/m/pacientes' }),
+        beforeEnter: (to, from, next) => {
+          const { can } = usePermissions()
+          if (!can('socios', 'show')) return next('/')
+          next()
+        },
+      },
 
       // ── Escaneo QR (cualquier rol con shell mobile) ──
       { path: 'scan', component: () => import('../views/mobile/MScanView.vue') },

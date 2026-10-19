@@ -12,13 +12,41 @@
 import { consumidorCable } from './cableConsumer.js'
 
 const handlers = new Map()   // recurso → Set<fn>
+const recargas = new Set()   // las recargas de `alCambiarAgrupado`: lo que se re-pide al volver
 let subscription = null
 let ultimoEvento = null
+let conecto = false
+let ocultaDesde = null
+
+// LO QUE PASÓ MIENTRAS NO ESCUCHABA (16-oct-2026, Javi: «devolví el pesaje y no actualizó en
+// manicura»). En el teléfono, con la pantalla apagada o la app atrás, el WebSocket se corta; los
+// avisos de ese rato no llegan nunca y la pantalla queda con lo viejo hasta recargar a mano. Al
+// reconectar, o al volver a la app después de un rato, cada pantalla abierta re-pide lo suyo.
+const VOLVER_TRAS_MS = 3000
+const RESINCRONIZAR = { recurso: '*', accion: 'resincronizar' }
+
+export function resincronizar() {
+  ultimoEvento = RESINCRONIZAR
+  for (const correr of [...recargas]) {
+    try { correr() } catch (e) { console.warn('[cambios] resincronizar', e) }
+  }
+}
+
+function alVolverALaApp() {
+  if (document.visibilityState === 'hidden') { ocultaDesde = Date.now(); return }
+  if (ocultaDesde && Date.now() - ocultaDesde >= VOLVER_TRAS_MS) resincronizar()
+  ocultaDesde = null
+}
 
 function asegurarSuscripcion() {
   if (subscription) return
   try {
     subscription = consumidorCable().subscriptions.create('ClubChannel', {
+      // La primera conexión no: la pantalla recién cargó. Las siguientes son un corte que terminó.
+      connected() {
+        if (conecto) resincronizar()
+        conecto = true
+      },
       received(evento) {
         ultimoEvento = evento
         const lista = handlers.get(evento?.recurso)
@@ -31,6 +59,7 @@ function asegurarSuscripcion() {
   } catch (e) {
     console.warn('[cambios] WebSocket no disponible', e?.message)
   }
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', alVolverALaApp)
 }
 
 // Anota un handler para uno o varios recursos. Devuelve la función para desanotarse.
@@ -58,19 +87,25 @@ export function alCambiarAgrupado(recursos, recargar, { espera = 300, filtro = n
       if (pendiente) { pendiente = false; correr() }
     }
   }
-  return alCambiar(recursos, (evento) => {
+  const soltar = alCambiar(recursos, (evento) => {
     if (filtro && !filtro(evento)) return
     clearTimeout(timer)
     timer = setTimeout(correr, espera)
   })
+  recargas.add(correr)
+  return () => { soltar(); recargas.delete(correr); clearTimeout(timer) }
 }
 
 // Al cerrar sesión: nada de lo anotado vale para el próximo usuario.
 export function olvidarCambios() {
   handlers.clear()
+  recargas.clear()
   try { subscription?.unsubscribe() } catch {}
   subscription = null
+  conecto = false
+  ocultaDesde = null
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', alVolverALaApp)
 }
 
 // Para tests.
-export const _interno = { handlers, get subscription() { return subscription } }
+export const _interno = { handlers, recargas, get subscription() { return subscription } }

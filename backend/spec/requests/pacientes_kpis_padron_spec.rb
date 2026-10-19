@@ -56,13 +56,14 @@ RSpec.describe 'GET /api/pacientes — KPIs del padrón', type: :request do
 
       body = kpis
       expect(body['pendientes']).to eq(1)
-      expect(body['sin_rep']).to    eq(0)
+      # En trámite no pide entrevista (19-oct-2026: «sin REPROCANN» pasó a ser «pendiente de entrevista»).
+      expect(body['entrevista_pendiente']).to eq(0)
     end
 
-    it 'sin número de certificado cuenta como sin REPROCANN' do
+    it 'sin REPROCANN, el vinculado cuenta como pendiente de entrevista' do
       paciente(reprocann_numero: nil, reprocann_estado: 'sin_registro')
 
-      expect(kpis['sin_rep']).to eq(1)
+      expect(kpis['entrevista_pendiente']).to eq(1)
     end
 
     it 'separa vencido de por vencer usando la fecha' do

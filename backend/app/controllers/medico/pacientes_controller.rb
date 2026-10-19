@@ -40,10 +40,12 @@ module Medico
                   .limit(limit)
                   .to_a
 
-      entrevista = Pacientes::Entrevista.para(pacientes.map(&:id),
-                                              medico_id: (current_user.medico? ? current_user.id : nil))
+      # Los tres estados (`Pacientes::Situacion`), con lo que dicen SUS turnos al lado.
+      agenda  = Pacientes::Agenda.para(pacientes.map(&:id), medico_id: (current_user.medico? ? current_user.id : nil))
+      ultimas = Dispensacion.no_canceladas.where(paciente_id: pacientes.map(&:id))
+                            .group(:paciente_id).maximum(:fecha_dispensacion)
       render json: {
-        data: pacientes.map { |p| serialize_paciente_resumen(p, entrevista[p.id]) },
+        data: pacientes.map { |p| serialize_paciente_resumen(p, p.situacion(ultima_dispensacion: ultimas[p.id], agenda: agenda[p.id], usuario: current_user)) },
         meta: { pagina: page, limite: limit, total: total, kpis: kpis(base) },
       }
     end
@@ -58,7 +60,7 @@ module Medico
       {
         total:    base.count,
         activos:  base.where(es_paciente: true).count,
-        proximos: base.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido]).count,
+        proximos: base.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido no_indicado rechazado]).count,
         vencidos: vencidos(base, hoy).count,
         sin_rep:  base.where(reprocann_vencimiento: nil).where.not(reprocann_estado: 'vencido').count,
       }
@@ -69,7 +71,7 @@ module Medico
 
       case filtro
       when 'activos'  then scope.where(es_paciente: true)
-      when 'proximos' then scope.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido])
+      when 'proximos' then scope.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido no_indicado rechazado])
       when 'vencidos' then vencidos(scope, hoy)
       when 'sin_rep'  then scope.where(reprocann_vencimiento: nil).where.not(reprocann_estado: 'vencido')
       else scope
@@ -80,7 +82,8 @@ module Medico
     # iniciado no es vencido sino «en trámite», aunque la fecha haya pasado: la misma precedencia que
     # `Paciente.reprocann_categoria`, así la lista del médico y la de administración cuentan igual.
     def vencidos(scope, hoy)
-      scope.where(reprocann_vencimiento: ...hoy).where.not(reprocann_estado: 'pendiente')
+      # Igual que `Pacientes::Situacion.reprocann`: en trámite o cerrado no es vencido.
+      scope.where(reprocann_vencimiento: ...hoy).where.not(reprocann_estado: %w[pendiente no_indicado rechazado])
            .or(scope.where(reprocann_estado: 'vencido'))
     end
 
@@ -125,7 +128,7 @@ module Medico
       ActiveRecord::Base.sanitize_sql_array(statement)
     end
 
-    def serialize_paciente_resumen(p, entrevista = nil)
+    def serialize_paciente_resumen(p, situacion = nil)
       hoy  = Time.zone.today
       venc = p.reprocann_vencimiento
 
@@ -144,8 +147,8 @@ module Medico
         reprocann_categoria:    p.reprocann_categoria,
         reprocann_vinculo:      p.reprocann_vinculo,
         reprocann_tramite_iniciado_el: p.reprocann_tramite_iniciado_el,
-        # 'pendiente_entrevista' | 'falto_turno' | nil — de SUS turnos (`Pacientes::Entrevista`).
-        entrevista:             entrevista,
+        # Vínculo, REPROCANN y paciente, con los datos chicos de sus turnos (19-oct-2026).
+        situacion:              situacion,
         reprocann_vencimiento:  venc,
         dias_hasta_vencimiento: venc ? (venc - hoy).to_i : nil,
         con_seguimiento:        p.con_seguimiento_medico,

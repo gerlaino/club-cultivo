@@ -14,7 +14,7 @@ class PesajesManicuraController < ApplicationController
 
   before_action -> { require_feature!(:cultivo) }
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso, :quitar_planta]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso, :quitar_planta, :revisar, :soltar_revision]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Trabajo de equipo: todos los que pueden ver el lote ven TODOS los pesajes (para
@@ -189,6 +189,7 @@ class PesajesManicuraController < ApplicationController
     if @pesaje.confirmado?
       return render json: { error: 'No se puede borrar un pesaje ya confirmado' }, status: :unprocessable_entity
     end
+    return render_en_revision if @pesaje.en_revision_por_otro?(current_user)
 
     # Si lo borra un admin/supervisor (no el propio manicurista), avisarle al manicurista
     # que su pesaje se descartó para que lo vuelva a cargar.
@@ -257,7 +258,14 @@ class PesajesManicuraController < ApplicationController
     unless @pesaje.enviado?
       return render json: { error: 'Solo se puede reabrir un pesaje enviado' }, status: :unprocessable_entity
     end
-    @pesaje.update!(estado: 'borrador', enviado_at: nil)
+    # Con el candado de la fila: no puede colarse entre el «Confirmar» que abre el admin y su check.
+    en_revision = false
+    @pesaje.with_lock do
+      next en_revision = true if @pesaje.en_revision_por_otro?(current_user)
+
+      @pesaje.update!(estado: 'borrador', enviado_at: nil, revisando_por: nil, revisando_at: nil)
+    end
+    return render_en_revision if en_revision
 
     # Si lo reabre un admin/supervisor (no el propio manicurista), avisarle que su pesaje
     # volvió a borrador para que lo corrija y lo vuelva a enviar. Los datos se conservan.
@@ -274,6 +282,26 @@ class PesajesManicuraController < ApplicationController
     end
 
     render json: PesajeManicuraSerializer.serialize(@pesaje)
+  end
+
+  # POST /lotes/:lote_id/pesajes_manicura/:id/revisar
+  # El admin abre «Confirmar»: el pesaje queda «en revisión» a su nombre y nadie más lo reabre ni lo
+  # borra hasta que lo suelte, lo confirme o pasen 15 minutos. Si lo tiene otro, 409 con quién.
+  def revisar
+    return render json: { error: 'Solo admin o supervisor pueden confirmar' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
+
+    @pesaje.empezar_revision!(current_user)
+    render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
+  rescue PesajeManicura::Conflicto => e
+    render json: { error: e.message, en_revision: @pesaje.reload.en_revision? }, status: :conflict
+  end
+
+  # DELETE /lotes/:lote_id/pesajes_manicura/:id/revisar — cerró sin confirmar.
+  def soltar_revision
+    return render json: { error: 'No autorizado' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
+
+    @pesaje.soltar_revision!(current_user)
+    render json: PesajeManicuraSerializer.serialize(@pesaje.reload)
   end
 
   # POST /lotes/:lote_id/pesajes_manicura/:id/enviar
@@ -302,10 +330,15 @@ class PesajesManicuraController < ApplicationController
       stock_id:          params[:stock_id],
       # Repartido en varios frascos (copones, bajos): [{ stock_id | nada = nuevo, gramos, descripcion }].
       destinos:          params[:destinos].presence,
+      # La versión que vio en pantalla (`enviado_at`): si se reabrió y reenvió en el medio, se rechaza.
+      version:           params[:version],
     )
     render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta: #{e.param}" }, status: :unprocessable_entity
+  rescue PesajeManicura::Conflicto => e
+    # Cambió o lo tiene otro: la pantalla recarga y cierra el modal, no confirma a ciegas.
+    render json: { error: e.message, cambio: true }, status: :conflict
   rescue ArgumentError, RuntimeError => e
     # Lo confirmó otra persona (o el mismo, con un doble toque): la pantalla lo saca de la lista
     # en vez de mostrarlo como un error.
@@ -403,6 +436,10 @@ class PesajesManicuraController < ApplicationController
       # nacía «por asignar» en una pantalla que para él no existe.
       stock.update!(sede: current_user.club.sedes.first, estado: 'asignado')
     end
+  end
+
+  def render_en_revision
+    render json: { error: "No se puede tocar: #{@pesaje.motivo_en_revision}", en_revision: true }, status: :conflict
   end
 
   def set_lote

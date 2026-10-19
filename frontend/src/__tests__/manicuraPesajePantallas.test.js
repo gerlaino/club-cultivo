@@ -12,6 +12,7 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const api = {
   listPesajesManicuraAdmin: vi.fn(), confirmarPesajeManicura: vi.fn(), reabrirPesajeManicura: vi.fn(),
+  revisarPesajeManicura: vi.fn(), soltarRevisionPesajeManicura: vi.fn(() => Promise.resolve({ data: {} })),
   listStocks: vi.fn(() => Promise.resolve({ data: [] })),
   createPesajeManicura: vi.fn(), registrarDirectoManicura: vi.fn(), listPlants: vi.fn(),
 }
@@ -24,7 +25,11 @@ vi.mock('../composables/useManicuraJornada', () => ({ useManicuraJornada: () => 
 
 const PESAJE = { id: 9, lote_id: 5, lote_codigo: 'L-26-010', estado: 'enviado', peso_total_g: 30, peso_calculado_g: 30, plantas_count: 3, manicurador_nombre: 'Ana' }
 
-beforeEach(() => { vi.clearAllMocks(); setActivePinia(createPinia()) })
+beforeEach(() => {
+  vi.clearAllMocks(); setActivePinia(createPinia())
+  // Abrir «Confirmar» toma la revisión: devuelve el pesaje como está ahora, con su versión.
+  api.revisarPesajeManicura.mockImplementation(() => Promise.resolve({ data: { ...PESAJE, enviado_at: 'v1', en_revision: true } }))
+})
 
 describe('Confirmar pesajes (teléfono del admin)', () => {
   async function montar() {
@@ -83,8 +88,42 @@ describe('Confirmar pesajes (teléfono del admin)', () => {
     await w.find('.maa__btn-confirmar').trigger('click'); await flushPromises()
     expect(api.confirmarPesajeManicura.mock.calls[0][2]).toEqual({
       peso_confirmado_g: 30,
+      version:           'v1',
       destinos: [{ stock_id: undefined, gramos: 20, descripcion: 'Copones' }, { stock_id: undefined, gramos: 10, descripcion: 'Bajos' }],
     })
+  })
+
+  // AC (Javi, 15-oct-2026): al abrir para confirmar se bloquea a la manicura; si igual cambió, no
+  // se confirma a ciegas.
+  it('abrir «Confirmar» toma la revisión, y confirmar manda la versión que vio', async () => {
+    const w = await montar()
+    expect(api.revisarPesajeManicura).toHaveBeenCalledWith(5, 9)
+    api.confirmarPesajeManicura.mockResolvedValue({ data: {} })
+    await w.find('.maa__btn-confirmar').trigger('click'); await flushPromises()
+    expect(api.confirmarPesajeManicura.mock.calls[0][2]).toMatchObject({ peso_confirmado_g: 30, version: 'v1' })
+    expect(api.soltarRevisionPesajeManicura).not.toHaveBeenCalled() // confirmado: ya lo soltó el backend
+  })
+
+  it('si otro lo está revisando, no se abre y dice quién', async () => {
+    api.revisarPesajeManicura.mockRejectedValue({ response: { status: 409, data: { error: 'Javi lo está revisando para confirmarlo.' } } })
+    const w = await montar()
+    expect(toast.error).toHaveBeenCalledWith('Javi lo está revisando para confirmarlo.')
+    expect(w.find('.maa__sheet').exists()).toBe(false)
+  })
+
+  it('cerrar sin confirmar suelta la revisión', async () => {
+    const w = await montar()
+    await w.find('.maa__overlay').trigger('click'); await flushPromises()
+    expect(api.soltarRevisionPesajeManicura).toHaveBeenCalledWith(5, 9)
+  })
+
+  it('si cambió mientras se revisaba: avisa, cierra y recarga, sin confirmar', async () => {
+    const w = await montar()
+    api.confirmarPesajeManicura.mockRejectedValue({ response: { status: 409, data: { error: 'El pesaje cambió mientras lo revisabas', cambio: true } } })
+    await w.find('.maa__btn-confirmar').trigger('click'); await flushPromises()
+    expect(toast.error).toHaveBeenCalledWith('El pesaje cambió mientras lo revisabas')
+    expect(w.find('.maa__sheet').exists()).toBe(false)
+    expect(api.listPesajesManicuraAdmin).toHaveBeenCalledTimes(2)
   })
 
   it('un doble toque manda una sola confirmación', async () => {

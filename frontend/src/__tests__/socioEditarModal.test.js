@@ -13,7 +13,7 @@ vi.mock('../composables/useToast.js', () => ({
 const fetchOne = vi.fn()
 vi.mock('../stores/pacientes', () => ({
   usePacientesStore: () => ({
-    current: { id: 1, nombre: 'Ana', apellido: 'Gómez', domicilio_calle: 'Falsa' },
+    current: { id: 1, nombre: 'Ana', apellido: 'Gómez', dni: '30111222', fecha_nacimiento: '1990-01-01', domicilio_calle: 'Falsa' },
     fetchOne,
   }),
 }))

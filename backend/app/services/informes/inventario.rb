@@ -160,7 +160,7 @@ module Informes
     end
 
     # Positivo de producción o traslado que NO es la vuelta de un derivado eliminado (esa lleva el
-    # derivado en `stock_resultante_id`, como la salida que deshace).
+    # derivado en `stock_resultante_id`). Sólo quedan las de (fn): desde (fo) no se crean más.
     def entrada_por_produccion?(m)
       %w[produccion transferencia].include?(m.tipo) && m.gramos.positive? && m.stock_resultante_id.nil?
     end
