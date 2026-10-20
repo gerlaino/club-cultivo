@@ -12,9 +12,7 @@ class PlantsController < ApplicationController
   # lotes#por_qr: usa la instancia api autenticada, así el front lo consume igual
   # que el QR de lote (sin fetch crudo cross-origin que se colgaba en producción).
   def por_qr
-    plant = Plant.joins(:lote)
-                 .where(lotes: { club_id: current_user.club_id })
-                 .find_by(codigo_qr: params[:codigo_qr])
+    plant = plantas_al_alcance.find_by(codigo_qr: params[:codigo_qr])
     return render json: { error: 'Planta no encontrada' }, status: :not_found unless plant
 
     render json: {
@@ -33,22 +31,13 @@ class PlantsController < ApplicationController
 
   # GET /plants
   def index
-    plants = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
-
+    # Las plantas de los lotes que este usuario alcanza: la misma regla que la ficha del lote, así
+    # que si el lote se abre, sus plantas vienen; y un id de otro lote simplemente no trae nada.
+    plants = plantas_al_alcance
     if params[:lote_id].present?
-      # Con lote_id explícito la unidad de acceso es el lote (ya scoped al club).
-      # No aplicamos el filtro de sala asignada: el cultivador puede ver las plantas
-      # del lote al que navega, independientemente de si está en sala_cultivadores.
-      return render json: [] unless current_user.club.lotes.exists?(id: params[:lote_id])
       plants = plants.where(lote_id: params[:lote_id])
     elsif params[:lote_ids].present?
-      # Las plantas de varios lotes de una: las banderitas de los lotes elegidos en /lotes. Acá sí
-      # va el alcance: la lista de lotes lo aplica, y un id de otro lote simplemente no trae nada.
-      plants = plants.merge(Lote.al_alcance_de(current_user)).where(lote_id: Array(params[:lote_ids]))
-    else
-      # Mismo criterio que la lista de lotes: sin él, un cultivador sin sedes asignadas veía
-      # todos los lotes y ninguna planta.
-      plants = plants.merge(Lote.al_alcance_de(current_user))
+      plants = plants.where(lote_id: Array(params[:lote_ids]))
     end
     plants = plants.where(state: params[:state])                if params[:state].present?
     plants = plants.where(lotes: { estado: params[:lote_estado] }) if params[:lote_estado].present?
@@ -60,8 +49,7 @@ class PlantsController < ApplicationController
   # Activas = vegetativo + floración. Cosechadas = state cosechado (total). En manicura =
   # cosechadas cuyo lote está en_manicura (la planta se congela en 'cosechado'). Descartadas.
   def kpis
-    base = Plant.joins(:lote).where(lotes: { club_id: current_user.club_id })
-                .merge(Lote.al_alcance_de(current_user))
+    base = plantas_al_alcance
     # cosechadas y en_manicura son DISJUNTAS: la planta se congela en 'cosechado', así que
     # "en manicura" (lote en_manicura) NO se cuenta también en "cosechadas".
     render json: {
@@ -79,7 +67,7 @@ class PlantsController < ApplicationController
 
   # POST /plants
   def create
-    lote = current_user.club.lotes.find(params[:plant][:lote_id])
+    lote = lotes_al_alcance.find(params[:plant][:lote_id])
 
     # El tope es de plantas EN FLORACIÓN: sólo cuenta si el lote ya está adentro del cupo. La red
     # de verdad es la validación de `Plant`; esto es para contestar con el mensaje y el 402.
@@ -367,10 +355,7 @@ class PlantsController < ApplicationController
   end
 
   def set_plant
-    club   = current_user.club
-    @plant = Plant.joins(:lote)
-                  .where(lotes: { club_id: club.id })
-                  .find(params[:id])
+    @plant = plantas_al_alcance.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta no encontrada' }, status: :not_found
   end
@@ -423,6 +408,7 @@ class PlantsController < ApplicationController
       nombre:       plant.nombre,
       codigo_qr:    plant.codigo_qr,
       state:        plant.state,
+      en_cultivo:   plant.en_cultivo?,
       estado_label: plant.estado_label,
       origen:       plant.origen,
       es_seleccion: plant.es_seleccion,
@@ -455,6 +441,7 @@ class PlantsController < ApplicationController
       nombre:    plant.nombre,
       codigo_qr: plant.codigo_qr,
       state:     plant.state,
+      en_cultivo: plant.en_cultivo?,
       estado_label: plant.estado_label,
       origen:    plant.origen,
       es_seleccion: plant.es_seleccion,

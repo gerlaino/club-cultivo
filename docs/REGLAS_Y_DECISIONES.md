@@ -616,6 +616,32 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`otra_organizacion`) = paciente nuevo con REPROCANN vigente, vinculado a otra organización por
   ahora. Vacío = sin dato: los que ya existían arrancan así, nadie adivina. El mostrador no lo ve
   (como el resto del REPROCANN). PENDIENTE DE DECIDIR: si los adherentes salen en el informe REPROCANN.
+- **QUIÉN VE QUÉ LOTE: UNA SOLA REGLA** (20-oct-2026, Germán: «tiene que estar realmente bien
+  hecho»). `Lote.al_alcance_de(user)` es LA regla del alcance del cultivo: cultivador = sus salas +
+  lo post-cosecha de sus sedes + lo que él cosechó; supervisor = las salas y lo post-cosecha de sus
+  sedes; manicura = los lotes en manicura que le asignaron; admin = todo. Todo controller que busca
+  un lote o una planta por id usa `lotes_al_alcance` / `plantas_al_alcance` (ApplicationController),
+  nunca `club.lotes.find`: lista, ficha, buscador, plantas, QR, fotos, riegos, eventos, notas,
+  pesadas, análisis, costos y el dictado. Antes había cuatro versiones y el buscador mostraba una
+  planta cuyo lote daba 404. Lo vigila `spec/requests/alcance_cultivo_spec.rb`. Queda afuera
+  `pesajes_manicura` (tiene su regla de quién pesa y quién aprueba).
+- **EL NOMBRE DE UN ESTADO SE PIDE AL MODELO** (20-oct-2026): `Lote.etiqueta_estado(estado, origen)`
+  y nada de tablas propias en los controllers (había tres, y a cada una le faltaba algo: «en_manicura
+  → Curado»). Entiende los nombres viejos del historial (semilla/esqueje/germinación, secado).
+- **EL CÓDIGO DE LOTE NO SE REPITE EN UNA ORGANIZACIÓN** (20-oct-2026). `Lote` lo valida, pero la
+  base no lo impide: lo que escribe sin validar (la mudanza `cultivo:mudar`) dejó cinco repetidos en
+  el Club Modelo. La mudanza ahora frena si el código ya existe en el destino; `rake
+  lotes:codigos_repetidos` (sólo lee) los lista. Producción sin repetidos (Germán, 20-oct) → índice
+  único parcial `index_lotes_codigo_unico_por_club` (sin eliminados ni vacíos).
+- **UNA PLANTA QUE YA NO CRECE NO RECIBE REGISTROS DE CULTIVO** (20-oct-2026): cosechada, en secado
+  o descartada (`Plant#en_cultivo?`). Lo valida `PlantActivity` para lo hecho HOY; cargar historia
+  pasada sí (un trasplante de hace 20 días en un lote cosechado). La ficha recibe `en_cultivo`.
+- **TODA FECHA CORTA PASA POR `fechaLocal`** (20-oct-2026): agrega el año cuando no es el de hoy.
+  `fechasConAnio.test.js` barre `src`.
+- **EN UNA ORGANIZACIÓN NO HAY LISTA DE TODAS LAS PLANTAS; HAY LUPA** (12 y 20-oct-2026): `/plantas`
+  y `/m/plantas` sólo en autocultivo (guard con `esUsoPersonal()`, no con `club.data`, que entrando
+  por la dirección todavía no llegó). El teléfono tiene la misma lupa que escritorio
+  (`BuscadorGlobal movil`) y cada resultado abre su ficha bajo /m (`lib/rutaMovil.js`).
 - **LOS TRES ESTADOS DEL PACIENTE** (18 y 19-oct-2026, Germán; reemplaza «pendiente de entrevista
   sale de los turnos» del 6-oct). Tres ejes, una sola regla (`Pacientes::Situacion`, viaja como
   `situacion` en la lista, la ficha y la del médico; los contadores usan la misma cuenta):

@@ -102,6 +102,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../utils/dates.js'
 import { computed } from 'vue'
 import { tareaCerrada } from '../lib/tareaEstado.js'
 import { useAuthStore } from '../stores/auth'
@@ -150,7 +151,7 @@ function formatFecha(fecha) {
   if (diff === -1) return 'Ayer'
   if (diff === 1) return 'Mañana'
   if (diff < 0) return `Hace ${Math.abs(diff)} días`
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(d, { day: 'numeric', month: 'short' })
 }
 
 function iniciales(nombre) {

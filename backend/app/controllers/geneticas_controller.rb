@@ -38,9 +38,8 @@ class GeneticasController < ApplicationController
 
   # GET /geneticas/:id/resenas — feedback de pacientes sobre esta genética (interno).
   def resenas
-    unless current_user.admin? || current_user.supervisor?
-      return render json: { error: 'No autorizado' }, status: :forbidden
-    end
+    return render json: { error: 'No autorizado' }, status: :forbidden unless ve_resenas?
+
     resenas = @genetica.resenas.includes(:paciente).recientes
     render json: {
       resumen: @genetica.resenas.resumen,
@@ -99,6 +98,10 @@ class GeneticasController < ApplicationController
   end
 
   private
+
+  # Las reseñas son feedback interno de pacientes: sólo administración. La ficha recibe
+  # `ve_resenas` para no pedir lo que este endpoint le va a negar.
+  def ve_resenas? = current_user.admin? || current_user.supervisor?
 
   # Una genética global es del catálogo INASE, compartido por TODAS las organizaciones: no se
   # edita, no se apaga y no se le tocan las fotos desde una organización. Hasta acá `update`
@@ -287,6 +290,7 @@ class GeneticasController < ApplicationController
 
     {
       id:                     genetica.id,
+      ve_resenas:             ve_resenas?,
       club_id:                genetica.club_id,
       global:                 genetica.global,
       nombre:                 genetica.nombre,

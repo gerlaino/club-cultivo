@@ -45,6 +45,8 @@ class PlantActivitiesController < ApplicationController
                     status: :unprocessable_entity
     end
 
+    return render json: { errors: activity.errors.full_messages }, status: :unprocessable_entity if activity.invalid?
+
     # Actualizar campos denormalizados en la planta
     if activity.activity_type == 'registro_planta' && activity.metadata.present?
       meta = activity.metadata
@@ -71,9 +73,7 @@ class PlantActivitiesController < ApplicationController
   private
 
   def set_plant
-    @plant = Plant.joins(:lote)
-                  .where(lotes: { club_id: current_user.club_id })
-                  .find(params[:plant_id])
+    @plant = plantas_al_alcance.find(params[:plant_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta no encontrada' }, status: :not_found
   end
@@ -143,17 +143,11 @@ class PlantActivitiesController < ApplicationController
 
   def nutricion_sin_costo = (@nutricion_sin_costo ||= Lotes::Nutricion.new(@plant.lote, con_costo: false))
 
-  FASE_LABELS = {
-    'semilla' => 'Enraizado', 'esqueje' => 'Enraizado', 'germinacion' => 'Enraizado',
-    'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
-    'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
-  }.freeze
-
   def serialize_evento(e)
     case e.tipo
     when 'cambio_estado'
       atype = 'lote_fase'
-      desc  = "#{FASE_LABELS[e.estado_anterior] || e.estado_anterior} → #{FASE_LABELS[e.estado_nuevo] || e.estado_nuevo}".sub(/^ → /, '')
+      desc  = [e.estado_anterior, e.estado_nuevo].compact_blank.map { |x| Lote.etiqueta_estado(x, e.lote&.origen) }.join(' → ')
       meta  = {}
     when 'actividad'
       cat   = LoteEvento::CATEGORIA_META[e.categoria] || {}

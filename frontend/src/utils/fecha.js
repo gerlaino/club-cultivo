@@ -1,3 +1,4 @@
+import { fechaLocal } from './dates.js'
 /**
  * Helpers de fecha para formato argentino DD/MM/AAAA.
  * El backend SIEMPRE recibe/devuelve ISO (YYYY-MM-DD).
@@ -24,7 +25,7 @@ export function formatFecha(d) {
 export function formatFechaCorta(d) {
   const date = parseDate(d)
   if (!date) return '—'
-  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(date, { day: 'numeric', month: 'short' })
 }
 
 /** Larga para títulos → "2 de mayo de 2026" */

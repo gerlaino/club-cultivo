@@ -453,9 +453,11 @@ const routes = [
     // La lista de TODAS las plantas sólo queda en autocultivo (son pocas y es como piensa esa
     // persona). En una organización tardaba y nadie la miraba: a una planta se llega por su lote
     // o por el buscador de arriba (Ctrl+K) (Germán, 12-oct-2026). La ficha (/plantas/:id) sigue.
+    // `esUsoPersonal()` y no `club.data`: entrando directo por la dirección, el club todavía no
+    // llegó y la lista de 1.000 plantas se colaba igual (20-oct-2026).
     beforeEnter: [
       requiresPermission("plantas", "index"),
-      () => (useClubStore().data && !useClubStore().data.personal ? '/lotes' : true),
+      () => (esUsoPersonal() ? true : '/lotes'),
     ],
   },
   {
@@ -1144,8 +1146,15 @@ const routes = [
       // Las MISMAS vistas de la web, montadas dentro del shell. La PWA no recorta lo que el rol
       // puede hacer: cambia el envoltorio (bottom nav, tablas como tarjetas), no el contenido.
       // Van bajo /m porque el guard de PWA rebota cualquier ruta fuera de ese prefijo.
-      { path: 'plantas',   component: () => import('../views/PlantasView.vue') },
+      // Como en escritorio: la lista de todas las plantas es del autocultivo. En una organización
+      // se llega a una planta por su lote o con la lupa de arriba (20-oct-2026).
+      { path: 'plantas',   component: () => import('../views/PlantasView.vue'),
+        beforeEnter: () => (esUsoPersonal() ? true : '/m') },
       { path: 'geneticas', component: () => import('../views/GeneticasView.vue') },
+      // La ficha también, para que tocarla en la lista o en el buscador no lleve al inicio.
+      { path: 'geneticas/:id', component: () => import('../views/GeneticaDetalleView.vue'),
+        props: (r) => ({ id: Number(r.params.id) }),
+        beforeEnter: requiresPermission('geneticas', 'show') },
       { path: 'historial', component: () => import('../views/HistorialDispensacionesView.vue') },
       { path: 'pacientes', component: () => import('../views/PacientesDispatch.vue') },
       // Nutrientes y recetas, y la guía, también dentro del shell (19-oct-2026): en una organización

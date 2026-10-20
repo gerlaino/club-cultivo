@@ -152,6 +152,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed, onMounted } from 'vue'
 import {
   Users, AlertTriangle, Clock, ShieldAlert, FilePlus, FileHeart,
@@ -207,7 +208,7 @@ function iniciales(p) {
 }
 function formatDate(d) {
   if (!d) return '—'
-  return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(safeDate(d), { day: 'numeric', month: 'short' })
 }
 function fmtHora(fechaHora) {
   return new Date(fechaHora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_19_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1512,6 +1512,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_19_120000) do
     t.bigint "cama_ciclo_id"
     t.index ["cama_ciclo_id"], name: "index_lotes_on_cama_ciclo_id"
     t.index ["cama_id"], name: "index_lotes_on_cama_id"
+    t.index ["club_id", "codigo"], name: "index_lotes_codigo_unico_por_club", unique: true, where: "((deleted_at IS NULL) AND (codigo IS NOT NULL))"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

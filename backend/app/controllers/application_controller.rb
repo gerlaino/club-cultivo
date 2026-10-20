@@ -86,6 +86,12 @@ class ApplicationController < ActionController::API
 
   private
 
+  # Los lotes y las plantas que ESTE usuario alcanza (`Lote.al_alcance_de`). Todo controller que
+  # busca un lote o una planta por id lo busca acá, no en `club.lotes`: si no, lo que una pantalla
+  # esconde se abre por URL, o el buscador muestra algo que la ficha después niega (20-oct-2026).
+  def lotes_al_alcance = current_user.club.lotes.merge(Lote.al_alcance_de(current_user))
+  def plantas_al_alcance = Plant.joins(:lote).merge(lotes_al_alcance)
+
   # Los pacientes que ESTE usuario puede leer. Para un médico, sólo sus vinculados (6-oct-2026);
   # para el resto, lo que diga su rol. Todo controller que busca un paciente por id para alguien
   # que puede ser médico lo busca acá, no en `club.pacientes`: si no, el médico abre por URL la

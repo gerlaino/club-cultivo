@@ -44,8 +44,11 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { buscarGeneral } from '../../lib/api.js'
+import { rutaMovil } from '../../lib/rutaMovil.js'
 import { useClubStore } from '../../stores/club.js'
 
+// `movil`: dentro del shell del teléfono, cada resultado abre su ficha bajo /m.
+const props = defineProps({ movil: { type: Boolean, default: false } })
 const router = useRouter()
 const club = useClubStore()
 const abierto = ref(false)
@@ -109,7 +112,7 @@ function cerrar() {
 function irA(r) {
   if (!r) return
   cerrar()
-  router.push(r.ruta)
+  router.push(props.movil ? rutaMovil(r.ruta) : r.ruta)
 }
 function onKey(e) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {

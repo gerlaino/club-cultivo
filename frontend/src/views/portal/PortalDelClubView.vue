@@ -102,6 +102,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 // Lo que PUBLICA la organización, tratado como si valiera algo: la última novedad va como portada,
 // con su foto y su titular. Una organización que se toma el trabajo de escribir algo tiene que
 // verlo tratado así — es lo que hace que lo siga escribiendo. Después, en orden: lo que VIENE (es
@@ -139,7 +140,7 @@ const dia        = (f) => (f ? d(f).getDate() : '')
 const diaSemana  = (f) => (f ? DIAS[d(f).getDay()].toUpperCase() : '')
 const hora       = (f) => (f ? d(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
 const fechaLarga = (f) => (f ? d(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '')
-const fechaCorta = (f) => (f ? d(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '')
+const fechaCorta = (f) => (f ? fechaLocal(d(f), { day: 'numeric', month: 'short' }) : '')
 
 onMounted(async () => {
   // Las tres en paralelo, y ninguna hace caer a las otras: si la organización no cargó eventos,

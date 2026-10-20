@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 // El panel de quien VENDE la plataforma.
 //
 // Antes esto era un recuento: cuántas plantas, cuántos lotes y cuántos pacientes sumando todos
@@ -96,7 +97,7 @@ const adopcion     = computed(() => (pulso.value?.adopcion || []).filter(a => a.
 
 function fecha(f) {
   if (!f) return '—'
-  return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+  return fechaLocal(new Date(f + 'T00:00:00'), { day: '2-digit', month: 'short' })
 }
 
 const hoyLargo = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })

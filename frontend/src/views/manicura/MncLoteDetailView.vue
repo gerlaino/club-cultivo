@@ -372,6 +372,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -485,7 +486,7 @@ async function borrarPesaje(p) {
 
 function fmtDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return fechaLocal(new Date(d), { weekday: 'short', day: 'numeric', month: 'short' })
 }
 function pesajeEstadoLabel(estado) {
   return { borrador: 'En progreso', enviado: 'Enviado', confirmado: 'Confirmado' }[estado] || estado

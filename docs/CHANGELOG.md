@@ -1,5 +1,35 @@
 # Changelog
 
+## Octubre 2026 (ft) — La lupa en el teléfono; quién ve qué lote, una sola regla (20-oct)
+
+- **Alcance del cultivo unificado** (Germán: «tiene que estar realmente bien hecho»): la lupa le
+  mostraba al cultivador una planta de un lote cosechado que la ficha le negaba (404). Había cuatro
+  versiones de «qué lotes ve» (lista, ficha, buscador/plantas, dictado) y fotos, riegos, eventos,
+  notas, pesadas, análisis y costos no aplicaban ninguna. Ahora todo usa `Lote.al_alcance_de` vía
+  `lotes_al_alcance` / `plantas_al_alcance`. `alcance_cultivo_spec` (falla con el código anterior).
+- **Nombres de fase**: el historial de la planta decía «en_manicura → Curado» y el del lote
+  «enraizado»; las tres tablas de etiquetas se reemplazaron por `Lote.etiqueta_estado`.
+- **Códigos de lote repetidos**: la mudanza (`cultivo:mudar`) conservaba el código sin mirar el
+  destino; ahora frena. `rake lotes:codigos_repetidos` (sólo lee). Producción dio sin repetidos, así
+  que la base ahora lo impide: migración `CodigoDeLoteUnicoPorOrganizacion` (índice único parcial).
+- Ficha de planta en el teléfono: el código del lote lleva al lote.
+- **Planta cosechada o descartada no recibe registros de cultivo de hoy** (poda, medición,
+  trasplante, riego, registro): escritorio lo escondía, el teléfono no y el backend aceptaba. Ahora
+  la regla vive en `PlantActivity` (todas las puertas, también el dictado), la ficha recibe
+  `en_cultivo` y las dos pantallas lo usan. Cargar historia pasada sigue permitido; la nota también.
+- **Fechas con año cuando no son de este año**: `fechaLocal` (`utils/dates.js`) en las 33 pantallas
+  que armaban «2 dic» a mano; un test barre `src` para que no vuelva.
+
+- **Buscador en el teléfono** (Germán): la misma lupa de escritorio (`BuscadorGlobal`, `/buscar`)
+  en la barra de arriba del shell `/m`, para todos menos el repartidor. Cada resultado abre su
+  ficha DENTRO de la app (`lib/rutaMovil.js`, compartido con «Últimas acciones»).
+- `/plantas` en una organización lleva a Lotes también entrando por la dirección (el guard miraba
+  `club.data`, que todavía no había llegado, y la lista de 1.068 plantas tardaba 15 s); `/m/plantas`
+  igual, al inicio del teléfono. En autocultivo, sin cambios.
+- `/m/geneticas/:id`: la ficha de una genética ya no rebota al inicio en la app instalada.
+- La ficha de genética trae `ve_resenas` y la pantalla sólo pide las reseñas si el backend dice
+  que este rol las ve (el cultivador recibía un 403 en cada ficha).
+
 ## Octubre 2026 (fs) — Nutrientes en organizaciones: como en autocultivo, por sede (19-oct)
 
 - «Nutrientes y recetas» también en organizaciones: arriba, los nutrientes del depósito agrupados

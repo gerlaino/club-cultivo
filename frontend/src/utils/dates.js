@@ -136,3 +136,16 @@ export function yaPaso(fecha, hora, ahora = new Date()) {
   if (!fecha || !hora) return false
   return new Date(`${fecha}T${hora}:00`) <= ahora
 }
+
+/**
+ * Una fecha en castellano con las opciones dadas, y el AÑO cuando no es el de hoy. «2 dic» de hace
+ * diez meses se leía como el que viene (20-oct-2026). Toda fecha corta («2 dic», «2 dic 14:00») pasa
+ * por acá; las de un solo mes (chips de calendario) no lo necesitan.
+ *   fechaLocal('2025-12-02T14:00', { day: 'numeric', month: 'short' }) → «2 dic 2025»
+ */
+export function fechaLocal(fecha, opciones) {
+  const d = fecha instanceof Date ? fecha : new Date(fecha)
+  if (isNaN(d.getTime())) return ''
+  const opts = d.getFullYear() === new Date().getFullYear() ? opciones : { ...opciones, year: 'numeric' }
+  return d.toLocaleString('es-AR', opts)
+}

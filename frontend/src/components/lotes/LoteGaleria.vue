@@ -186,7 +186,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { getLoteFotos, uploadFotoLote, updateFotoLote, deleteFotoLote, setFotoPortadaLote } from '../../lib/api.js'
-import { hoyISO } from '../../utils/dates.js'
+import { hoyISO, fechaLocal } from '../../utils/dates.js'
 import { achicarImagen } from '../../lib/imagenes.js'
 
 const props = defineProps({
@@ -239,7 +239,7 @@ useRecargaEnCambios('fotos', cargar, { filtro: () => true })
 const FASES = { enraizado: 'Enraizando', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', secado: 'Secado', curado: 'Curado', en_manicura: 'Manicura', finalizado: 'Finalizado' }
 const faseLabel = f => FASES[f] || f
 const labelEtiqueta = e => etiquetasCatalogo.value.find(x => x.clave === e)?.label || e.replace(/_/g, ' ')
-const fechaCorta = iso => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : ''
+const fechaCorta = iso => iso ? fechaLocal(new Date(iso + 'T00:00:00'), { day: 'numeric', month: 'short' }) : ''
 
 const etiquetasEnUso = computed(() => [...new Set(fotos.value.flatMap(f => f.etiquetas || []))])
 const visibles = computed(() => filtro.value ? fotos.value.filter(f => f.etiquetas?.includes(filtro.value)) : fotos.value)

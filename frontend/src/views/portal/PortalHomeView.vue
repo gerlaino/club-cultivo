@@ -96,6 +96,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 // EL INICIO DEL PORTAL ES EL ESTADO DEL PACIENTE.
 //
 // Hasta acá el inicio era el boletín de la organización —portada de novedades, agenda, catálogo—
@@ -150,7 +151,7 @@ const vigenciaIndicacion = computed(() => {
 })
 
 const d = (f) => new Date(f)
-const fechaCorta = (f) => (f ? d(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '')
+const fechaCorta = (f) => (f ? fechaLocal(d(f), { day: 'numeric', month: 'short' }) : '')
 const fechaHora  = (f) => (f
   ? d(f).toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
   : '')

@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed, onMounted } from 'vue'
 import {
   listPatientDocuments,
@@ -76,7 +77,7 @@ function formatDate(d) {
 
 function formatDateTime(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return fechaLocal(new Date(d), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 // ── Carga ─────────────────────────────────────────────────────────────

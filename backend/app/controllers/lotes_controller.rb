@@ -12,30 +12,17 @@ class LotesController < ApplicationController
     lotes = current_user.club.lotes.includes(:costo_lote, :pesadas, :lote_eventos, :manicurador, sala: :sede, genetica: { fotos_attachments: :blob })
     lotes = lotes.where(sala_id: @sala.id) if @sala.present?
 
-    if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      if params[:cosechados].present?
-        mis_lotes_cosechados = LoteEvento.where(
-          club_id:      current_user.club_id,
-          user_id:      current_user.id,
-          estado_nuevo: 'cosecha'
-        ).select(:lote_id)
-        lotes = lotes.where(sala_id: salas_ids).or(lotes.where(id: mis_lotes_cosechados))
-      else
-        # El cultivador ve solo lotes EN CULTIVO. Aunque por datos viejos un lote en
-        # manicura conserve una sala de veg/flor, se filtra por estado para no colarse.
-        lotes = lotes.where(sala_id: salas_ids)
-                     .where(estado: Lote::CULTIVO_ESTADOS)
-      end
-    elsif current_user.supervisor?
-      salas_ids = current_user.salas_ids_en_sedes_asignadas
-      lotes = lotes.where(sala_id: salas_ids)
+    # Qué alcanza este rol: la misma regla que la ficha, el buscador y las plantas.
+    lotes = lotes.merge(Lote.al_alcance_de(current_user))
+    # La lista del cultivador muestra sólo lo EN CULTIVO, salvo que pida lo cosechado. Es lo que
+    # se muestra, no lo que alcanza: la ficha de un lote cosechado suyo se abre igual.
+    if current_user.cultivador? && params[:cosechados].blank?
+      lotes = lotes.where(estado: Lote::CULTIVO_ESTADOS)
     end
 
     if current_user.manicura?
-      # El manicura ve los lotes en manicura que el admin le asignó. La "espera de
-      # aprobación" no es un estado del lote: es un PesajeManicura ya enviado (ver abajo).
-      lotes = lotes.where(lotes: { estado: 'en_manicura', manicurador_id: current_user.id })
+      # El manicura ve los lotes en manicura que el admin le asignó (`al_alcance_de`). La "espera
+      # de aprobación" no es un estado del lote: es un PesajeManicura ya enviado (ver abajo).
       # Flujo nuevo: "en espera de aprobación" = lotes con un pesaje ya enviado por
       # este manicura (el lote sigue en_manicura, lo que espera es el PesajeManicura).
       if ActiveModel::Type::Boolean.new.cast(params[:pesaje_enviado])
@@ -92,7 +79,7 @@ class LotesController < ApplicationController
 
   # GET /lotes/por_qr/:codigo_qr
   def por_qr
-    lote = current_user.club.lotes.find_by(codigo_qr: params[:codigo_qr])
+    lote = lotes_al_alcance.find_by(codigo_qr: params[:codigo_qr])
     return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
 
     render json: {
@@ -958,12 +945,6 @@ class LotesController < ApplicationController
     }
   end
 
-  FASE_LABELS = {
-    'semilla' => 'Enraizado', 'esqueje' => 'Enraizado', 'germinacion' => 'Enraizado',
-    'vegetativo' => 'Vegetativo', 'floracion' => 'Floración', 'cosecha' => 'Cosecha',
-    'secado' => 'Secado', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
-    'en_manicura' => 'En manicura',
-  }.freeze
 
   # GET /lotes/:id/historial
   # Bitácora UNIFICADA del lote: normaliza todo (fases, actividades, registros,
@@ -1109,7 +1090,7 @@ class LotesController < ApplicationController
       (current_user.admin? || current_user.super_admin? || r.user_id == current_user.id)
   end
 
-  def fase_label(estado) = FASE_LABELS[estado] || estado
+  def fase_label(estado) = estado.present? ? Lote.etiqueta_estado(estado, @lote&.origen) : estado
 
   # Normaliza un LoteEvento a un item del historial unificado.
   def evento_item(e, kind:, emoji:, titulo:, detalle: nil, categoria: nil, metadata: {}, editable: true, deletable: true)
@@ -1174,22 +1155,7 @@ class LotesController < ApplicationController
   end
 
   def set_lote
-    scope = current_user.club.lotes
-    if current_user.cultivador?
-      salas_ids = current_user.salas_ids_asignadas
-      mis_cosechados = LoteEvento.where(
-        club_id:      current_user.club_id,
-        user_id:      current_user.id,
-        estado_nuevo: 'cosecha'
-      ).select(:lote_id)
-      scope = scope.where(sala_id: salas_ids).or(scope.where(id: mis_cosechados))
-    elsif current_user.supervisor?
-      salas_ids = current_user.salas_ids_en_sedes_asignadas
-      scope = scope.where(sala_id: salas_ids)
-    elsif current_user.manicura?
-      scope = scope.where(lotes: { estado: 'en_manicura', manicurador_id: current_user.id })
-    end
-    @lote = scope.find(params[:id])
+    @lote = lotes_al_alcance.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Lote no encontrado' }, status: :not_found
   end

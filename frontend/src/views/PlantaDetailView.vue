@@ -574,7 +574,8 @@ const registrosHoyPlanta = computed(() =>
 
 // Solo mientras la planta está en cultivo se registran mediciones (altura/colas/salud): una
 // planta cosechada, en secado o descartada ya no crece, así que "Registrar planta" no aplica.
-const enCultivo = computed(() => ['enraizado', 'vegetativo', 'floracion'].includes(planta.value?.state))
+// Lo dice el backend (`Plant#en_cultivo?`), que además rechaza el registro: la regla vive en un lado.
+const enCultivo = computed(() => !!planta.value?.en_cultivo)
 
 const plantaAcciones = computed(() => {
   const items = []

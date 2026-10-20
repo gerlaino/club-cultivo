@@ -36,7 +36,7 @@ class PesadasController < ApplicationController
   private
 
   def set_lote
-    @lote = current_user.club.lotes.find(params[:lote_id])
+    @lote = lotes_al_alcance.find(params[:lote_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Lote no encontrado' }, status: :not_found
   end

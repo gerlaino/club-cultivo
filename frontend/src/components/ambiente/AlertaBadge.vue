@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { computed } from 'vue'
 
 const props = defineProps({
@@ -20,7 +21,7 @@ const TIPO_ICON = {
 
 function formatTime(ts) {
   if (!ts) return ''
-  return new Date(ts).toLocaleString('es-AR', {
+  return fechaLocal(new Date(ts), {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 }

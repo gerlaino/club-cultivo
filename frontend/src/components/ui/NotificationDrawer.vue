@@ -146,6 +146,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { X, ChevronRight, Bell, AlertTriangle } from 'lucide-vue-next'
@@ -235,7 +236,7 @@ function timeAgo(ts) {
   const dias = Math.floor(hrs / 24)
   if (dias === 1)  return 'ayer'
   if (dias < 7)    return `hace ${dias} días`
-  return new Date(ts).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(new Date(ts), { day: 'numeric', month: 'short' })
 }
 </script>
 

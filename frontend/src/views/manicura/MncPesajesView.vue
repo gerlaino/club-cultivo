@@ -160,6 +160,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -319,7 +320,7 @@ async function borrarPesaje(p) {
 function fmtDate(d) {
   if (!d) return '—'
   const dt = new Date(d)
-  return dt.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return fechaLocal(dt, { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 function estadoLabel(estado) {

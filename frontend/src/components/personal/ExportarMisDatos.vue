@@ -23,6 +23,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getExportacionDatos, pedirExportacionDatos } from '../../lib/api'
 import { descargarArchivo } from '../../lib/descargas'
@@ -61,7 +62,7 @@ const peso = computed(() => {
   return b > 1048576 ? `${(b / 1048576).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(b / 1024))} KB`
 })
 const vence = computed(() => (est.value.vence_at
-  ? new Date(est.value.vence_at).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  ? fechaLocal(new Date(est.value.vence_at), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   : ''))
 </script>
 

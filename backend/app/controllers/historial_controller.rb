@@ -45,7 +45,7 @@ class HistorialController < ApplicationController
       eventos.each do |e|
         titulo = case e.tipo
                  when "cambio_estado"
-                   "#{label_estado(e.estado_anterior)} → #{label_estado(e.estado_nuevo)}"
+                   "#{label_estado(e.estado_anterior, e.lote&.origen)} → #{label_estado(e.estado_nuevo, e.lote&.origen)}"
                  when "movimiento_sala"
                    "Movimiento entre salas"
                  when "nota"
@@ -94,17 +94,5 @@ class HistorialController < ApplicationController
 
   private
 
-  ESTADO_LABELS = {
-    "planificacion" => "Planificación",
-    "vegetativo"    => "Vegetativo",
-    "floracion"     => "Floración",
-    "cosecha"       => "Cosecha",
-    "secado"        => "Secado",
-    "curado"        => "Curado",
-    "finalizado"    => "Finalizado",
-  }.freeze
-
-  def label_estado(e)
-    ESTADO_LABELS[e] || e.to_s.humanize
-  end
+  def label_estado(e, origen = nil) = Lote.etiqueta_estado(e, origen)
 end

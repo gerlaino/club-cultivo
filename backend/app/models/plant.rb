@@ -29,6 +29,9 @@ class Plant < ApplicationRecord
 
   STATES   = %w[enraizado vegetativo floracion secado cosechado descartada].freeze
   ORIGENES = %w[semilla esqueje].freeze
+  # La planta todavía crece: recibe poda, medición, trasplante, registros. Cosechada, en secado o
+  # descartada ya no (Germán, 20-oct-2026). Escritorio lo tenía en su pantalla y el teléfono no.
+  ESTADOS_EN_CULTIVO = %w[enraizado vegetativo floracion].freeze
 
   # La planta todavía no tiene raíz funcional. Un descarte acá es, por defecto, un esqueje o una
   # plántula que NO PRENDIÓ — que es justo lo que hay que poder medir.
@@ -42,6 +45,8 @@ class Plant < ApplicationRecord
   # (misma regla que `Lote#estado_label`: cambia la palabra, no la fase). Fuera de ese tramo es nil
   # y la pantalla usa su palabra de siempre. Manda el origen del LOTE: el alta de una planta suelta
   # trae `semilla` por defecto aunque el lote sea de esquejes.
+  def en_cultivo? = ESTADOS_EN_CULTIVO.include?(state)
+
   def estado_label
     return nil unless state == 'enraizado'
     Lote::ARRANQUE_POR_ORIGEN.dig(lote&.origen || origen, 'planta') || 'Enraizado'

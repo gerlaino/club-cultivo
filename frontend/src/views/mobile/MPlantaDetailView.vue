@@ -24,7 +24,9 @@
         <span v-if="esPersonal && lote" class="mpd__chip" :class="lote.automatica ? 'mpd__chip--auto' : 'mpd__chip--foto'">{{ lote.automatica ? 'Auto' : 'Foto' }}</span>
       </h2>
       <div class="mpd__hero-meta">
-        <span v-if="!esPersonal && planta.lote?.codigo">{{ planta.lote.codigo }}</span>
+        <!-- El código del lote lleva al lote, como en escritorio: era texto suelto y había que
+             buscar el camino en «Acciones». -->
+        <RouterLink v-if="!esPersonal && planta.lote?.codigo" :to="`/m/lote-m/${planta.lote.id}`" class="mpd__lote-link">{{ planta.lote.codigo }}</RouterLink>
         <span v-if="!esPersonal && planta.genetica?.nombre" class="mpd__sep">·</span>
         <span v-if="planta.genetica?.nombre">{{ planta.genetica.nombre }}</span>
         <template v-if="esPersonal">
@@ -45,13 +47,15 @@
         <i class="bi bi-droplet-fill" aria-hidden="true"></i> Regar
       </button>
       <button type="button" class="mpd__rapida" :disabled="subiendoFoto" @click="pedirFoto"><i class="bi bi-camera" aria-hidden="true"></i> {{ subiendoFoto ? 'Subiendo…' : 'Foto' }}</button>
-      <button type="button" class="mpd__rapida" @click="showRegistrar = true"><i class="bi bi-pencil" aria-hidden="true"></i> Nota</button>
+      <button v-if="planta.en_cultivo" type="button" class="mpd__rapida" @click="showRegistrar = true"><i class="bi bi-pencil" aria-hidden="true"></i> Nota</button>
       <button type="button" class="mpd__rapida" @click="showMas = true"><i class="bi bi-three-dots" aria-hidden="true"></i> Más</button>
     </div>
 
     <!-- Organización: como siempre (registrar + acciones), con la foto y el descarte andando. -->
     <div v-else class="mpd__actions">
-      <button class="mpd__btn-registrar" @click="showRegistrar = true">
+      <!-- Cosechada o descartada ya no crece: no se le registra nada (como en escritorio; el
+           backend también lo rechaza). -->
+      <button v-if="planta.en_cultivo" class="mpd__btn-registrar" @click="showRegistrar = true">
         <i class="bi bi-pencil-square"></i>
         Registrar actividad
       </button>
@@ -220,6 +224,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LineaDeFotos from '../../components/personal/LineaDeFotos.vue'
@@ -339,7 +344,7 @@ function detalleAct(a) {
 
 function formatFecha(ts) {
   if (!ts) return ''
-  return new Date(ts).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return fechaLocal(ts, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 // ── Foto: se hacía sólo en escritorio y el botón del teléfono decía «usá la web». Una foto es de
@@ -419,6 +424,7 @@ async function cosechar(conEtiqueta) {
 </script>
 
 <style scoped>
+.mpd__lote-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .mpd { padding: 0 0 2rem; }
 .mpd--loading, .mpd--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 3rem 1rem; text-align: center; color: var(--c-ink-500); }
 .mpd__spin { font-size: 1.6rem; animation: mpd-spin .8s linear infinite; }

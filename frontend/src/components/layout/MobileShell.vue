@@ -16,9 +16,15 @@
           </div>
         </template>
       </div>
-      <button class="msh__icon-btn" aria-label="Cuenta" @click="menuOpen = !menuOpen">
-        <i class="bi bi-person-circle"></i>
-      </button>
+      <div class="msh__acciones">
+        <!-- La lupa, como en escritorio (20-oct-2026): en una organización la lista de todas las
+             plantas no existe, y sin esto a una planta sólo se llegaba escaneando su QR. El
+             repartidor no la tiene, igual que en escritorio: no ve cultivo ni pacientes. -->
+        <BuscadorGlobal v-if="role !== 'delivery'" movil class="msh__icon-btn" />
+        <button class="msh__icon-btn" aria-label="Cuenta" @click="menuOpen = !menuOpen">
+          <i class="bi bi-person-circle"></i>
+        </button>
+      </div>
 
       <!-- El ícono suelto de salir no se encontraba: ahora hay un menú con el nombre del usuario y
            la acción escrita. -->
@@ -178,6 +184,7 @@ import NuevaPlantaSheet from '../personal/NuevaPlantaSheet.vue'
 import ModalCrearSala from '../salas/ModalCrearSala.vue'
 import ModalTarea from '../ModalTarea.vue'
 import AsistenteVoz from '../AsistenteVoz.vue'
+import BuscadorGlobal from './BuscadorGlobal.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -679,6 +686,7 @@ onMounted(() => {
   box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 6px 20px rgba(15,42,30,.18);
 }
 .msh__brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.msh__acciones { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
 .msh__logo { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
 .msh__logo-text {
   width: 36px; height: 36px; border-radius: 10px;

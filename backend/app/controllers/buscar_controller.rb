@@ -44,7 +44,7 @@ class BuscarController < ApplicationController
     club.present? && !club.personal? && PacientePolicy::ROLES_LECTURA.include?(current_user.role)
   end
 
-  def lotes_visibles = club.lotes.merge(Lote.al_alcance_de(current_user))
+  def lotes_visibles = lotes_al_alcance
 
   def plantas
     Plant.joins(:lote).merge(lotes_visibles)

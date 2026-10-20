@@ -51,6 +51,27 @@ RSpec.describe 'Buscador general', type: :request do
     expect(titulos('plantas')).to eq(['Madre Gorilla'])
   end
 
+  # AC (Germán, 20-oct-2026): el buscador llega al teléfono; el cultivador encuentra lo que ve en
+  # su pantalla y nada más. Con dos sedes y él asignado a una sola, la planta de la otra no viene.
+  it 'el cultivador asignado a una sede no encuentra las plantas de la otra' do
+    cultivador = create(:user, :cultivador, club: club)
+    ActsAsTenant.with_tenant(club) do
+      finca = create(:sede, club: club, created_by: admin, nombre: 'Finca')
+      otra  = create(:sede, club: club, created_by: admin, nombre: 'Galpón')
+      sala.update!(sede: finca)
+      sala_otra = create(:sala, club: club, created_by: admin, sede: otra, nombre: 'Flora chica')
+      create(:plant, lote: create(:lote, club: club, sala: sala_otra), club: club, nombre: 'Gorilla del galpón')
+      UserSede.create!(user: cultivador, sede: finca)
+    end
+    sign_in_as(cultivador)
+    buscar('gorilla')
+
+    expect(titulos('plantas')).to eq(['Madre Gorilla'])
+
+    buscar('flora')
+    expect(titulos('salas')).to eq(['Flora grande'])
+  end
+
   it 'con menos de dos letras no busca' do
     sign_in_as(admin)
     buscar('g')

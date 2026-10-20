@@ -12,7 +12,7 @@ import { ref, computed, reactive } from 'vue'
 import { listInsumos, listDepositos, listMovimientos, createMovimiento, updateMovimiento, deleteMovimiento,
          listCategoriasContables, createCategoriaContable, updateCategoriaContable,
          listUnidadesNegocio, listLotes, listSedes, createCompraCuotas } from '../lib/api'
-import { hoyISO, toISO } from '../utils/dates.js'
+import { hoyISO, toISO, fechaLocal } from '../utils/dates.js'
 
 // Sectores que le aplican: cultivo y lo general. Con los de dispensario y buffet la lista se
 // llenaba de cosas que nunca va a comprar.
@@ -195,7 +195,7 @@ export function useGastosPersonal() {
   }
 
   function ars(n) { return '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }) }
-  function fechaCorta(f) { return f ? new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '' }
+  function fechaCorta(f) { return f ? fechaLocal(new Date(f + 'T00:00:00'), { day: 'numeric', month: 'short' }) : '' }
 
   return {
     hoy, mes, mesLabel, esMesActual, moverMes,

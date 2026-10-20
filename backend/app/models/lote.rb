@@ -234,9 +234,17 @@ class Lote < ApplicationRecord
     'esqueje' => { 'estado' => 'Enraizado',   'verbo' => 'enraizando', 'donde' => '¿Dónde enraíza?', 'planta' => 'Enraizado' },
   }.freeze
 
+  # Nombres de estados viejos que siguen en el historial de eventos: el arranque tenía tres
+  # nombres antes de ser uno solo (31-jul), y el secado era una fase.
+  ARRANQUE_LEGADO   = %w[semilla esqueje germinacion].freeze
+  ETIQUETAS_LEGADO  = { 'secado' => 'Secado', 'planificacion' => 'Planificación' }.freeze
+
+  # EL nombre de un estado en pantalla. Historiales, eventos y pesadas lo piden acá y no tienen su
+  # propia tabla: había tres, y en cada una faltaba algo («en_manicura → Curado», 20-oct-2026).
   def self.etiqueta_estado(estado, origen)
+    estado = 'enraizado' if ARRANQUE_LEGADO.include?(estado)
     return ARRANQUE_POR_ORIGEN.dig(origen, 'estado') || 'Enraizado' if estado == 'enraizado'
-    ETIQUETAS_ESTADO[estado] || estado.to_s.humanize
+    ETIQUETAS_ESTADO[estado] || ETIQUETAS_LEGADO[estado] || estado.to_s.humanize
   end
 
   def estado_label   = self.class.etiqueta_estado(estado, origen)
@@ -264,20 +272,36 @@ class Lote < ApplicationRecord
   scope :por_sala,    ->(sala_id) { where(sala_id: sala_id) }
   scope :recientes,   -> { order(created_at: :desc) }
 
-  # Qué lotes alcanza un cultivador o un supervisor. Filtrar sólo por `sala_id` deja afuera todo
-  # lo post-cosecha: al cosechar, el lote suelta la sala para liberar el slot (`avanzar_fase!`) y
-  # se queda con la sede. Sin esta segunda condición, las plantas de un lote cosechado o en
-  # manicura no le aparecen NUNCA —ni en la lista ni en los KPIs—, aunque él lo haya cosechado.
+  # Qué lotes alcanza cada rol. Es LA regla: la lista, la ficha, el buscador, las plantas, las
+  # fotos, los riegos y los eventos del lote la usan, y ninguna pantalla puede mostrar algo que
+  # otra después niegue (20-oct-2026: el buscador le mostraba al cultivador una planta cuyo lote
+  # le daba 404, porque la ficha tenía su propia versión de esta regla).
+  #
+  # - Cultivador: los lotes de sus salas, lo post-cosecha de sus sedes y lo que él cosechó.
+  #   Filtrar sólo por `sala_id` deja afuera todo lo post-cosecha: al cosechar, el lote suelta la
+  #   sala para liberar el slot (`avanzar_fase!`) y se queda con la sede.
+  # - Supervisor: las salas de sus sedes y lo post-cosecha de esas sedes.
+  # - Manicura: sólo los lotes en manicura que le asignaron.
+  # - El resto de los roles con acceso al cultivo (admin): todo lo de la organización.
   scope :al_alcance_de, ->(user) {
-    next all unless %w[cultivador supervisor].include?(user.role)
+    case user.role
+    when 'cultivador', 'supervisor'
+      salas_ids = user.cultivador? ? user.salas_ids_asignadas : user.salas_ids_en_sedes_asignadas
+      sedes_ids = user.sedes_ids_asignadas
 
-    salas_ids = user.cultivador? ? user.salas_ids_asignadas : user.salas_ids_en_sedes_asignadas
-    sedes_ids = user.sedes_ids_asignadas
+      post_cosecha = where(sala_id: nil, estado: POST_COSECHA)
+      post_cosecha = post_cosecha.where(sede_id: sedes_ids) if sedes_ids.any?
 
-    post_cosecha = where(sala_id: nil, estado: POST_COSECHA)
-    post_cosecha = post_cosecha.where(sede_id: sedes_ids) if sedes_ids.any?
+      alcance = where(sala_id: salas_ids).or(post_cosecha)
+      next alcance unless user.cultivador?
 
-    where(sala_id: salas_ids).or(post_cosecha)
+      cosechados = LoteEvento.where(club_id: user.club_id, user_id: user.id, estado_nuevo: 'cosecha').select(:lote_id)
+      alcance.or(where(id: cosechados))
+    when 'manicura'
+      where(estado: 'en_manicura', manicurador_id: user.id)
+    else
+      all
+    end
   }
 
   def soft_delete!

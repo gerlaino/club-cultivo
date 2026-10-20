@@ -1054,11 +1054,8 @@ class AsistenteController < BaseController
     club.salas.where(id: current_user.salas_ids_asignadas)
   end
 
-  def lotes_visibles(club)
-    return club.lotes unless current_user.cultivador?
-
-    club.lotes.where(sala_id: current_user.salas_ids_asignadas)
-  end
+  # La regla de siempre (`Lote.al_alcance_de`): lo que se dicta sólo cae en un lote que la ficha abre.
+  def lotes_visibles(club) = club.lotes.merge(Lote.al_alcance_de(current_user))
 
   def ejecutar_registro_ambiental_sala(accion, datos, club, contexto)
     sala = sala_de(accion, datos, club, contexto)

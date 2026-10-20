@@ -216,7 +216,7 @@ import EnviosDeHoy       from './EnviosDeHoy.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import DsStat               from '../../design-system/components/Stat.vue'
 import { PackagePlus }      from 'lucide-vue-next'
-import { toISO } from '../../utils/dates.js'
+import { toISO, fechaLocal } from '../../utils/dates.js'
 
 const auth = useAuthStore()
 
@@ -269,7 +269,7 @@ const FORMA_LABEL = {
 function formaLabel(f) { return FORMA_LABEL[f] || f || '—' }
 function fmtFechaReserva(f) {
   if (!f) return '—'
-  return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+  return fechaLocal(new Date(f + 'T00:00:00'), { day: '2-digit', month: 'short' })
 }
 function fmtARS(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
 

@@ -30,6 +30,7 @@
 // (`Autocultivo::UltimasAcciones`): acá sólo se dibuja.
 import { ref, onMounted } from 'vue'
 import { getUltimasAcciones } from '../../lib/api.js'
+import { rutaMovil } from '../../lib/rutaMovil.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 // `movil`: en el teléfono las fichas viven bajo /m (el guard de la PWA rebota lo que no).
@@ -49,14 +50,9 @@ function verMas() { limite.value = 20; todas.value = true; cargar() }
 onMounted(cargar)
 useRecargaEnCambios(['lotes', 'plantas', 'fotos', 'tareas'], cargar)
 
-const RUTAS_MOVIL = [
-  [/^\/plantas\/(\d+)/, '/m/planta/$1'], [/^\/salas\/(\d+)/, '/m/sala-m/$1'],
-  [/^\/lotes\/(\d+)/, '/m/lote-m/$1'], [/^\/tareas/, '/m/tareas'],
-]
 function ruta(r) {
-  if (!props.movil || !r) return r || '/'
-  for (const [re, a] of RUTAS_MOVIL) if (re.test(r)) return r.replace(re, a)
-  return r
+  if (!r) return '/'
+  return props.movil ? rutaMovil(r) : r
 }
 
 // «hace 5 min», «hoy 10:32», «ayer 18:05», «lun 6/10».

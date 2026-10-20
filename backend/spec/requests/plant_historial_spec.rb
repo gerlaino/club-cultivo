@@ -27,6 +27,20 @@ RSpec.describe 'GET /plants/:id/plant_activities (historial de la planta)', type
     expect(tipos).to include('transplant', 'lote_fase', 'lote_actividad', 'registro_ambiental_lote')
   end
 
+  # AC (20-oct-2026): el historial nombra las fases como la pantalla, nunca con el identificador
+  # interno; y el arranque de una semilla es «Germinación» (la palabra, no la fase).
+  it 'los cambios de fase se leen en castellano, también los de manicura y el arranque' do
+    lote.update_columns(origen: 'semilla')
+    lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado', estado_nuevo: 'vegetativo',
+                              user: admin, club: club, registrado_en: 9.days.ago)
+    lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'en_manicura', estado_nuevo: 'curado',
+                              user: admin, club: club, registrado_en: 1.day.ago)
+
+    get "/plants/#{plant.id}/plant_activities", headers: auth_headers
+    fases = JSON.parse(response.body).select { |a| a['activity_type'] == 'lote_fase' }.map { |a| a['description'] }
+    expect(fases).to contain_exactly('Germinación → Vegetativo', 'En manicura → Curado')
+  end
+
   # AC (Germán, 12-oct-2026): en la ficha de la planta se ve QUÉ se le aplicó, no sólo que hubo
   # «Riego · Nutrición»: la receta, cada producto con su cantidad, los litros. Sin costos.
   it 'cada riego dice qué se aplicó: receta, productos, cantidades y litros' do

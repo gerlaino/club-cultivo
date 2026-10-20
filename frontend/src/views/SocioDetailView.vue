@@ -35,7 +35,7 @@ import { reprocannSit, pacienteSit, vinculoSit } from '../composables/useSituaci
 import '../components/pacientes/formulario/formulario.css'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
-import { hoyISO, yaPaso } from '../utils/dates.js'
+import { hoyISO, yaPaso, fechaLocal } from '../utils/dates.js'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -640,7 +640,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :class="{ 'sd__turno-row--cancelado': t.estado === 'cancelado' }"
             @click="turnoSeleccionado = t">
             <div class="sd__turno-fecha">
-              <div class="sd__turno-dia">{{ new Date(t.fecha_hora).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) }}</div>
+              <div class="sd__turno-dia">{{ fechaLocal(new Date(t.fecha_hora), { weekday: 'short', day: 'numeric', month: 'short' }) }}</div>
               <div class="sd__turno-hora">{{ new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }}</div>
             </div>
             <div class="sd__turno-info">

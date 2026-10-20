@@ -12,7 +12,7 @@ import {
   X, ChevronLeft, ChevronRight, Plus, User2, Clock,
   Calendar, CheckCircle2, Pencil, Trash2, AlertTriangle,
 } from 'lucide-vue-next'
-import { toISO } from '../../utils/dates.js'
+import { toISO, fechaLocal } from '../../utils/dates.js'
 
 const props = defineProps({
   pacienteId:     { type: Number, required: true },
@@ -443,7 +443,7 @@ onMounted(async () => {
                 <div class="atm__pi-row">
                   <span class="atm__pi-lbl">Fecha y hora</span>
                   <span class="atm__pi-val atm__pi-val--strong">
-                    {{ slotSel ? new Date(slotSel.fecha).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) : '' }}
+                    {{ slotSel ? fechaLocal(new Date(slotSel.fecha), { weekday: 'short', day: 'numeric', month: 'short' }) : '' }}
                     · {{ slotSel?.hora }}
                   </span>
                 </div>
@@ -499,7 +499,7 @@ onMounted(async () => {
                 <div class="atm__pi-row">
                   <span class="atm__pi-lbl">Fecha y hora</span>
                   <span class="atm__pi-val atm__pi-val--strong">
-                    {{ slotSel ? new Date(slotSel.fecha + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) : '' }}
+                    {{ slotSel ? fechaLocal(new Date(slotSel.fecha + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' }) : '' }}
                     · {{ slotSel?.hora }}
                   </span>
                 </div>

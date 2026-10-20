@@ -37,10 +37,10 @@ class NotasController < ApplicationController
       noteable = current_user.club.salas.find(params[:sala_id])
       @noteable_notas = noteable.notas
     elsif params[:lote_id]
-      noteable = current_user.club.lotes.find(params[:lote_id])
+      noteable = lotes_al_alcance.find(params[:lote_id])
       @noteable_notas = noteable.notas
     elsif params[:plant_id]
-      noteable = Plant.joins(:lote).where(lotes: { club_id: current_user.club.id }).find(params[:plant_id])
+      noteable = plantas_al_alcance.find(params[:plant_id])
       @noteable_notas = noteable.observaciones
     else
       render json: { error: 'Contexto no encontrado' }, status: :unprocessable_entity

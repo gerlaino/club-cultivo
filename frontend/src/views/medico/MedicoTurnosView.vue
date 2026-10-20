@@ -1,5 +1,5 @@
 <script setup>
-import { toISO } from '../../utils/dates.js'
+import { toISO, fechaLocal } from '../../utils/dates.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
@@ -190,7 +190,7 @@ async function loVi(t) {
   }
 }
 function fmtDiaHora(iso) {
-  return new Date(iso).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return fechaLocal(new Date(iso), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 // Si administración le da, le mueve o le cancela un turno, la agenda se actualiza sola.

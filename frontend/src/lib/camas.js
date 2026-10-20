@@ -1,3 +1,4 @@
+import { fechaLocal } from '../utils/dates.js'
 // Suelo vivo: lo que las pantallas de cama muestran. Las REGLAS viven en el backend (el estado, el
 // «qué viene», qué receta sirve para qué, las unidades, qué agua) y viajan en la cama o en `/me`
 // (`reglas_cultivo.suelo_vivo`); acá sólo se les pone texto y color.
@@ -54,7 +55,7 @@ export const fmtM2 = (n) => (n == null ? '—' : `${fmtNum(n)} m²`)
 function fechaCorta(iso) {
   if (!iso) return ''
   const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(new Date(y, m - 1, d), { day: 'numeric', month: 'short' })
 }
 
 // «Lista el 12-oct», «Descansa hasta el 15-nov (faltan 12 días)», «Toca top dress en 3 días».

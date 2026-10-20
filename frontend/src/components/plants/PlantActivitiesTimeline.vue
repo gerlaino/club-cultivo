@@ -106,6 +106,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, onMounted } from 'vue'
 import { logger } from '../../utils/logger.js'
 import { listPlantActivities, createPlantActivity, deletePlantActivity } from '../../lib/api.js'
@@ -209,7 +210,7 @@ const formatDate = (date) => {
   if (diffHours < 24) return `Hace ${diffHours} hrs`
   if (diffDays < 7) return `Hace ${diffDays} días`
 
-  return d.toLocaleDateString('es-AR', {
+  return fechaLocal(d, {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

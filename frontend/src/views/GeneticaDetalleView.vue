@@ -183,10 +183,10 @@ async function cargar() {
   } finally {
     loading.value = false
   }
-  cargarResenas()
+  if (gen.value?.ve_resenas) cargarResenas()
 }
 
-// Feedback de pacientes (interno). Falla en silencio si el rol no tiene acceso.
+// Feedback de pacientes (interno). Sólo si el backend dice que este rol las ve.
 const resenas       = ref([])
 const resumenResena = ref(null)
 async function cargarResenas() {

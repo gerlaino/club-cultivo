@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../utils/dates.js'
 import { resumenStockFlor } from '../lib/stockFlor.js'
 import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
@@ -104,7 +105,7 @@ async function verMasCajas() {
 
 function fmtFechaCaja(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return fechaLocal(new Date(iso), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 // Gramos y «stock bajo» = sólo flor seca, con la regla del aviso automático (`lib/stockFlor.js`).
 const stockFlor  = computed(() => resumenStockFlor(tiendaStocks.value, umbralStockBajo.value))

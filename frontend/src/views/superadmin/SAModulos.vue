@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 /**
  * Los módulos de una organización, en una sola pantalla y sin botón de guardar.
  *
@@ -187,7 +188,7 @@ async function cargarCreditos() {
 
 function fechaHora(f) {
   if (!f) return ''
-  return new Date(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(new Date(f), { day: 'numeric', month: 'short' })
 }
 
 const iaUso = computed(() => props.club.ia_uso)

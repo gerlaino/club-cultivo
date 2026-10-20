@@ -19,7 +19,7 @@ import {
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
-import { hoyISO } from '../../utils/dates.js'
+import { hoyISO, fechaLocal } from '../../utils/dates.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -288,7 +288,7 @@ const fmtFecha = (d) => d
   ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
   : '—'
 const fmtFechaHora = (iso) => iso
-  ? new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  ? fechaLocal(new Date(iso), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   : '—'
 
 const fmtMoneda = (n) => (n == null ? null : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n))

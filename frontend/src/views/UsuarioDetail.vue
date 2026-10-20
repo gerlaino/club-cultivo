@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../utils/dates.js'
 import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
@@ -344,7 +345,7 @@ const TONO_INFO = {
 }
 function fechaAudit(d) {
   const dt = new Date(d)
-  return dt.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) + ' · ' +
+  return fechaLocal(dt, { day: 'numeric', month: 'short' }) + ' · ' +
          dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 

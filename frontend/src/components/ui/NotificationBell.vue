@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Dropdown } from 'bootstrap'
@@ -60,7 +61,7 @@ async function onClickAlerta(a) {
 
 function formatTime(ts) {
   if (!ts) return ''
-  return new Date(ts).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return fechaLocal(new Date(ts), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 

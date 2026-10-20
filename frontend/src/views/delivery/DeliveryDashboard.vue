@@ -7,7 +7,7 @@ import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
-import { hoyISO } from '../../utils/dates.js'
+import { hoyISO, fechaLocal } from '../../utils/dates.js'
 
 const toast    = useToast()
 // Cola offline: la entrega se guarda en el dispositivo si no hay señal y se manda sola después.
@@ -340,7 +340,7 @@ async function confirmarFallo() {
 }
 
 const fmtFecha = (d) => d
-  ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
+  ? fechaLocal(new Date(d + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
   : '—'
 
 onMounted(load)

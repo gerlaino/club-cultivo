@@ -63,6 +63,16 @@ namespace :cultivo do
       sin_gen = lotes.count { |l| l.genetica_id.nil? }
       problemas << "#{sin_gen} lote(s) sin genética." if sin_gen.positive?
 
+      # El código del lote es único por organización (`Lote` lo valida) y la mudanza lo conserva
+      # con `update_columns`, que no valida. Si el destino ya tiene un L-26-001, quedarían dos: el
+      # buscador muestra dos plantas «L-26-001-P001» y la trazabilidad no sabe de cuál se habla.
+      # Así quedaron cinco repetidos en el Club Modelo (20-oct-2026).
+      repetidos = Lote.unscoped.where(club_id: destino.id, deleted_at: nil, codigo: lotes.map(&:codigo).compact).pluck(:codigo)
+      if repetidos.any?
+        problemas << "#{repetidos.size} código(s) de lote ya existen en el destino: #{repetidos.sort.join(', ')}. " \
+                     'Renombralos en el origen antes de mudar.'
+      end
+
       # Cada genética tiene que existir en destino con el mismo slug. Es la suposición sobre la
       # que se apoya todo el re-apuntado: sin la copia, el lote aterriza sin genética.
       mapa_gen = {}

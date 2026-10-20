@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed } from 'vue'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useToast } from '../../composables/useToast.js'
@@ -172,7 +173,7 @@ Content-Type: application/json
     <!-- Última lectura -->
     <div v-if="dispositivo.ultima_lectura_at" class="dc__last">
       <i class="bi bi-reception-4"></i>
-      Última lectura: {{ new Date(dispositivo.ultima_lectura_at).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+      Última lectura: {{ fechaLocal(new Date(dispositivo.ultima_lectura_at), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
     </div>
     <div v-else class="dc__last dc__last--none">
       <i class="bi bi-reception-0"></i> Sin lecturas todavía

@@ -1,4 +1,5 @@
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 // LA BANDEJA DE CONSULTAS: lo que dejaron en el formulario de cultivoespacial.com
 // (`SolicitudContacto`). Cada una ya llegó por push y por mail; acá queda guardada aunque el aviso
 // haya fallado. Pendientes arriba; «Atendida» la baja de la cola y se puede deshacer.
@@ -65,7 +66,7 @@ async function enviarRespuesta (c) {
   }
 }
 
-const cuando = (iso) => new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const cuando = (iso) => fechaLocal(new Date(iso), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 onMounted(cargar)
 </script>

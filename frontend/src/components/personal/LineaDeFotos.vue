@@ -27,6 +27,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { getLineaFotosPlanta } from '../../lib/api'
 
@@ -44,7 +45,7 @@ async function cargar() {
 watch(() => props.plantId, cargar, { immediate: true })
 
 const actual = computed(() => fotos.value[i.value] || {})
-const fechaCorta = (iso) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '')
+const fechaCorta = (iso) => (iso ? fechaLocal(new Date(`${iso}T12:00:00`), { day: 'numeric', month: 'short' }) : '')
 
 function pausar() { reproduciendo.value = false; clearInterval(timer) }
 function alternar() {

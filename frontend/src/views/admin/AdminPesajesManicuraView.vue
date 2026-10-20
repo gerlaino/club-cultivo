@@ -265,6 +265,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
@@ -479,7 +480,7 @@ async function confirmar() {
 function fmtDate(d) {
   if (!d) return '—'
   const dt = new Date(d)
-  return dt.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  return fechaLocal(dt, { day: 'numeric', month: 'short' })
 }
 
 onMounted(cargar)

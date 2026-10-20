@@ -1,3 +1,4 @@
+import { fechaLocal } from '../utils/dates.js'
 import { esUsoPersonal } from '../composables/useUsoPersonal.js'
 
 // ¿Autocultivo? Sin Pinia activa (tests de funciones puras) se lee como organización.
@@ -228,7 +229,7 @@ export function formatDate(d) {
 export function formatDateTime(d) {
   if (!d) return '—'
   const date = parseDate(d)
-  return !date || isNaN(date.getTime()) ? '—' : date.toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return !date || isNaN(date.getTime()) ? '—' : fechaLocal(date, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }

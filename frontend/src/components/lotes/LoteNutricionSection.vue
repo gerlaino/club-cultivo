@@ -112,6 +112,7 @@
 </template>
 
 <script setup>
+import { fechaLocal } from '../../utils/dates.js'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 const { esPersonal } = useUsoPersonal()
 // «¿Qué recibió este lote?»: cada aplicación de nutrientes y los totales. Todo lo calcula el
@@ -161,7 +162,7 @@ const fases = computed(() => Object.entries(data.value?.por_fase || {})
 const U = { mililitro: 'ml', gramo: 'g', litro: 'L', kilogramo: 'kg', unidad: 'u' }
 const u = x => U[x] || x || ''
 const num = v => (v == null ? '—' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 2 }))
-const formatDate = d => (d ? new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '')
+const formatDate = d => (d ? fechaLocal(new Date(d), { day: 'numeric', month: 'short' }) : '')
 </script>
 
 <style scoped>
