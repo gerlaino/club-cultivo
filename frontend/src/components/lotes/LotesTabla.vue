@@ -258,7 +258,7 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
 .lt-pop__fila { display: flex; justify-content: space-between; gap: 1rem; white-space: nowrap; }
 .lt-pop__vacio { color: var(--c-slate-300); white-space: nowrap; }
 
-.lt-codigo { font-weight: 700; color: var(--c-slate-900); font-family: monospace; font-size: .85rem; }
+.lt-codigo { font-weight: 700; color: var(--c-slate-900); font-family: monospace; font-size: .85rem; white-space: nowrap; }
 .lt-genetica { font-weight: 600; color: #3F6452; }
 .lt-strain { font-style: italic; color: var(--c-slate-500); }
 .lt-tipo { display: inline-block; margin-left: .4rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .1em .45em; border-radius: 999px; vertical-align: middle; }

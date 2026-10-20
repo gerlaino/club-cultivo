@@ -221,6 +221,7 @@ class StocksController < ApplicationController
     cerradas = dispensaciones_en_periodo_cerrado
     render json: {
       data: serialize_stock(@stock).merge(situaciones([@stock])[@stock.id]).merge(
+        total_entrado:       @stock.total_entrado.to_f,
         # Si se puede corregir QUÉ ES. La pantalla no tiene que ofrecer un selector que el backend
         # va a rechazar, ni esconderlo sin decir por qué.
         puede_cambiar_forma: cerradas.zero?,

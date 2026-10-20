@@ -529,13 +529,11 @@ const KIND_GRADIENT = {
 const KIND_EMOJI = { vegetativo:'🍃', floracion:'🌸', cosecha:'🌾', cosechado:'🌾', manicura:'✂️', curado:'💊', madre:'🌱', mixta:'🏠' }
 const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', cosechado:'Cosecha', manicura:'Manicura', curado:'Curado', madre:'Madres', mixta:'Mixta' }
 const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb' }
-const EL = { enraizado: 'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
 
 const kindGradient = k => KIND_GRADIENT[k] || 'linear-gradient(135deg,#0f172a,#1e293b)'
 const kindEmoji    = k => KIND_EMOJI[k] || '🏠'
 const kindLabel    = k => KIND_LABEL[k] || k || '—'
 const estadoColor  = e => EC[e] || '#64748b'
-const estadoLabel  = e => EL[e] || e || '—'
 
 // Autocultivo: las plantas del espacio y la hoja «Nueva planta» (el lote se crea por debajo).
 const plantas = ref([])
@@ -646,7 +644,7 @@ onMounted(async () => {
     if (lotesRes.status === 'fulfilled')
       lotes.value = (lotesRes.value.data || []).filter(l => l.estado !== 'finalizado')
     if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
-  } catch {} finally { loading.value = false }
+  } catch { /* allSettled no rechaza: lo que falló queda vacío */ } finally { loading.value = false }
   cargarFotos()
   cargarPlantas()
   atenderAccion()

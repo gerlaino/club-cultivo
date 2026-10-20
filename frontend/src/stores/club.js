@@ -2,6 +2,10 @@
 import { defineStore } from 'pinia'
 import api from '../lib/api'
 
+// El pedido de /preferences en vuelo: dos llamadas simultáneas (el arranque de la app y el guard
+// de una ruta con módulo) comparten el mismo, en vez de pedirlo dos veces.
+let enVuelo = null
+
 export const useClubStore = defineStore('club', {
   state: () => ({
     data: null,
@@ -23,7 +27,12 @@ export const useClubStore = defineStore('club', {
       this.error   = null
     },
 
-    async fetch() {
+    fetch() {
+      if (!enVuelo) enVuelo = this._pedir().finally(() => { enVuelo = null })
+      return enVuelo
+    },
+
+    async _pedir() {
       this.loading = true
       this.error   = null
       try {

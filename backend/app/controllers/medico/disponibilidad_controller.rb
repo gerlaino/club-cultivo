@@ -1,7 +1,7 @@
 module Medico
   class DisponibilidadController < BaseController
     # GET /api/medico/disponibilidad
-    def index
+    def show
       slots = current_user.disponibilidad_medicos
                           .where(club: club)
                           .activas

@@ -4,7 +4,6 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useLotesStore } from "../stores/lotes";
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore }  from "../stores/auth";
-import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
 import { descargarListado } from '../lib/descargas.js';
@@ -222,15 +221,6 @@ const showEdit   = ref(false);
 const editForm   = ref({ id: null, ...emptyForm() });
 const editErrors = ref({});
 
-function validateForm(form) {
-  const e = {};
-  if (!ESTADOS.includes(form.estado))  e.estado = "Estado inválido";
-  const n = Number(form.plants_count);
-  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000";
-  if (!form.sala_id) e.sala_id = "Seleccioná una sala";
-  return e;
-}
-
 function startEdit(l) {
   editForm.value = {
     id: l.id, codigo: l.codigo||"", estado: l.estado||"vegetativo",
@@ -253,11 +243,15 @@ async function submitEdit() {
   editErrors.value = e;
   if (Object.keys(e).length) return;
   try {
-    const { id, codigo, sala_id, ...payload } = editForm.value;
+    const { id, sala_id, ...payload } = editForm.value;
+    delete payload.codigo;   // el código no se edita acá
     payload.metodo_enraizado = payload.metodo_enraizado || null;
     await store.update(id, payload, sala_id);
     showEdit.value = false;
-  } catch {}
+  } catch (e) {
+    // Antes `catch {}`: si el backend rechazaba, se apretaba Guardar y no pasaba nada.
+    toast.error(e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'No se pudo guardar el lote');
+  }
 }
 
 async function confirmDelete(l) {
@@ -268,7 +262,8 @@ async function confirmDelete(l) {
     variant: 'danger',
   });
   if (!ok) return;
-  try { await store.remove(l.id, l.sala_id); } catch {}
+  try { await store.remove(l.id, l.sala_id); }
+  catch (e) { toast.error(e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'No se pudo eliminar el lote'); }
 }
 
 // Lo mismo que la lista, en PDF o Excel (`DescargaProfesional`).

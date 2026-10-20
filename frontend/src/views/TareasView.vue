@@ -319,6 +319,7 @@ import ModalTarea from '../components/ModalTarea.vue'
 import ModalCompletarTarea from '../components/ModalCompletarTarea.vue'
 import { pideRegistroDeRiego, resumenRiego } from '../composables/useCompletarRiego.js'
 import { listSalas, listLotes, listUsers, listSedes, getTareasSemana } from '../lib/api'
+import { useRutaOfrecible } from '../composables/useRutaOfrecible.js'
 import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -343,6 +344,7 @@ const lotes             = ref([])
 const usuarios          = ref([])
 const toast             = useToast()
 const { confirm }       = useConfirm()
+const { ofrece }        = useRutaOfrecible()
 const { marcarNoSeHizo } = useNoSeHizo()
 
 const { loading, dashboard, stats, hayVencidas, pendientes, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
@@ -613,9 +615,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
 async function cargarContexto() {
   try {
-    // allSettled: roles como manicura no pueden listar salas (403) — que eso
-    // no impida cargar lotes/sedes ni la lista de tareas
-    const [resSalas, resLotes, resSedes] = await Promise.allSettled([listSalas(), listLotes(), listSedes()])
+    // Sólo lo que el rol puede ver: el dispensador pedía los lotes y comía un 403 en cada
+    // apertura (recorrido del 20-oct-2026). allSettled igual, para que una falla no tape el resto.
+    const nada = Promise.resolve({ data: [] })
+    const [resSalas, resLotes, resSedes] = await Promise.allSettled([
+      ofrece('/salas') ? listSalas() : nada, ofrece('/lotes') ? listLotes() : nada, listSedes(),
+    ])
     salas.value = resSalas.status === 'fulfilled' ? (resSalas.value.data || []) : []
     lotes.value = resLotes.status === 'fulfilled' ? (resLotes.value.data || []) : []
     sedes.value = resSedes.status === 'fulfilled' ? (resSedes.value.data || []) : []

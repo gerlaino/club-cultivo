@@ -33,10 +33,8 @@
           <span v-if="helpDot" class="dtb__help-dot" />
         </button>
 
-        <!-- Bell (vacío, sin notificaciones para dispensador por ahora) -->
-        <button class="dtb__icon-btn" aria-label="Notificaciones">
-          <Bell :size="20" :stroke-width="1.75" />
-        </button>
+        <!-- Sin campana: el dispensador no tiene notificaciones, y un botón que no hace nada es
+             peor que no tenerlo (recorrido del 20-oct-2026). -->
 
         <!-- Avatar dropdown -->
         <DsDropdown v-model="avatarOpen" align="right">
@@ -82,7 +80,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useClubStore } from '../../stores/club.js'
 import DsDropdown from '../../design-system/components/Dropdown.vue'
 import DsAvatar   from '../../design-system/components/Avatar.vue'
-import { Bell, User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
+import { User, LogOut, Menu, HelpCircle } from 'lucide-vue-next'
 import ClubBrand from './ClubBrand.vue'
 import HelpDrawer from '../HelpDrawer.vue'
 
@@ -224,4 +222,12 @@ async function handleLogout() {
 .dtb__user-item--danger { color: var(--c-rust-600); }
 .dtb__user-item--danger:hover { background: var(--c-rust-100); color: var(--c-rust-600); }
 .dtb__divider { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
+
+/* En el teléfono (navegador, sin la app): sólo el nombre de la pantalla, en un renglón. Las migas
+   enteras se pisaban con la lupa y la campana (recorrido del 20-oct-2026). */
+@media (max-width: 600px) {
+  .dtb__inner { padding: 0 var(--sp-3); gap: var(--sp-2); }
+  .dtb__bc-link, .dtb__bc-sep { display: none; }
+  .dtb__bc-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 </style>

@@ -23,6 +23,10 @@ class DispensacionesController < ApplicationController
   before_action -> { require_feature!(:delivery) },
                 only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores, :envios_del_dia, :agregar_envio]
   before_action :require_dispensaciones_role!
+  # EL MÉDICO SÓLO MIRA (20-oct-2026): las dispensas de SUS pacientes vinculados, sin plata. Estaba
+  # adentro de `require_dispensador_o_admin`, así que por API podía dispensar, editar y anular, y
+  # listar las dispensas de toda la organización con los montos.
+  before_action :medico_solo_lectura!
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
@@ -75,7 +79,7 @@ class DispensacionesController < ApplicationController
       end
     end
 
-    payload = { dispensaciones: @dispensaciones.map { |d| serialize_dispensacion(d) } }
+    payload = { dispensaciones: @dispensaciones.map { |d| current_user.medico? ? DispensacionSerializer.serialize_para_medico(d) : serialize_dispensacion(d) } }
     payload[:meta] = @meta if @meta
     # Los números de arriba del historial, contados por cobro y en un solo lugar
     # (`Dispensaciones::Resumen`): la pantalla los muestra, no los calcula.
@@ -90,6 +94,8 @@ class DispensacionesController < ApplicationController
 
   # GET /dispensaciones/:id
   def show
+    return render json: DispensacionSerializer.serialize_para_medico(@dispensacion) if current_user.medico?
+
     render json: DispensacionSerializer.serialize_detail(@dispensacion)
   end
 
@@ -903,17 +909,19 @@ class DispensacionesController < ApplicationController
 
   def set_paciente_opt
     return unless params[:paciente_id].present?
-    @paciente = current_user.club.pacientes.find(params[:paciente_id])
+    # El médico, sólo los suyos (`pacientes_visibles`); el resto, la organización.
+    @paciente = (current_user.medico? ? pacientes_visibles : current_user.club.pacientes).find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Paciente no encontrado' }, status: :not_found
   end
 
   def set_dispensacion
     club_sede_ids = current_user.club.sede_ids
-    @dispensacion = Dispensacion
+    scope = Dispensacion
       .joins(:stock)
       .where("stocks.sede_id IN (?) OR stocks.club_id = ?", club_sede_ids, current_user.club_id)
-      .find(params[:id])
+    scope = scope.where(paciente_id: pacientes_visibles.select(:id)) if current_user.medico?
+    @dispensacion = scope.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Dispensación no encontrada' }, status: :not_found
   end
@@ -1157,8 +1165,18 @@ class DispensacionesController < ApplicationController
     }
   end
 
+  # Listado de UN paciente suyo y la ficha de una dispensa; nada más (ni el día, ni envíos, ni
+  # exportar, ni tocar). El resumen tampoco: es plata.
+  def medico_solo_lectura!
+    return unless current_user&.medico?
+    return if action_name == 'show'
+    return if action_name == 'index' && params[:paciente_id].present? && params[:resumen] != 'true'
+
+    render json: { error: 'No autorizado' }, status: :forbidden
+  end
+
   def require_dispensador_o_admin
-    unless current_user.admin? || current_user.medico? || current_user.dispensador? || current_user.supervisor?
+    unless current_user.admin? || current_user.dispensador? || current_user.supervisor?
       render json: { error: 'No autorizado' }, status: :forbidden
     end
   end

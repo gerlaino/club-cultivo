@@ -78,6 +78,44 @@ class DispensacionSerializer
     }
   end
 
+  # LO QUE VE EL MÉDICO (20-oct-2026, Germán): qué se le dio al paciente, cuánto y cuándo —es lo
+  # que consume y le importa clínicamente— y NADA de plata: ni precio, ni total, ni cobros, ni
+  # medio de pago, ni descuentos, ni cuenta corriente. Lista blanca, nunca `serialize` recortado:
+  # un campo de plata nuevo en `serialize` no tiene que aparecerle solo. Tampoco el token del
+  # pasaporte ni las observaciones (texto libre que puede hablar de plata).
+  def self.serialize_para_medico(d)
+    stock_med = lambda do |stk|
+      stk && { forma_producto: stk.forma_producto, unidad: stk.unidad,
+               lote: stk.lote ? { codigo: stk.lote.codigo } : nil }
+    end
+    items = if d.items.empty?
+              d.stock ? [{ id: nil, stock: stock_med.(d.stock), cantidad: d.cantidad.to_f,
+                           lote_codigo: d.lote_codigo || d.stock&.lote&.codigo,
+                           genetica_nombre: d.genetica_nombre || d.stock&.genetica&.nombre }] : []
+            else
+              d.items.map do |it|
+                { id: it.id, stock: stock_med.(it.stock), cantidad: it.cantidad.to_f,
+                  lote_codigo: it.lote_codigo, genetica_nombre: it.genetica_nombre }
+              end
+            end
+    {
+      id:                 d.id,
+      paciente_id:        d.paciente_id,
+      fecha_dispensacion: d.fecha_dispensacion,
+      usuario:            { nombre: d.user&.first_name || d.user&.email },
+      sede:               d.sede ? { nombre: d.sede.nombre } : nil,
+      stock:              stock_med.(d.stock),
+      items:              items,
+      multi_stock:        d.multi_stock?,
+      cantidad:           d.cantidad.to_f,
+      lote_codigo:        d.lote_codigo || d.stock&.lote&.codigo,
+      genetica_nombre:    d.genetica_nombre || d.stock&.genetica&.nombre || d.stock&.lote&.genetica&.nombre,
+      anulada:            d.cancelada?,
+      con_envio:          d.con_envio,
+      estado_envio:       d.estado_envio,
+    }
+  end
+
   # Detalle (vista /dispensaciones/:id): igual que serialize + las reseñas que el paciente
   # dejó sobre los productos de ESTA dispensa. No se incluye en el listado para no pegarle
   # una query de reseñas por fila.

@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+import { useRutaOfrecible } from '../composables/useRutaOfrecible.js'
 import { useAmbienteStore } from '../stores/ambiente.js'
 import { useAmbiente } from '../composables/useAmbiente.js'
 import { useSetpoints } from '../composables/useSetpoints.js'
@@ -141,9 +142,11 @@ const setpointChart = computed(() => {
 })
 
 // Breadcrumbs
+const { ofrece } = useRutaOfrecible()
 const breadcrumbs = computed(() => {
-  const items = [{ label: 'Sedes', to: { name: 'sedes' } }]
-  if (sala.value?.sede) {
+  // Sedes sólo si se puede entrar (el cultivador y el autocultivo no): si no, la miga rebota.
+  const items = ofrece('/sedes') ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []
+  if (sala.value?.sede && ofrece('/sedes')) {
     items.push({ label: sala.value.sede.nombre, to: { name: 'sede-detail', params: { id: sala.value.sede.id } } })
   }
   if (sala.value) {

@@ -20,8 +20,10 @@
         <span v-if="groupBadge(g)" class="asb__badge">{{ groupBadge(g) }}</span>
       </RouterLink>
       <!-- Autocultivo: las secciones del grupo van adentro del menú, no como pestañas arriba
-           (un solo menú, 11-oct-2026). Se ven las del grupo en el que estás. -->
-      <div v-if="club.data?.personal && !collapsed && activeKey === g.key && subsDe(g).length > 1" class="asb__subs">
+           (un solo menú, 11-oct-2026). Se ven las del grupo en el que estás. En una organización,
+           sólo en el teléfono: ahí las pestañas de arriba no entran y se esconden (20-oct-2026). -->
+      <div v-if="!collapsed && activeKey === g.key && subsDe(g).length > 1" class="asb__subs"
+           :class="{ 'asb__subs--solo-movil': !club.data?.personal }">
         <RouterLink v-for="t in subsDe(g)" :key="t.to" :to="t.to" class="asb__sub"
                     :class="{ 'asb__sub--active': subActiva(g) === t }">
           {{ labelDe(t, club.data) }}
@@ -141,6 +143,7 @@ watch(() => route.path, (path, prev) => {
 .asb__link--active { background: rgba(255,255,255,0.14); color: var(--c-paper); font-weight: 600; border-left-color: var(--c-leaf-300); }
 .asb__link-ico { flex-shrink: 0; }
 .asb__subs { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 30px; }
+@media (min-width: 601px) { .asb__subs--solo-movil { display: none; } }
 .asb__sub { padding: 6px 12px; border-radius: var(--r-md); font-size: var(--fs-13); color: var(--c-leaf-300); text-decoration: none; }
 .asb__sub:hover { background: rgba(255,255,255,0.06); color: var(--c-paper); }
 .asb__sub--active { color: var(--c-paper); font-weight: 600; background: rgba(255,255,255,0.08); }

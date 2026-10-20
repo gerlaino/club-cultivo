@@ -380,7 +380,9 @@ Rails.application.routes.draw do
         member { patch :visto }
       end
       resources :check_ins, only: [:create]
-      resource  :disponibilidad, only: [:index, :update], controller: 'disponibilidad'
+      # Singular: un médico tiene UN horario. Con `only: [:index]` Rails no creaba el GET (un recurso
+      # singular no tiene index) y la pantalla de disponibilidad daba 404 desde el 9-jun-2026.
+      resource  :disponibilidad, only: [:show, :update], controller: 'disponibilidad'
     end
 
     namespace :admin do

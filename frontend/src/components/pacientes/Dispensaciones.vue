@@ -134,6 +134,9 @@ const showEntrega   = ref(false)
 const reservaSel    = ref(null)
 
 async function loadReservas() {
+  // Las reservas son de quien dispensa o reserva; el médico (sólo mira, sin plata) no las pide:
+  // el backend se las niega y el 403 quedaba tragado en cada ficha.
+  if (!tieneRolDispensar.value && !tieneRolReservar.value) return
   try {
     const { data } = await listReservasPaciente(props.socioId)
     reservasPend.value = (data.reservas || []).filter(r => r.estado === 'pendiente')

@@ -106,4 +106,14 @@ RSpec.describe 'POST /stocks/:id/ajuste — entró mercadería', type: :request 
     expect(response.status).to be_in([403, 404])
     expect(ajeno.reload.cantidad.to_f).to eq(10.0)
   end
+  # AC (Javi, 20-oct-2026, ST-26-0028): la ficha decía «Total inicial 42 g» con 70 disponibles —lo
+  # que entró después no contaba—. La ficha dice lo que entró en total, y lo cuenta el backend.
+  it 'la ficha dice lo que entró en total: el alta más cada ingreso' do
+    ActsAsTenant.with_tenant(club) { externo.update_columns(cantidad_inicial: 100) }
+    ingresar(externo, gramos: 30)
+    ingresar(externo, gramos: 12.5)
+
+    get "/stocks/#{externo.id}", headers: auth_headers
+    expect(json.dig('data', 'total_entrado')).to eq(142.5)
+  end
 end

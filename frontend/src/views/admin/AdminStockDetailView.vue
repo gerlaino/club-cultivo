@@ -45,8 +45,9 @@
              backend); la mesa es un LUGAR y va aparte, no como resta. -->
         <div class="sd__hero-kpis">
           <div class="sd__kpi">
-            <div class="sd__kpi-val">{{ Number(stock.cantidad_inicial ?? stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
-            <div class="sd__kpi-lbl">Total inicial</div>
+            <!-- Lo que entró en total (el alta + cada «Entró mercadería»): lo cuenta el backend. -->
+            <div class="sd__kpi-val">{{ Number(stock.total_entrado ?? stock.cantidad_inicial ?? stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Entró en total</div>
           </div>
           <div class="sd__kpi sd__kpi--warn">
             <div class="sd__kpi-val">{{ Number(stock.disponible_para_entregar ?? stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
@@ -510,6 +511,13 @@
                   <textarea class="sd__input sd__textarea" rows="2" v-model="ajustarForm.motivo"
                     :placeholder="esIngreso ? 'Remito, factura, lo que sirva para encontrarlo después…' : 'Describí el motivo del ajuste…'"></textarea>
                 </div>
+              </div>
+              <!-- Reconteo en un externo: si llegó más, la puerta es «Entró mercadería» (así lo cuentan
+                   los informes). Javi buscaba cómo sumar y en Reconteo sólo veía Quitar/Recontar. -->
+              <div v-if="esExterno && ajustarForm.tipo === 'reconteo'" class="sd__alert sd__alert--info">
+                ¿Llegó más mercadería? Cargala como
+                <button type="button" class="sd__alert-link sd__alert-btn" @click="ajustarForm.tipo = 'ingreso'">Entró mercadería</button>:
+                así aparece como ingreso en los informes. El reconteo es para corregir un conteo.
               </div>
               <!-- Si el reconteo da MÁS en un frasco de cosecha, se explica dónde se corrige en
                    vez de dejar apretar y mostrar el error del backend. -->
@@ -1478,6 +1486,7 @@ function badgeVencLabel(s) {
 /* No es un error: es la explicación de por dónde va ese cambio. */
 .sd__alert--info { background: var(--c-amber-100, #fef3c7); border-color: #fcd34d; color: #92400e; }
 .sd__alert-link  { color: inherit; font-weight: 700; text-decoration: underline; }
+.sd__alert-btn   { background: none; border: 0; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer; }
 .sd__edit-ft   { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 
 /* ── Actions ──────────────────────────────────────────────────────────────── */

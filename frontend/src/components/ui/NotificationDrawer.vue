@@ -134,7 +134,7 @@
           <span class="nd-ambient__text">
             {{ alertasAmbientales.length }} alerta{{ alertasAmbientales.length !== 1 ? 's' : '' }} ambiental{{ alertasAmbientales.length !== 1 ? 'es' : '' }} activa{{ alertasAmbientales.length !== 1 ? 's' : '' }}
           </span>
-          <RouterLink to="/sedes" class="nd-ambient__link" @click="close">
+          <RouterLink to="/salas" class="nd-ambient__link" @click="close">
             Ver salas <ChevronRight :size="12" :stroke-width="2" style="vertical-align:middle" />
           </RouterLink>
         </div>

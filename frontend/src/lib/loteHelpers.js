@@ -226,10 +226,15 @@ export function formatDate(d) {
   return !date || isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// Con hora de 24 (en la Argentina se lee «14:30», no «02:30 p. m.»). Lo que se cargó sin hora
+// —historia heredada, una fecha sola— queda a la medianoche: ahí va sólo el día, no «12:00 a. m.»
+// (recorrido del 20-oct-2026).
 export function formatDateTime(d) {
   if (!d) return '—'
   const date = parseDate(d)
-  return !date || isNaN(date.getTime()) ? '—' : fechaLocal(date, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  if (!date || isNaN(date.getTime())) return '—'
+  if (date.getHours() === 0 && date.getMinutes() === 0) return fechaLocal(date, { day: 'numeric', month: 'short' })
+  return fechaLocal(date, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 }
 
 export function capitalizarFase(f) { return FASE_LABELS[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : '') }

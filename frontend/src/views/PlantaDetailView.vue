@@ -1,7 +1,9 @@
 <script setup>
 import LineaDeFotos from '../components/personal/LineaDeFotos.vue'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+import { useRutaOfrecible } from '../composables/useRutaOfrecible.js'
 const { esPersonal } = useUsoPersonal()
+const { ofrece } = useRutaOfrecible()
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
@@ -624,8 +626,8 @@ onMounted(async () => {
         ...(planta.lote?.sala ? [{ label: planta.lote.sala.nombre, to: { name: 'sala-detail', params: { id: planta.lote.sala.id } } }] : []),
         { label: planta.nombre || planta.codigo_qr },
       ] : [
-        { label: 'Sedes', to: { name: 'sedes' } },
-        ...(planta.lote?.sala?.sede ? [{ label: planta.lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: planta.lote.sala.sede.id } } }] : []),
+        ...(ofrece('/sedes') ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
+        ...(planta.lote?.sala?.sede && ofrece('/sedes') ? [{ label: planta.lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: planta.lote.sala.sede.id } } }] : []),
         ...(planta.lote?.sala ? [{ label: planta.lote.sala.nombre, to: { name: 'sala-detail', params: { id: planta.lote.sala.id } } }] : []),
         ...(planta.lote ? [{ label: planta.lote.codigo, to: { name: 'lote-detail', params: { id: planta.lote.id } } }] : []),
         { label: planta.nombre || planta.codigo_qr },

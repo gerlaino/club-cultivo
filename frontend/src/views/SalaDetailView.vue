@@ -20,7 +20,7 @@ import EtiquetasLotesModal    from '../components/lotes/EtiquetasLotesModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import { useMoverLotes } from '../composables/useMoverLotes.js'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, createLoteHeredado, cambiarFaseSala, listFotosSala, deleteFotoSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, cambiarFaseSala, listFotosSala, deleteFotoSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -28,7 +28,6 @@ import { useToast } from '../composables/useToast.js'
 import { textoCambioDeFase } from '../lib/textoCambioDeFase.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { hoyISO, toISO } from '../utils/dates.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -88,8 +87,6 @@ async function cargarFotosSala() {
 async function borrarFoto(f) {
   try { await deleteFotoSala(salaId, f.id); await cargarFotosSala() } catch { /* no bloquea: queda lo que había */ }
 }
-
-const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]
 
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
@@ -263,7 +260,6 @@ function salaEscapeHandler(e) {
   if (showCrearLoteCosecha.value) { showCrearLoteCosecha.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
-  if (showUpgrade.value)     { showUpgrade.value = false; return }
   if (lecturaOpen.value)     { lecturaOpen.value = false; return }
 }
 
@@ -550,194 +546,10 @@ async function onLoteCargado() {
 }
 
 // ── Crear lote ─────────────────────────────────────────────
-const KIND_TO_ESTADO = { floracion:"floracion" }
-const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
-
-const ESTADOS_HEREDADO = [
-  { value: 'enraizado', label: 'Enraizado' },
-  { value: 'vegetativo', label: 'Vegetativo' },
-  { value: 'floracion',  label: 'Floración' },
-  { value: 'cosecha',    label: 'Cosecha' },
-]
-
-const estadosHeredadoPermitidos = computed(() => {
-  const kind = sala.value?.kind
-  if (kind === 'floracion') return ESTADOS_HEREDADO.filter(e => e.value === 'floracion')
-  if (kind === 'cosecha') return ESTADOS_HEREDADO.filter(e => e.value === 'cosecha')
-  return ESTADOS_HEREDADO.filter(e => ['enraizado', 'vegetativo'].includes(e.value))
-})
-
 const showCreate            = ref(false)
 const showCrearLoteCosecha  = ref(false)
-const loteForm       = ref(emptyLoteForm())
-const loteErrors     = ref({})
-const loteApiError   = ref(null)
-const showUpgrade    = ref(false)
-const creandoLote    = ref(false)
-const tipoCreacion   = ref('nuevo')
-const proximoCodigo  = ref('')
-const loadingCodigo  = ref(false)
-const heredadoEstado = ref('germinacion')
-const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 })
-const plantasMadre    = ref([])
-const loadingMadres   = ref(false)
-const madreQuery      = ref('')
-const madreFocused    = ref(false)
 
-const plantaMadreSeleccionada = computed(() =>
-  plantasMadre.value.find(p => p.id === loteForm.value.planta_madre_id)
-)
-const madreDropdown = computed(() => {
-  const q = madreQuery.value.trim().toLowerCase()
-  if (!q) return []
-  return plantasMadre.value.filter(p =>
-    p.nombre?.toLowerCase().includes(q) ||
-    p.lote?.codigo?.toLowerCase().includes(q) ||
-    p.lote?.sala?.nombre?.toLowerCase().includes(q) ||
-    p.genetica?.nombre?.toLowerCase().includes(q)
-  ).slice(0, 40)
-})
-const madreAgrupado = computed(() => {
-  const salas = {}
-  for (const p of plantasMadre.value) {
-    const salaId     = p.lote?.sala?.id    ?? 0
-    const salaNombre = p.lote?.sala?.nombre ?? 'Sin sala'
-    const loteId     = p.lote?.id          ?? 0
-    const loteCodigo = p.lote?.codigo      ?? '–'
-    const genetica   = p.genetica?.nombre  ?? ''
-    if (!salas[salaId]) salas[salaId] = { sala_id: salaId, sala_nombre: salaNombre, lotes: {} }
-    if (!salas[salaId].lotes[loteId])
-      salas[salaId].lotes[loteId] = { lote_id: loteId, lote_codigo: loteCodigo, genetica, plants: [] }
-    salas[salaId].lotes[loteId].plants.push(p)
-  }
-  return Object.values(salas).map(s => ({ ...s, lotes: Object.values(s.lotes) }))
-})
 
-const heredadoStartDatePreview = computed(() => {
-  const e = heredadoEstado.value
-  const d = heredadoDias.value
-  let total = d.semilla_esqueje
-  if (['vegetativo','floracion','cosecha'].includes(e)) total += d.vegetativo
-  if (['floracion','cosecha'].includes(e))              total += d.floracion
-  if (e === 'cosecha')                                  total += d.cosecha
-  if (total <= 0) return null
-  const date = new Date()
-  date.setDate(date.getDate() - total)
-  return toISO(date)
-})
-
-function emptyLoteForm() {
-  const kind = sala.value?.kind
-  const conOrigen = !kind || KINDS_CON_ORIGEN.includes(kind)
-  const estadoInicial = conOrigen ? 'germinacion' : (KIND_TO_ESTADO[kind] || 'vegetativo')
-  return {
-    estado: estadoInicial,
-    origen: conOrigen ? 'semilla' : null,
-    planta_madre_id: null,
-    plants_count: 0,
-    start_date: hoyISO(),
-    genetica_id: '',
-    grow_type: 'sustrato',
-    light_type: '',
-    tamanio_maceta: '',
-    notes: '',
-  }
-}
-
-async function setOrigen(valor) {
-  loteForm.value.origen = valor
-  // Estado inicial según origen: semilla → germinación, esqueje → esqueje.
-  loteForm.value.estado = valor === 'esqueje' ? 'esqueje' : 'germinacion'
-  loteForm.value.planta_madre_id = null
-  madreQuery.value = ''
-  if (valor === 'esqueje') {
-    loadingMadres.value = true
-    try {
-      const { data } = await listPlants({ lote_estado: 'vegetativo' })
-      plantasMadre.value = data || []
-    } catch { plantasMadre.value = [] }
-    finally { loadingMadres.value = false }
-  }
-}
-
-let _madreFocusTimer = null
-function onMadreBlur() {
-  _madreFocusTimer = setTimeout(() => { madreFocused.value = false }, 180)
-}
-function selectMadre(plant) {
-  clearTimeout(_madreFocusTimer)
-  loteForm.value.planta_madre_id = plant.id
-  madreQuery.value = ''
-  madreFocused.value = false
-  if (plant.genetica?.id) {
-    loteForm.value.genetica_id = plant.genetica.id
-  }
-}
-function clearMadre() {
-  loteForm.value.planta_madre_id = null
-  madreQuery.value = ''
-}
-
-const mostrarOrigenSelector = computed(() => {
-  const k = sala.value?.kind
-  return !k || KINDS_CON_ORIGEN.includes(k)
-})
-
-function validateLote(form) {
-  const e = {}
-  if (!ESTADOS_LOTE.includes(form.estado)) e.estado = "Estado inválido"
-  const n = Number(form.plants_count)
-  if (!Number.isInteger(n) || n < 0 || n > 5000) e.plants_count = "Debe ser 0–5000"
-  return e
-}
-
-async function createLote() {
-  if (tipoCreacion.value === 'existente') {
-    const estadoReal = (heredadoEstado.value === 'germinacion' && loteForm.value.origen === 'esqueje')
-      ? 'esqueje' : heredadoEstado.value
-    loteForm.value.estado = estadoReal
-  }
-  const e = validateLote(loteForm.value)
-  loteErrors.value   = e
-  loteApiError.value = null
-  if (Object.keys(e).length) return
-
-  creandoLote.value = true
-  try {
-    const payload = { ...loteForm.value }
-    if (!payload.genetica_id)     delete payload.genetica_id
-    if (!payload.light_type)      delete payload.light_type
-    if (!payload.planta_madre_id) delete payload.planta_madre_id
-
-    if (tipoCreacion.value === 'existente') {
-      delete payload.start_date
-      if (!payload.origen) payload.origen = 'semilla'
-      await createLoteHeredado(salaId, payload, {
-        dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
-        dias_vegetativo:      heredadoDias.value.vegetativo      || 0,
-        dias_floracion:       heredadoDias.value.floracion        || 0,
-        dias_cosecha:         heredadoDias.value.cosecha          || 0,
-      })
-      await lotes.fetchBySala(salaId)
-    } else {
-      if (!payload.origen) delete payload.origen
-      await lotes.createInSala(salaId, payload)
-    }
-
-    closeCreate()
-    lotesExpanded.value = true
-    salas.fetchSala(salaId)
-  } catch (err) {
-    if (err.response?.status === 402) {
-      showCreate.value  = false
-      showUpgrade.value = true
-    } else {
-      loteApiError.value = err.response?.data?.errors?.[0] || err.response?.data?.error || 'Error al crear el lote'
-    }
-  } finally {
-    creandoLote.value = false
-  }
-}
 function openCreate() {
   // Autocultivo: se agrega una PLANTA (el lote se arma por debajo, `Lotes::Plantar`).
   if (esPersonal.value) { showNuevaPlanta.value = true; return }
@@ -774,13 +586,7 @@ async function onLoteCosechaCreado() {
   lotesExpanded.value = true
 }
 function closeCreate() {
-  showCreate.value     = false
-  loteForm.value       = emptyLoteForm()
-  loteErrors.value     = {}
-  loteApiError.value   = null
-  tipoCreacion.value   = 'nuevo'
-  proximoCodigo.value  = ''
-  heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
+  showCreate.value = false
 }
 
 // ── Mini widget ambiente ───────────────────────────────────────
@@ -1434,17 +1240,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
       </div>
     </Teleport>
 
-    <!-- Modal upgrade plan -->
-    <Teleport to="body">
-      <div v-modal="() => showUpgrade = false" v-if="showUpgrade" class="sd__overlay">
-        <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
-          <div style="font-size:3rem;margin-bottom:.75rem"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></div>
-          <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>
-          <p style="color:#64748b;font-size:.875rem;margin-bottom:1.5rem">Alcanzaste el máximo de lotes o plantas de tu plan. Contactá al equipo para actualizar.</p>
-          <button class="sd__btn-primary" @click="showUpgrade=false">Entendido</button>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 
@@ -1502,7 +1297,10 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__kpi-progress { height: 4px; background: #d4e6d4; border-radius: 999px; overflow: hidden; margin-top: .5rem; }
 .sd__kpi-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
 
-.sd__layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
+/* `minmax(0, 1fr)` y no `1fr`: con `1fr` la columna no baja de lo que mide la tabla, y en una
+   compu de 1366 px el panel de Ambiente quedaba 70 px afuera de la pantalla (20-oct-2026). La
+   tabla, si no entra, se desliza adentro de su tarjeta. */
+.sd__layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.25rem; align-items: start; }
 @media (max-width: 900px) { .sd__layout { grid-template-columns: 1fr; } }
 
 .sd__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
@@ -1517,7 +1315,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__section-body { border-top: 1px solid #e8f0e9; padding: 1rem 1.1rem; }
 .sd__section-body--flush { padding: 0; border-top: 1px solid #e8f0e9; }
 
-.sd__lotes { display: flex; flex-direction: column; }
+.sd__lotes { display: flex; flex-direction: column; overflow-x: auto; }
 
 /* Selección para mover lotes */
 .sd__lotes-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 0 10px; }

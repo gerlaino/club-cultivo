@@ -238,7 +238,7 @@ module Clubs
                  'curado' => ciclo[:manicura], 'finalizado' => ciclo[:manicura] + 60 }
       orden[1..indice_actual].to_a.each do |fase|
         LoteEvento.new(tipo: 'cambio_estado', estado_anterior: orden[orden.index(fase) - 1],
-                       estado_nuevo: fase, descripcion: "Avance a #{fase}",
+                       estado_nuevo: fase, descripcion: "Avance a #{Lote.etiqueta_estado(fase, lote.origen)}",
                        lote: lote, club: club, user: @admin,
                        registrado_en: (inicio + fechas[fase]).in_time_zone.change(hour: 11))
                   .save!(validate: false)
@@ -682,12 +682,13 @@ module Clubs
             aporte_socio_ars: total,
             monto_credito_ars: %w[cuenta_corriente no_abona].include?(medio) ? total : 0,
           )
+          # La línea la crea el modelo (`asegurar_item_espejo`, after_create): `validate: false` saltea
+          # validaciones, no callbacks. Crearla también acá duplicaba cada dispensa del demo (dos
+          # renglones de $30.904 con un total de $30.904) — 20-oct-2026.
           disp.save!(validate: false)
-          DispensacionItem.new(dispensacion: disp, stock: stock, cantidad: cantidad,
-                               precio_unitario_ars: precio).save!(validate: false)
 
-          # El asiento contable lo crea este service, no un callback del modelo: guardando con
-          # `validate: false` no corre nada, así que hay que invocarlo. Es el MISMO camino que usa
+          # El asiento contable lo crea este service, no un callback del modelo, así que hay que
+          # invocarlo. Es el MISMO camino que usa
           # la app al dispensar, así que los datos del demo salen como los reales.
           begin
             Dispensaciones::AplicarEfectos.financiero!(dispensacion: disp, usuario: dispensador)

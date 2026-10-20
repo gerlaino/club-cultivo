@@ -146,3 +146,22 @@ describe('lo que la matriz de permisos concede, el router lo deja abrir', () => 
     expect(faltantes).toEqual([])
   })
 })
+
+// AC (recorrido del 20-oct-2026): lo que sólo existe en autocultivo no se abre en una organización
+// (cada pedido daba 404), y lo que sólo existe en una organización no se abre en autocultivo.
+describe('pantallas que existen de un solo lado', async () => {
+  const { soloDePersonal, soloDeOrganizacion } = await import('../router/index.js')
+
+  it('los informes y el inicio del autocultivo son sólo de uso personal', () => {
+    expect(soloDePersonal('/mis-informes')).toBe(true)
+    expect(soloDePersonal('/m/personal/informes')).toBe(true)
+    expect(soloDePersonal('/m/personal/hoy')).toBe(true)
+    expect(soloDePersonal('/informe-semestral')).toBe(false)
+    expect(soloDePersonal('/m/pacientes')).toBe(false)
+  })
+
+  it('sedes y usuarios son sólo de organización', () => {
+    expect(soloDeOrganizacion('/sedes/4')).toBe(true)
+    expect(soloDeOrganizacion('/salas/4')).toBe(false)
+  })
+})

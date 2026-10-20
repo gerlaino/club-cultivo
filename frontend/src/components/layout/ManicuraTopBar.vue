@@ -217,4 +217,12 @@ async function handleLogout() {
 .mtb__user-item--danger { color: var(--c-rust-600); }
 .mtb__user-item--danger:hover { background: var(--c-rust-100); color: var(--c-rust-600); }
 .mtb__divider { height: 1px; background: var(--c-ink-100); margin: var(--sp-1) 0; }
+
+/* En el teléfono (navegador, sin la app): sólo el nombre de la pantalla, en un renglón. Las migas
+   enteras se pisaban con la lupa y la campana (recorrido del 20-oct-2026). */
+@media (max-width: 600px) {
+  .mtb__inner { padding: 0 var(--sp-3); gap: var(--sp-2); }
+  .mtb__bc-link, .mtb__bc-sep { display: none; }
+  .mtb__bc-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 </style>

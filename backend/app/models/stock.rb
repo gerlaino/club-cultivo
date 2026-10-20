@@ -240,6 +240,12 @@ class Stock < ApplicationRecord
     [cantidad.to_d - apartado_para_mostrador.to_d, 0.to_d].max
   end
 
+  # LO QUE ENTRÓ EN TOTAL (20-oct-2026): lo del alta más cada «Entró mercadería». En un externo que
+  # recibió más de lo mismo, `cantidad_inicial` sola decía «Total inicial 42 g» con 70 disponibles.
+  def total_entrado
+    cantidad_inicial.to_d + stock_movimientos.where(tipo: 'ingreso').sum(:gramos).to_d
+  end
+
   # LA MESA NO PUEDE TENER MÁS QUE EL FRASCO (20-oct-2026). Depósito + mesa = lo que hay: si el
   # total baja por debajo de lo que la mesa tiene arriba (un reconteo que dice 70 con 132 sobre la
   # mesa, finalizar el stock, producir un derivado, corregir un externo), lo que falta salió de la

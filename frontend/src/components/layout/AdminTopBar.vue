@@ -29,6 +29,9 @@
         </RouterLink>
       </nav>
       <span v-else class="atb__page-title">{{ labelDe(tituloActual, club.data) }}</span>
+      <!-- En el teléfono las pestañas no entran («Pacientes Dis…»): va el título, y las secciones
+           siguen en el menú ☰ (recorrido del 20-oct-2026). -->
+      <span v-if="visibleTabs.length && (!club.data?.personal || collapsed)" class="atb__page-title atb__page-title--movil">{{ labelDe(tituloActual, club.data) }}</span>
 
       <!-- Right actions -->
       <div class="atb__right">
@@ -408,4 +411,10 @@ async function handleLogout() {
 .atb__push-dot--off { background: var(--c-ink-300); }
 .atb__push-dot--blocked { background: #dc2626; }
 .atb__push-item--blocked { color: #b91c1c; }
+
+.atb__page-title--movil { display: none; }
+@media (max-width: 600px) {
+  .atb__tabs { display: none; }
+  .atb__page-title--movil { display: block; }
+}
 </style>

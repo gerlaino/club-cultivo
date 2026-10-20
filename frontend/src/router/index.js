@@ -30,7 +30,7 @@ const requiresPermission = (resource, action) => {
     } else if (!can(resource, action)) {
       useToast().warning(
         `No tenés acceso a esta sección con tu rol (${auth.user?.role || 'sin rol'}). ` +
-        'Si creés que deberías tenerlo, pedíselo a un administrador del club.'
+        'Si creés que deberías tenerlo, pedíselo a quien administra tu organización.'
       );
       next(ROLE_HOME[auth.user?.role] || "/");
     } else {
@@ -324,7 +324,7 @@ const routes = [
     name: "mis-informes",
     component: () => import("../views/personal/MisInformesView.vue"),
     meta: { requiresAuth: true },
-    beforeEnter: () => (useClubStore().data && !useClubStore().data.personal ? '/auditor' : true),
+    // Sólo de uso personal: lo decide `soloDePersonal` en el guard general.
   },
 
   // Salas
@@ -1315,7 +1315,8 @@ const ROLE_ALLOWED_PREFIX = {
   // `/tareas` faltaba acá aunque la matriz de permisos ya le da `tareas: ['index','show']`: la
   // misma regla escrita en dos lados y desalineada, que se ve como "la pantalla te deja y el
   // router te rebota".
-  dispensador: ['/', '/mostrador', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock',
+  // `/stocks`: la etiqueta del frasco (`/stocks/:id/etiqueta`), que su lista de stock ofrece (20-oct-2026).
+  dispensador: ['/', '/mostrador', '/pacientes', '/socios', '/historial', '/stock', '/stocks', '/admin/stock',
                 '/insumos', '/reservas', '/bar', '/entregas', '/tareas', '/m',
                 ...ETIQUETAS, ...COMUNES],
 
@@ -1380,6 +1381,15 @@ const SOLO_ORGANIZACION_PREFIJOS = ['/sedes', '/usuarios', '/documentos', '/insu
 
 export function soloDeOrganizacion(path) {
   return SOLO_ORGANIZACION_PREFIJOS.some(p => path === p || path.startsWith(p + '/'))
+}
+
+// Y al revés: lo que SÓLO existe en uso personal. Un admin de organización que escribía
+// /mis-informes abría la pantalla y cada pedido daba 404 (recorrido del 20-oct-2026).
+// (`/mi-cultivo` tiene su propio beforeEnter: a una organización la manda a sus salas.)
+const SOLO_PERSONAL_PREFIJOS = ['/mis-informes', '/m/personal']
+
+export function soloDePersonal(path) {
+  return SOLO_PERSONAL_PREFIJOS.some(p => path === p || path.startsWith(p + '/'))
 }
 
 const MODULO_LABEL = {
@@ -1525,7 +1535,7 @@ router.beforeEach(async (to) => {
     if (!puedeEntrar(role, to.path)) {
       useToast().warning(
         `No tenés acceso a esa sección con tu rol (${role}). ` +
-        'Si creés que deberías tenerlo, pedíselo a un administrador del club.'
+        'Si creés que deberías tenerlo, pedíselo a quien administra tu organización.'
       )
       return ROLE_HOME[role] || '/'
     }
@@ -1537,9 +1547,11 @@ router.beforeEach(async (to) => {
   const moduloFaltante = moduloRequerido(to.path)
   if (auth.isAuthenticated && !to.meta.public && moduloFaltante) {
     const club = useClubStore()
-    // Sólo se bloquea con las features YA cargadas: si todavía no llegó `/preferences` no se
-    // puede afirmar que falte nada, y rebotar por una carrera de carga es peor que dejar pasar
-    // (el backend sigue siendo la barrera real).
+    // Abriendo la dirección directo, `/preferences` todavía no llegó: antes se dejaba pasar y un
+    // módulo no contratado se abría roto, con 403 en cada pedido (ARICCAME, recorrido del
+    // 20-oct-2026). Se espera la carga que ya está en vuelo (`fetch` la comparte). Si falla, se
+    // deja pasar: rebotar por un error de red es peor, y el backend sigue siendo la barrera.
+    if (!club.data) await club.fetch().catch(() => {})
     if (club.data?.features && club.data.features[moduloFaltante] !== true) {
       useToast().warning(
         `${MODULO_LABEL[moduloFaltante] || 'Ese módulo'} no está contratado por tu organización. ` +
@@ -1558,6 +1570,10 @@ router.beforeEach(async (to) => {
     // estas dos rutas, y con el error tragado: si no llegan, se deja pasar y el backend decide.
     if (!club.data && auth.user?.club_personal == null) await club.fetch().catch(() => {})
     if (esUsoPersonal()) return ROLE_HOME[role] || '/'
+  }
+  // `/me` ya llegó (el router lo espera), y trae `club_personal`: no hace falta esperar nada más.
+  if (auth.isAuthenticated && !to.meta.public && soloDePersonal(to.path) && !esUsoPersonal()) {
+    return ROLE_HOME[role] || '/'
   }
 
   return true;

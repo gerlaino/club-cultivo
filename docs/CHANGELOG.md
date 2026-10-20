@@ -1,5 +1,37 @@
 # Changelog
 
+## Octubre 2026 (fw) — Lo que encontró el recorrido por rol (20-oct)
+
+Primer bloque del congelamiento: se recorrieron 7 roles en compu y teléfono (~700 pantallas, sólo
+navegando) y se arregló lo que apareció.
+
+- **El médico y las dispensaciones** (Germán: «puede ver las dispensaciones del paciente, pero no
+  se le debe mostrar ningún valor de lo gastado»): ve qué, cuánto y cuándo, de SUS vinculados, con
+  lista blanca (`DispensacionSerializer.serialize_para_medico`). Además estaba adentro de
+  `require_dispensador_o_admin`: por API podía dispensar, editar y anular, y listar las dispensas
+  de toda la organización con montos. Ahora sólo lee (`medico_solo_lectura!`).
+  `medico_dispensaciones_spec` (5 de 6 fallan con el código anterior).
+- **Disponibilidad del médico**: `resource` singular con `index` no creaba el GET; la pantalla daba
+  404 desde el 9-jun. `medico_disponibilidad_spec`.
+- **Club Modelo**: cada dispensa tenía la línea duplicada (el sembrado la creaba y el modelo
+  también) y el historial decía «Avance a floracion». `rake demo:corregir` (CORREGIR=1) limpia las
+  organizaciones demo que ya existen.
+- **Teléfono sin la app**: las barras de arriba se pisaban (migas sobre la lupa, pestañas
+  cortadas). En ≤600 px va el nombre de la pantalla y, en el admin, las secciones pasan al menú ☰.
+  Se sacó la campana del dispensador, que no hacía nada.
+- **Ficha de sala en 1366 px**: se salía 70 px (`minmax(0, 1fr)`); la tabla se desliza adentro.
+- **Links que rebotaban**: `useRutaOfrecible` (la misma decisión que el router) en las migas de
+  Sedes; la etiqueta del frasco abre para el dispensador; «Ver salas» de la campana va a /salas.
+- «pedíselo a un administrador del club» → «a quien administra tu organización».
+- **Stock externo**: «Entró en total» (`Stock#total_entrado`: alta + ingresos) en vez de «Total
+  inicial»; en Reconteo, aviso con botón a «Entró mercadería».
+- **Módulos por URL**: el guard espera la carga de `/preferences` en vuelo (`club.fetch` la
+  comparte) en vez de dejar pasar; lo que sólo existe en autocultivo (`soloDePersonal`) no se abre
+  en una organización.
+- Detalles: Tareas del dispensador no pide lotes; editar/eliminar un lote dice por qué falló
+  (era `catch {}`); historial con hora de 24 y sin «12:00 a. m.» en lo cargado sin hora; código muerto
+  del formulario viejo de lote; caché de vitest fuera del repo.
+
 ## Octubre 2026 (fv) — Lo de todos los días del cultivo, también en el teléfono (20-oct)
 
 - **Mover un lote de sala** desde la ficha del teléfono. Antes de confirmar, el backend dice qué

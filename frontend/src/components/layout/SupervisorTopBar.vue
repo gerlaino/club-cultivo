@@ -222,4 +222,12 @@ async function handleLogout() {
 }
 .ctb__hamburger:hover { background: var(--c-ink-100); }
 @media (max-width: 1023px) { .ctb__hamburger { display: flex; align-items: center; } }
+
+/* En el teléfono (navegador, sin la app): sólo el nombre de la pantalla, en un renglón. Las migas
+   enteras se pisaban con la lupa y la campana (recorrido del 20-oct-2026). */
+@media (max-width: 600px) {
+  .ctb__inner { padding: 0 var(--sp-3); gap: var(--sp-2); }
+  .ctb__bc-link, .ctb__bc-sep { display: none; }
+  .ctb__bc-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 </style>
