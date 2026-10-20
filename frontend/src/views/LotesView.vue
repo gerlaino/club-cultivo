@@ -17,7 +17,7 @@ import EtiquetasLotesModal from '../components/lotes/EtiquetasLotesModal.vue'
 import { useSeleccion } from '../composables/useSeleccion.js'
 import { useToast } from '../composables/useToast.js'
 
-import { moverLotes } from '../lib/api.js'
+import { useMoverLotes } from '../composables/useMoverLotes.js'
 import { hoyISO } from '../utils/dates.js'
 
 const store = useLotesStore();
@@ -175,7 +175,7 @@ function onEtiquetasHechas() {
 // El lote TOMA LA FASE de la sala destino: una sala en floración da 12/12, así que lo que entra ahí
 // pasa a florecer. Por eso el diálogo enumera lote por lote qué va a cambiar antes de confirmar.
 const salaDestinoId = ref(null)
-const moviendo      = ref(false)
+const { mover: moverLotesDeSala, moviendo } = useMoverLotes()
 const puedeMover    = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.role))
 const MOVIBLES      = ['enraizado', 'vegetativo', 'floracion']
 const salasDestino  = computed(() => salas.items.filter(s => s.state === 'activa'))
@@ -185,34 +185,17 @@ const salaDestino   = computed(() => salasDestino.value.find(s => s.id === Numbe
 const KIND_LABEL = { vegetativo:'Vegetativo', floracion:'Floración', mixta:'Mixta', madre:'Madres', clon:'Clones', manicura:'Manicura' }
 const kindLabel = k => KIND_LABEL[k] || k || '—'
 
+// Qué va a pasar (cambios de fase, de sede) lo dice el backend al simular: `useMoverLotes`.
 async function confirmarMover() {
   const d = salaDestino.value
   // Post-cosecha el lote ya no vive en una sala: no se mueve.
   const elegidos = sel.seleccionados.value.filter(l => MOVIBLES.includes(l.estado))
   if (!d || !elegidos.length) { toast.warning('Ninguno de los lotes elegidos está en una sala de cultivo'); return }
 
-  const fase   = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
-  // El enraizado no lo cambia ninguna sala: sale cuando prende, no al cambiar de cuarto.
-  const cambian = fase ? elegidos.filter(l => l.estado !== fase && l.estado !== 'enraizado') : []
-  const lineas = [`Vas a mover ${elegidos.length} lote(s) a "${d.nombre}".`]
-  if (cambian.length) {
-    lineas.push(`Atención: la sala está en ${fase === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos cambian de fase:`)
-    lineas.push(...cambian.map(l => `   · ${l.codigo}: ${estadoLabel(l.estado)} → ${estadoLabel(fase)}`))
-    if (fase === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
-  }
-  if (!(await confirm({ title: 'Mover lotes de sala', message: lineas.join('\n'),
-                        variant: cambian.length ? 'danger' : 'warning', confirmText: 'Mover' }))) return
-
-  moviendo.value = true
-  try {
-    const { data } = await moverLotes(elegidos.map(l => l.id), d.id)
-    const extra = data.cambios_de_fase?.length ? ` · ${data.cambios_de_fase.length} cambiaron de fase` : ''
-    toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
-    sel.limpiar(); salaDestinoId.value = null
-    await store.fetch()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudieron mover')
-  } finally { moviendo.value = false }
+  const data = await moverLotesDeSala(elegidos.map(l => l.id), d)
+  if (!data) return
+  sel.limpiar(); salaDestinoId.value = null
+  await store.fetch()
 }
 
 

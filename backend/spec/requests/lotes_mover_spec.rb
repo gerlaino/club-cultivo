@@ -199,4 +199,53 @@ RSpec.describe 'POST /lotes/mover', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
   end
+
+  # AC (20-oct-2026): mover un lote es de todos los días y llega al teléfono. Antes de confirmar, la
+  # pantalla muestra lo que el backend dice que va a pasar (no lo calcula ella); y nadie mueve lo
+  # que no alcanza.
+  describe 'simular antes de confirmar' do
+    it 'dice qué lotes cambian de fase y si cambian de sede, sin tocar nada' do
+      lote = create(:lote, club: club, sala: sala_vege, sede: sede, estado: 'vegetativo')
+      sign_in_as(admin)
+
+      post '/lotes/mover', params: { lote_ids: [lote.id], sala_id: sala_flora.id, simular: true }, headers: auth_headers
+      json = JSON.parse(response.body)
+
+      expect(json['simulacion']).to be(true)
+      expect(json['movidos']).to eq(1)
+      expect(json['cambios_de_fase']).to eq([{ 'codigo' => lote.codigo, 'de' => 'vegetativo', 'a' => 'floracion',
+                                               'de_label' => 'Vegetativo', 'a_label' => 'Floración' }])
+      expect(json['cambia_sede']).to be(false)
+      expect(lote.reload.sala_id).to eq(sala_vege.id)
+      expect(lote.estado).to eq('vegetativo')
+    end
+
+    it 'avisa el cambio de sede' do
+      lote = create(:lote, club: club, sala: sala_vege, sede: sede, estado: 'vegetativo')
+      sign_in_as(admin)
+
+      post '/lotes/mover', params: { lote_ids: [lote.id], sala_id: sala_otra_sede.id, simular: true }, headers: auth_headers
+      expect(JSON.parse(response.body)).to include('cambia_sede' => true, 'sede_destino' => 'Sede Norte')
+    end
+  end
+
+  it 'el historial cuenta el cambio de fase con palabras, no con identificadores' do
+    lote = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
+    sign_in_as(admin)
+
+    mover(lote.id, sala_flora)
+    expect(lote.lote_eventos.order(:id).last.descripcion).to include('Vegetativo → Floración')
+  end
+
+  it 'un cultivador no mueve un lote de una sede que no tiene asignada' do
+    cultivador = create(:user, :cultivador, club: club)
+    UserSede.create!(user: cultivador, sede: sede)
+    ajeno = create(:lote, club: club, sala: sala_otra_sede, sede: sede2, estado: 'vegetativo')
+    sign_in_as(cultivador)
+
+    mover(ajeno.id, sala_vege)
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(ajeno.reload.sala_id).to eq(sala_otra_sede.id)
+  end
+
 end

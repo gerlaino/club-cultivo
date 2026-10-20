@@ -176,6 +176,24 @@
           <span class="mlot__accion-lbl">Anotar que empezó a florecer</span>
           <i class="bi bi-chevron-right mlot__accion-arr"></i>
         </button>
+        <!-- Lo que estaba sólo en la compu (20-oct-2026): el historial para corregir o borrar un
+             riego mal cargado, separar plantas al prender y mover de sala. Mismos modales y misma
+             lógica que el escritorio (`useHistorialLote`, `DesprenderLoteModal`, `useMoverLotes`). -->
+        <button class="mlot__accion-item" @click="abrirHistorial">
+          <span class="mlot__accion-ico"><i class="bi bi-clock-history"></i></span>
+          <span class="mlot__accion-lbl">{{ esAdmin ? 'Historial: corregir o borrar' : 'Historial' }}</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button v-if="puedeDesprender" class="mlot__accion-item" @click="showAcciones = false; showDesprender = true">
+          <span class="mlot__accion-ico"><i class="bi bi-flower2"></i></span>
+          <span class="mlot__accion-lbl">{{ esPersonal ? 'Separar algunas plantas' : 'Separar plantas a otro lote' }}</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button v-if="puedeMover" class="mlot__accion-item" @click="abrirMover">
+          <span class="mlot__accion-ico"><i class="bi bi-arrow-left-right"></i></span>
+          <span class="mlot__accion-lbl">Mover a {{ esPersonal ? 'otro espacio' : 'otra sala' }}</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
         <button class="mlot__accion-item" @click="abrirEditarLote">
           <span class="mlot__accion-ico"><i class="bi bi-pencil"></i></span>
           <span class="mlot__accion-lbl">{{ esPersonal ? 'Editar' : 'Editar lote' }}</span>
@@ -186,6 +204,34 @@
           <span class="mlot__accion-lbl">{{ esPersonal ? 'Eliminar estas plantas' : 'Eliminar lote' }}</span>
           <i class="bi bi-chevron-right mlot__accion-arr"></i>
         </button>
+      </div>
+    </SheetBottom>
+
+    <LoteHistorialModal
+      v-model="showHistorial"
+      :historial="historial"
+      :can-admin="esAdmin"
+      :lote="lote"
+      @crear="onCrearEvento"
+      @trasplante="onTrasplante"
+      @riego="showHistorial = false; abrirDiario('riego')"
+      @editar="onEditarEvento"
+      @delete="onDeleteEvento"
+      @actualizado="loadHistorial(); recargarLote()"
+    />
+    <DesprenderLoteModal v-model="showDesprender" :lote="lote" @desprendido="recargarLote" />
+
+    <SheetBottom v-model="showMover" :title="esPersonal ? 'Mover a otro espacio' : 'Mover a otra sala'">
+      <div class="mlot__sheet-body">
+        <p class="mlot__sheet-desc">Ahora en <strong>{{ lote.sala?.nombre || '—' }}</strong>. Elegí a dónde va:</p>
+        <div v-if="!salasDestino.length" class="mlot__muted">No hay {{ esPersonal ? 'otro espacio' : 'otra sala' }} activa.</div>
+        <div v-else class="mlot__accion-list">
+          <button v-for="s in salasDestino" :key="s.id" class="mlot__accion-item" :disabled="moviendo" @click="moverA(s)">
+            <span class="mlot__accion-ico"><i class="bi bi-house-door"></i></span>
+            <span class="mlot__accion-lbl">{{ s.nombre }}<small v-if="s.sede?.nombre && !esPersonal" class="mlot__mover-sede"> · {{ s.sede.nombre }}</small></span>
+            <i class="bi bi-chevron-right mlot__accion-arr"></i>
+          </button>
+        </div>
       </div>
     </SheetBottom>
 
@@ -281,6 +327,12 @@ import { getCama, listCamas, cambiarFaseSala } from '../../lib/api'
 import { mensajeLuzDelEspacio } from '../../composables/useLoteTransiciones.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
+import LoteHistorialModal  from '../../components/lotes/LoteHistorialModal.vue'
+import DesprenderLoteModal from '../../components/lotes/DesprenderLoteModal.vue'
+import { useHistorialLote } from '../../composables/useHistorialLote.js'
+import { useMoverLotes }    from '../../composables/useMoverLotes.js'
+import { useAuthStore }     from '../../stores/auth'
+import { listSalas }        from '../../lib/api'
 
 const route  = useRoute()
 const router = useRouter()
@@ -376,6 +428,37 @@ const plantasPagina = computed(() => {
   const start = (pagina.value - 1) * POR_PAG
   return plantas.value.slice(start, start + POR_PAG)
 })
+
+// ── Historial, separar y mover (antes sólo en la compu) ──
+const auth = useAuthStore()
+const esAdmin = computed(() => auth.user?.role === 'admin')
+const puedeOperar = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role))
+const showHistorial  = ref(false)
+const showDesprender = ref(false)
+const showMover      = ref(false)
+const { historial, loadHistorial, onCrearEvento, onTrasplante, onEditarEvento, onDeleteEvento } =
+  useHistorialLote(id, { alCambiar: () => recargarLote() })
+function abrirHistorial() { showAcciones.value = false; loadHistorial(); showHistorial.value = true }
+
+// Separar: en cultivo y con más de una planta (desprenderlas todas dejaría el lote vacío).
+const puedeDesprender = computed(() => puedeOperar.value && enCultivo.value && (lote.value?.plants_count || 0) > 1)
+
+// Mover: lo que sigue en cultivo y no está plantado en una cama (tiene las raíces en la tierra).
+const puedeMover = computed(() => puedeOperar.value && enCultivo.value && !lote.value?.en_cama)
+const salas = ref([])
+const salasDestino = computed(() => salas.value.filter(s => s.id !== lote.value?.sala?.id && s.state === 'activa'))
+const { mover, moviendo } = useMoverLotes()
+async function abrirMover() {
+  showAcciones.value = false
+  try { const { data } = await listSalas(); salas.value = data?.data || data || [] } catch { salas.value = [] }
+  showMover.value = true
+}
+async function moverA(destino) {
+  const data = await mover([id], destino)
+  if (!data) return
+  showMover.value = false
+  await recargarLote()
+}
 
 // Las plantas también: un trasplante que prende el lote las pasa a vegetativo, y la lista seguía
 // diciendo «Enraiz.» hasta salir y volver a entrar.
@@ -514,6 +597,7 @@ watch(() => route.query.accion, atenderAccion)
 </script>
 
 <style scoped>
+.mlot__mover-sede { color: var(--c-ink-500); font-weight: 400; }
 .mlot { padding: 0 0 2rem; }
 .mlot--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
 .mlot__spin { font-size: 2rem; color: var(--c-leaf-300, #a8c9b5); animation: spin .8s linear infinite; }

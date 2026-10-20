@@ -123,6 +123,14 @@
     />
 
     <!-- Sheet: Más acciones -->
+    <RegistroEnraizadoModal
+      v-model="showEnraizado"
+      :sala-id="id"
+      :sala-nombre="sala?.nombre || ''"
+      :lotes-count="lotes.filter(l => l.estado === 'enraizado').length"
+      @registrado="recargarSala"
+    />
+
     <SheetBottom v-model="showAcciones" title="Acciones">
       <div class="msal__accion-list">
         <button class="msal__accion-item" @click="abrirNuevoLote">
@@ -151,6 +159,19 @@
         <button v-if="puedeCambiarFase" class="msal__accion-item" :disabled="cambiandoFase" @click="cambiarFase()">
           <span class="msal__accion-ico">🔄</span>
           <span class="msal__accion-lbl">Pasar a {{ faseLabel(faseDestino) }}</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <!-- El clima del propagador va aparte del de la sala (adentro del domo hay otro aire: 60%
+             en el cuarto, 90% adentro). Sólo si algo está enraizando. Estaba sólo en la compu. -->
+        <button v-if="puedeRegistrarEnraizado" class="msal__accion-item" @click="showAcciones = false; showEnraizado = true">
+          <span class="msal__accion-ico">🌱</span>
+          <span class="msal__accion-lbl">Clima del propagador</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <!-- El ambiente con su gráfico y la lectura manual: la misma pantalla de escritorio, bajo /m. -->
+        <button v-if="puedeVerAmbiente" class="msal__accion-item" @click="router.push(`/m/sala-m/${id}/ambiente`)">
+          <span class="msal__accion-ico">📈</span>
+          <span class="msal__accion-lbl">Ambiente y gráficos</span>
           <i class="bi bi-chevron-right msal__accion-arr"></i>
         </button>
         <button v-if="puedeEditar" class="msal__accion-item" @click="abrirEditar">
@@ -330,6 +351,8 @@ import { avisoAlPlantar } from '../../lib/camas.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import NuevaPlantaSheet from '../../components/personal/NuevaPlantaSheet.vue'
 import { listPlants } from '../../lib/api'
+import RegistroEnraizadoModal from '../../components/salas/RegistroEnraizadoModal.vue'
+import { usePermissions } from '../../composables/usePermissions.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -350,6 +373,12 @@ const auth = useAuthStore()
 const puedeCambiarFase = computed(() =>
   ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role) &&
   ['vegetativo', 'floracion'].includes(sala.value?.kind))
+// Clima del propagador y ambiente: mismas reglas que la ficha de escritorio.
+const { can } = usePermissions()
+const showEnraizado = ref(false)
+const puedeRegistrarEnraizado = computed(() =>
+  ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role) && lotes.value.some(l => l.estado === 'enraizado'))
+const puedeVerAmbiente = computed(() => can('ambiente', 'index'))
 const puedeEditar  = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) || esPersonal.value)
 const faseDestino  = computed(() => (sala.value?.kind === 'vegetativo' ? 'floracion' : 'vegetativo'))
 const faseLabel    = (f) => ({ vegetativo: 'Vegetativo', floracion: 'Floración' }[f] || f)

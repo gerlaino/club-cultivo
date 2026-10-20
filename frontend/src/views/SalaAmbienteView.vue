@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useAmbienteStore } from '../stores/ambiente.js'
 import { useAmbiente } from '../composables/useAmbiente.js'
 import { useSetpoints } from '../composables/useSetpoints.js'
@@ -23,6 +24,9 @@ const store  = useAmbienteStore()
 const { getSetpoint } = useSetpoints()
 
 const salaId  = Number(route.params.id)
+// Autocultivo dice «espacio», nunca «sala». En el teléfono (/m) se vuelve a la ficha del teléfono.
+const { esPersonal, sala: salaTxt } = useUsoPersonal()
+const volverA = computed(() => (route.path.startsWith('/m/') ? `/m/sala-m/${salaId}` : { name: 'sala-detail', params: { id: salaId } }))
 const sala    = ref(null)
 const lotes   = ref([])
 const loading = ref(true)
@@ -238,10 +242,11 @@ watch(seccionActiva, (val) => {
       <div class="sav__hero">
         <div class="sav__hero-left">
           <div class="sav__title-row">
-            <h1 class="sav__title">🌿 {{ sala?.nombre || 'Sala' }} — Ambiente</h1>
+            <h1 class="sav__title">🌿 {{ sala?.nombre || salaTxt.Corta }} — Ambiente</h1>
             <span v-if="liveConectado" class="sav__live-dot" title="Actualizaciones en tiempo real activas">● en vivo</span>
           </div>
-          <p class="sav__subtitle" v-if="loteActivo">
+          <!-- En autocultivo el lote no se nombra (son sus plantas). -->
+          <p class="sav__subtitle" v-if="loteActivo && !esPersonal">
             Lote activo: <strong>{{ loteActivo.codigo }}</strong>
             <span v-if="loteActivo.estado"> · {{ estadoLabel(loteActivo.estado) }}</span>
           </p>
@@ -250,8 +255,8 @@ watch(seccionActiva, (val) => {
           <button class="sav__btn-icon" :disabled="store.loadingLecturas" @click="refrescar" title="Actualizar">
             <i class="bi bi-arrow-clockwise" :class="{ 'sav__spin': store.loadingLecturas }"></i>
           </button>
-          <RouterLink :to="{ name: 'sala-detail', params: { id: salaId } }" class="sav__btn-ghost">
-            <i class="bi bi-arrow-left"></i> Sala
+          <RouterLink :to="volverA" class="sav__btn-ghost">
+            <i class="bi bi-arrow-left"></i> {{ salaTxt.Corta }}
           </RouterLink>
         </div>
       </div>
@@ -412,12 +417,12 @@ watch(seccionActiva, (val) => {
               {{ d.ultima_lectura_at ? `Última lectura ${fmtDesde(d.ultima_lectura_at)}` : 'Todavía no mandó ninguna lectura' }}
             </span>
           </div>
-          <RouterLink to="/dispositivos" class="sav__sensor-link">Administrar sensores de la organización →</RouterLink>
+          <RouterLink to="/dispositivos" class="sav__sensor-link">{{ esPersonal ? 'Administrar mis sensores →' : 'Administrar sensores de la organización →' }}</RouterLink>
         </template>
 
         <div v-else class="sav__sensor-vacio">
           <i class="bi bi-broadcast sav__sensor-vacio-ico"></i>
-          <p class="sav__sensor-vacio-tit">Esta sala no tiene sensores conectados</p>
+          <p class="sav__sensor-vacio-tit">{{ esPersonal ? 'Este espacio' : 'Esta sala' }} no tiene sensores conectados</p>
           <p class="sav__sensor-vacio-sub">
             Con un sensor (Pulse, Sonoff u otro) la temperatura y la humedad se registran solas,
             sin tener que cargarlas a mano.

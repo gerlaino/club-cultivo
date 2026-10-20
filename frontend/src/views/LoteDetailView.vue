@@ -7,7 +7,7 @@ import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
-import { getLoteHistorial, registrarTrasplante, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
+import { listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 import TareasDelLote from '../components/TareasDelLote.vue'
@@ -16,6 +16,7 @@ import GraficosLote from '../components/GraficosLote.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useHistorialLote } from '../composables/useHistorialLote.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
 import { em, estadoLoteLabel, verboArranque, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
@@ -150,75 +151,15 @@ async function crearSalaInline(kind) {
 }
 
 // ── Historial unificado ───────────────────────────────────
-const historial        = ref([])
-const loadingHistorial = ref(false)
+// La lógica vive en `useHistorialLote` (la comparte la ficha del teléfono).
 const verHistorialOpen = ref(false)
-
-async function loadHistorial() {
-  loadingHistorial.value = true
-  try {
-    const { data } = await getLoteHistorial(id)
-    historial.value = data.historial || []
-  } catch { historial.value = [] }
-  finally { loadingHistorial.value = false }
-}
-
-async function onCrearEvento(payload) {
-  try {
-    await createLoteEvento(id, payload)
-    toast.success('Actividad registrada')
-    await loadHistorial()
-    graficosKey.value++
-  } catch (err) {
-    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo registrar la actividad')
-  }
-}
-
-async function onTrasplante(payload) {
-  try {
-    await registrarTrasplante(id, payload)
-    toast.success('Trasplante registrado')
-    await Promise.all([lotes.fetchOne(id), loadHistorial()])
-    graficosKey.value++
-  } catch (err) {
-    toast.error(err?.response?.data?.error || 'No se pudo registrar el trasplante')
-  }
-}
-
-async function onEditarEvento(payload) {
-  // Solo edita eventos manuales de lote (el modal solo muestra ✏️ en los editables).
-  try {
-    const attrs = { descripcion: payload.descripcion, registrado_en: payload.registrado_en }
-    if (payload.metadata) attrs.metadata = payload.metadata
-    await updateLoteEvento(id, payload.id, attrs)
-    toast.success('Evento actualizado')
-    await loadHistorial()
-    graficosKey.value++
-  } catch (err) {
-    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo actualizar el evento')
-  }
-}
-
-async function onDeleteEvento(it) {
-  const LABEL = { lote_evento: 'evento', registro_ambiental: 'registro', tarea: 'tarea completada' }
-  const ok = await confirm({
-    title:       `Borrar ${LABEL[it.source] || 'ítem'} del historial`,
-    message:     `¿Borrás "${it.titulo}" del historial?\n\nEsta acción no se puede deshacer.`,
-    confirmText: 'Sí, borrar',
-    variant:     'danger',
+const { historial, loadingHistorial, loadHistorial, onCrearEvento, onTrasplante, onEditarEvento, onDeleteEvento } =
+  useHistorialLote(id, {
+    alCambiar: ({ lote: cambioElLote }) => {
+      if (cambioElLote) lotes.fetchOne(id)
+      graficosKey.value++
+    },
   })
-  if (!ok) return
-  try {
-    if (it.source === 'registro_ambiental') await deleteRegistroAmbiental(id, it.id)
-    else if (it.source === 'tarea')          await deleteTarea(it.id)
-    else                                     await deleteLoteEvento(id, it.id)
-    toast.success('Borrado del historial')
-    await loadHistorial()
-    graficosKey.value++
-  } catch (err) {
-    toast.error(err?.response?.data?.error || 'No se pudo borrar')
-  }
-}
 
 // ── Section toggles ────────────────────────────────────────
 const tareasExpanded    = ref(true)

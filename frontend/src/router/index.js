@@ -1197,6 +1197,10 @@ const routes = [
       // ── Detalle mobile propio ──
       { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
       { path: 'sala-m/:id', component: () => import('../views/mobile/MSalaMobileDetail.vue') },
+      // El ambiente con su gráfico y la lectura manual, la misma pantalla de escritorio (20-oct-2026):
+      // con la app instalada, «/salas/:id/ambiente» caía en la ficha y se perdía el gráfico.
+      { path: 'sala-m/:id/ambiente', component: () => import('../views/SalaAmbienteView.vue'),
+        beforeEnter: requiresPermission('ambiente', 'index') },
       { path: 'lote-m/:id', component: () => import('../views/mobile/MLoteMobileDetail.vue') },
       { path: 'cama-m/:id', component: () => import('../views/CamaDetailView.vue') },
       { path: 'planta/:id', component: () => import('../views/mobile/MPlantaDetailView.vue') },
@@ -1496,7 +1500,9 @@ router.beforeEach(async (to) => {
     const detalleMatch = to.path.match(/^\/(salas|lotes|plantas|camas)\/(\d+)/)
     if (detalleMatch) {
       const map = { salas: 'sala-m', lotes: 'lote-m', plantas: 'planta', camas: 'cama-m' }
-      return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}`
+      // El ambiente de una sala tiene su pantalla en el teléfono: no se pierde en la ficha.
+      const sub = detalleMatch[1] === 'salas' && /\/ambiente\/?$/.test(to.path) ? '/ambiente' : ''
+      return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}${sub}`
     }
     // Ruta de manicura → equivalente mobile
     const mncMatch = to.path.match(/^\/mnc\/lotes\/(\d+)/)

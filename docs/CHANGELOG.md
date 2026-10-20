@@ -1,5 +1,16 @@
 # Changelog
 
+## Octubre 2026 (fv) — Lo de todos los días del cultivo, también en el teléfono (20-oct)
+
+- **Mover un lote de sala** desde la ficha del teléfono. Antes de confirmar, el backend dice qué
+  pasa (`POST /lotes/mover` con `simular`: cambios de fase y de sede); la sala, la lista y el
+  teléfono usan `useMoverLotes` y ya no calculan la regla cada una. El historial dice
+  «Vegetativo → Floración» y no identificadores. Un cultivador no mueve un lote de una sede ajena.
+- **Historial del lote en el teléfono**: corregir o borrar un riego mal cargado (`useHistorialLote`,
+  compartido con escritorio). **Separar plantas a otro lote** también.
+- **Ambiente con gráfico** en `/m/sala-m/:id/ambiente` (con la app instalada caía en la ficha) y
+  **clima del propagador** en las acciones de la sala del teléfono. «Espacio» en autocultivo.
+
 ## Octubre 2026 (fu) — La mesa nunca tiene más que el frasco (20-oct)
 
 - **Reconteo que no bajaba la mesa** (Javi, Mitocondria, ST-26-0028): el frasco quedó en 70 g y

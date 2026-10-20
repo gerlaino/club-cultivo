@@ -287,7 +287,8 @@ class LotesController < ApplicationController
     ids = Array(params[:lote_ids]).map(&:to_i).uniq
     return render json: { error: 'Elegí al menos un lote' }, status: :unprocessable_entity if ids.empty?
 
-    lotes = current_user.club.lotes.where(id: ids, estado: Lote::CULTIVO_ESTADOS).includes(:sala, :plants)
+    # Sólo los que este usuario alcanza (`Lote.al_alcance_de`): un id de otra sede no se mueve.
+    lotes = lotes_al_alcance.where(id: ids, estado: Lote::CULTIVO_ESTADOS).includes(:sala, :plants)
     if lotes.empty?
       return render json: { error: 'Ninguno de los lotes elegidos está en una sala de cultivo' },
                     status: :unprocessable_entity
@@ -324,6 +325,25 @@ class LotesController < ApplicationController
       }, status: :unprocessable_entity
     end
 
+    # `simular`: qué pasaría, sin tocar nada. Es lo que la pantalla muestra para confirmar (qué
+    # lotes cambian de fase, si cambian de sede): la cuenta vive acá y no en cada pantalla.
+    if ActiveModel::Type::Boolean.new.cast(params[:simular])
+      a_mover = lotes.reject { |l| l.sala_id == destino.id }
+      return render json: {
+        simulacion:      true,
+        movidos:         a_mover.size,
+        sala_destino:    { id: destino.id, nombre: destino.nombre, kind: destino.kind },
+        cambia_sede:     a_mover.any? { |l| l.sede_id != destino.sede_id },
+        sede_destino:    destino.sede&.nombre,
+        cambios_de_fase: a_mover.filter_map do |l|
+          fase_final = fase_al_mover(l, fase_destino)
+          next if fase_final == l.estado
+          { codigo: l.codigo, de: l.estado, a: fase_final,
+            de_label: Lote.etiqueta_estado(l.estado, l.origen), a_label: Lote.etiqueta_estado(fase_final, l.origen) }
+        end,
+      }
+    end
+
     movidos, cambiaron_fase, plantas = 0, [], 0
 
     ActiveRecord::Base.transaction do
@@ -343,7 +363,9 @@ class LotesController < ApplicationController
           if plant_state
             plantas += lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
           end
-          cambiaron_fase << { codigo: lote.codigo, de: estado_anterior, a: fase_final }
+          cambiaron_fase << { codigo: lote.codigo, de: estado_anterior, a: fase_final,
+                              de_label: Lote.etiqueta_estado(estado_anterior, lote.origen),
+                              a_label: Lote.etiqueta_estado(fase_final, lote.origen) }
         end
 
         lote.lote_eventos.create!(
@@ -359,7 +381,7 @@ class LotesController < ApplicationController
           descripcion:     [
             "Movido de #{sala_anterior&.nombre || 'sin sala'} a #{destino.nombre}",
             (sala_anterior&.sede_id != destino.sede_id ? "(cambio de sede)" : nil),
-            (cambia ? "· #{estado_anterior} → #{fase_destino}" : nil),
+            (cambia ? "· #{Lote.etiqueta_estado(estado_anterior, lote.origen)} → #{Lote.etiqueta_estado(fase_final, lote.origen)}" : nil),
           ].compact.join(' '),
           user:            current_user,
           club:            current_user.club,

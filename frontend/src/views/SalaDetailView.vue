@@ -18,8 +18,9 @@ import PlantasGrilla          from '../components/personal/PlantasGrilla.vue'
 import NuevaPlantaSheet       from '../components/personal/NuevaPlantaSheet.vue'
 import EtiquetasLotesModal    from '../components/lotes/EtiquetasLotesModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
+import { useMoverLotes } from '../composables/useMoverLotes.js'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
-import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
+import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, createLoteHeredado, cambiarFaseSala, listFotosSala, deleteFotoSala } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
@@ -349,7 +350,7 @@ const kpis = computed(() => {
 // irreversible en el sentido de que no se "des-florece" una planta, por eso el diálogo enumera
 // lote por lote qué va a cambiar, en vez de un "¿estás seguro?" genérico.
 const selLotes  = ref(new Set())
-const moviendo  = ref(false)
+const { mover: moverLotesDeSala, moviendo } = useMoverLotes()
 const salaDestinoId = ref(null)
 const showMover = ref(false)
 
@@ -375,51 +376,13 @@ const salasDestino = computed(() =>
   (salas.items || []).filter(s => s.id !== sala.value?.id && s.state === 'activa'))
 const salaDestino  = computed(() => salasDestino.value.find(s => s.id === Number(salaDestinoId.value)) || null)
 
-// Qué va a pasar con cada lote si se confirma. Es el contenido de la alerta.
-const efectosMover = computed(() => {
-  const d = salaDestino.value
-  if (!d) return { cambian: [], cambiaSede: false }
-  const faseDestino = ['vegetativo', 'floracion'].includes(d.kind) ? d.kind : null
-  return {
-    faseDestino,
-    // El enraizado no lo cambia ninguna sala: comparte fotoperíodo con vegetativo y lo que lo
-    // tiene ahí es no tener raíz, no el cuarto. Sale cuando prende.
-    cambian: faseDestino ? lotesAMover.value.filter(l => l.estado !== faseDestino && l.estado !== 'enraizado') : [],
-    cambiaSede: !!(d.sede?.id && sala.value?.sede?.id && d.sede.id !== sala.value.sede.id),
-  }
-})
-
+// Qué va a pasar (cambios de fase, de sede) lo dice el backend al simular: `useMoverLotes`.
 async function confirmarMover() {
-  const d = salaDestino.value
-  if (!d || !lotesAMover.value.length) return
-
-  const ef = efectosMover.value
-  const lineas = [`Vas a mover ${lotesAMover.value.length} lote(s) a "${d.nombre}".`]
-  if (ef.cambiaSede) lineas.push(`Atención: es de OTRA SEDE: los lotes pasan a ${d.sede?.nombre || 'esa sede'} y sus costos se imputan ahí.`)
-  if (ef.cambian.length) {
-    lineas.push(`Atención: la sala está en ${ef.faseDestino === 'floracion' ? 'FLORACIÓN' : 'VEGETATIVO'}, así que estos lotes cambian de fase:`)
-    lineas.push(...ef.cambian.map(l => `   · ${l.codigo}: ${estadoMeta(l.estado).label} → ${estadoMeta(ef.faseDestino).label}`))
-    if (ef.faseDestino === 'floracion') lineas.push('Pasar a floración no se deshace: la planta ya recibió 12/12.')
-  }
-
-  if (!(await confirm({
-    title: 'Mover lotes de sala',
-    message: lineas.join('\n'),
-    variant: ef.cambian.length ? 'danger' : 'warning',   // el diálogo no conoce 'primary'
-    confirmText: 'Mover',
-  }))) return
-
-  moviendo.value = true
-  try {
-    const { data } = await moverLotes(lotesAMover.value.map(l => l.id), d.id)
-    const extra = data.cambios_de_fase?.length ? ` · ${data.cambios_de_fase.length} cambiaron de fase` : ''
-    toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
-    selLotes.value = new Set(); showMover.value = false; salaDestinoId.value = null
-    await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
-    cargarFotosSala()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'No se pudieron mover')
-  } finally { moviendo.value = false }
+  const data = await moverLotesDeSala(lotesAMover.value.map(l => l.id), salaDestino.value)
+  if (!data) return
+  selLotes.value = new Set(); showMover.value = false; salaDestinoId.value = null
+  await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
+  cargarFotosSala()
 }
 
 // ── Ambiente actual de la sala ────────────────────────────────────────────────
