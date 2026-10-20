@@ -240,6 +240,31 @@ class Stock < ApplicationRecord
     [cantidad.to_d - apartado_para_mostrador.to_d, 0.to_d].max
   end
 
+  # LA MESA NO PUEDE TENER MÁS QUE EL FRASCO (20-oct-2026). Depósito + mesa = lo que hay: si el
+  # total baja por debajo de lo que la mesa tiene arriba (un reconteo que dice 70 con 132 sobre la
+  # mesa, finalizar el stock, producir un derivado, corregir un externo), lo que falta salió de la
+  # mesa —en el depósito no había— y la mesa baja con su movimiento. Antes quedaba «132 sobre la
+  # mesa» de un frasco de 70 y quien atendía veía producto que no existe.
+  #
+  # Se llama explícito desde las correcciones de administración y NO como callback: la dispensa
+  # baja el frasco ANTES de bajar la mesa (`Dispensacion#imputar_a_mostrador`), y un callback la
+  # recortaría dos veces.
+  def bajar_mesa_al_total!(usuario:, motivo:)
+    remove_instance_variable(:@apartado_mostrador_precargado) if defined?(@apartado_mostrador_precargado)
+    sobra = apartado_para_mostrador.to_d - cantidad.to_d
+    return if sobra <= 0
+
+    MostradorItem.unscoped.where(stock_id: id).where('cantidad > 0').includes(:mostrador)
+                 .order(cantidad: :desc).each do |mi|
+      break if sobra <= 0
+
+      bajar = [mi.cantidad.to_d, sobra].min
+      mi.mover!(cantidad: -bajar, tipo: 'ajuste', usuario: usuario, motivo: motivo,
+                turno: mi.mostrador&.turno_abierto)
+      sobra -= bajar
+    end
+  end
+
   def apartado_para_mostrador
     return @apartado_mostrador_precargado if defined?(@apartado_mostrador_precargado)
     return 0.to_d unless MostradorItem.table_exists?

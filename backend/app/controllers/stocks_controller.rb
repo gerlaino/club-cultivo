@@ -332,6 +332,7 @@ class StocksController < ApplicationController
     # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
     # manejan las operaciones y "Ajustar gramos"). Sin movimiento de stock.
     if @stock.update(attrs)
+      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: 'Cantidad corregida al editar el stock')
       render json: serialize_stock(@stock.reload)
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
@@ -396,6 +397,7 @@ class StocksController < ApplicationController
       # El usuario viaja hasta el callback que cierra el lote: el evento de cierre necesita autor.
       @stock.usuario_movimiento = current_user
       @stock.update!(estado: 'agotado') if nueva_cantidad == 0
+      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: "#{tipo_ajuste.capitalize} del stock: #{motivo}")
     end
     render json: serialize_stock(@stock.reload)
   rescue ActiveRecord::RecordInvalid => e
@@ -439,6 +441,7 @@ class StocksController < ApplicationController
       #    "finalizado". Se marca al final, cuando el derivado ya está en la base (paso 4).
       nueva_cant = @stock.cantidad.to_f - gramos
       @stock.update!(cantidad: nueva_cant)
+      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: "Usado para elaborar #{forma.tr("_", " ")}")
 
       # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
       # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.
@@ -532,6 +535,7 @@ class StocksController < ApplicationController
       # hoy cuando terminó el jueves.
       @stock.fecha_movimiento = fecha
       @stock.update!(cantidad: 0, estado: 'agotado')
+      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: "Stock finalizado: #{etiqueta}")
     end
     render json: serialize_stock(@stock.reload)
   rescue ActiveRecord::RecordInvalid => e

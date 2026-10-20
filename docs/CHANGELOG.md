@@ -1,5 +1,16 @@
 # Changelog
 
+## Octubre 2026 (fu) — La mesa nunca tiene más que el frasco (20-oct)
+
+- **Reconteo que no bajaba la mesa** (Javi, Mitocondria, ST-26-0028): el frasco quedó en 70 g y
+  «sobre la mesa» seguía diciendo 132. Ajustar, finalizar, producir un derivado y editar la cantidad
+  de un externo bajaban el total sin mirar la mesa. Ahora `Stock#bajar_mesa_al_total!`: lo que falta
+  sale primero del depósito y, si no alcanza, de la mesa, con movimiento `ajuste` y el motivo. Se
+  llama explícito (no callback): la dispensa baja el frasco antes que la mesa.
+  `stock_mesa_no_supera_total_spec` (6 de 7 fallan con el código anterior).
+- `rake stocks:mesa_de_mas` lista los stocks que quedaron así; `CORREGIR=1` baja la mesa al total.
+  **Correr en producción después del push.**
+
 ## Octubre 2026 (ft) — La lupa en el teléfono; quién ve qué lote, una sola regla (20-oct)
 
 - **Alcance del cultivo unificado** (Germán: «tiene que estar realmente bien hecho»): la lupa le
