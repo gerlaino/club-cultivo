@@ -27,6 +27,9 @@ namespace :e2e do
       usuario_e2e!(club, 'delivery',    'Beto', 'Reparto')
       # El del teléfono de cultivo: el «+» con «Regar» sólo se le ofrece a él (y en uso personal).
       usuario_e2e!(club, 'cultivador',  'Cata', 'Cultivo')
+      # Para la suite de humo por rol (20-oct-2026): cada rol recorre lo suyo.
+      usuario_e2e!(club, 'manicura',    'Mica', 'Manicura')
+      medico = usuario_e2e!(club, 'medico', 'Marta', 'Médica')
 
       sede = club.sedes.first || Sede.create!(club: club, created_by: admin, nombre: 'Sede E2E',
                                               tipo: 'mixta', direccion: 'Calle Falsa 123', activa: true)
@@ -60,8 +63,15 @@ namespace :e2e do
         pac.cuenta_corriente!.update!(limite_credito: 100_000)
       end
 
+      # El médico ve SÓLO sus vinculados: uno, para que su ficha tenga a quién mostrar.
+      pac0 = Paciente.find_by(club: club, dni: '90000000')
+      if pac0
+        pac0.update_columns(con_seguimiento_medico: true)
+        MedicoPaciente.vincular!(medico: medico, paciente: pac0) unless MedicoPaciente.exists?(medico: medico, paciente: pac0)
+      end
+
       puts "Club e2e ##{club.id} listo · sede ##{sede.id} · flor ##{flor.id} (1000 g)"
-      puts "  admin@e2e.test · dispensador@e2e.test · delivery@e2e.test · cultivador@e2e.test — clave #{CLAVE_E2E}"
+      puts "  admin · dispensador · delivery · cultivador · manicura · medico @e2e.test — clave #{CLAVE_E2E}"
     end
   end
 

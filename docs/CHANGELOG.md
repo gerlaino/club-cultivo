@@ -1,5 +1,18 @@
 # Changelog
 
+## Octubre 2026 (fx) — Las pantallas se prueban solas en cada push (21-oct)
+
+- **Humo por rol** (`e2e/humoPorRol.spec.js`): admin, cultivador, manicura, médico, dispensador,
+  delivery y autocultivo abren cada pantalla que su menú ofrece, en la compu y en el teléfono. Falla
+  con un error de JS, un 4xx/5xx de la API, «undefined/NaN/Invalid Date» en pantalla, un link que
+  rebota fuera de su sección o un desborde horizontal en el teléfono. Vuelto a romper a propósito
+  (la ruta de la disponibilidad del médico), lo agarra con el 404 exacto.
+- La org `e2e` siembra también manicura y médico (vinculado a un paciente).
+- **Job `e2e` en el CI**: backend en modo desarrollo en :3001 (con MailHog), el build del frontend
+  en :5173, Playwright archivo por archivo, capturas de lo que falla como artefacto. `sembrar` corre
+  el rake directo cuando `E2E_SEMBRAR_LOCAL=1`. **Por ahora no frena el deploy**
+  (`continue-on-error`): se saca con el primer verde en GitHub.
+
 ## Octubre 2026 (fw) — Lo que encontró el recorrido por rol (20-oct)
 
 Primer bloque del congelamiento: se recorrieron 7 roles en compu y teléfono (~700 pantallas, sólo

@@ -84,3 +84,98 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+
+  # LAS PANTALLAS, NO SÓLO LAS REGLAS (21-oct-2026). Los specs prueban reglas; un build verde no
+  # prueba que una pantalla abra. Este job levanta la app entera —backend en modo desarrollo en
+  # :3001, el build del frontend en :5173— sobre la organización `e2e` sembrada, y corre Playwright:
+  # el humo por rol (cada pantalla de cada menú, compu y teléfono) y los flujos de punta a punta.
+  # Cada archivo por separado: en conjunto comparten el mismo mostrador y se pisan.
+  e2e:
+    name: Pantallas (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # TEMPORAL (21-oct-2026): hasta ver el primer verde en GitHub, este job informa pero no frena
+    # el deploy —el CI es lo que deja publicar producción, y la infraestructura del job (backend en
+    # el runner, build servido) todavía no se probó ahí—. Con el primer verde, se saca esta línea.
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+      # En desarrollo el correo sale por SMTP a MailHog: sin él, un flujo que manda un mail rompe.
+      mailhog:
+        image: mailhog/mailhog
+        ports: ["1025:1025"]
+    env:
+      RAILS_ENV: development
+      SMTP_HOST: localhost
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_URL: redis://localhost:6379/0
+      DEVISE_JWT_SECRET_KEY: ci-no-es-un-secreto-real-0000000000000000000000000000000000000000
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ci-primary-key-no-real-000000000
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ci-deterministic-no-real-0000000
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ci-salt-no-real-000000000000000
+      VITE_API_URL: http://localhost:3001/api
+      E2E_SEMBRAR_LOCAL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paquetes del sistema
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips postgresql-client
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.9"
+          bundler-cache: true
+          working-directory: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Base de datos
+        working-directory: backend
+        run: bin/rails db:create db:schema:load
+      - name: Backend en :3001
+        working-directory: backend
+        run: |
+          bin/rails server -p 3001 -b 127.0.0.1 -d
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/up && break; sleep 2; done
+      - name: Frontend (build) en :5173
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npx vite preview --port 5173 --strictPort --host localhost > /tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:5173/ > /dev/null && break; sleep 1; done
+      - name: Navegador
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Playwright, archivo por archivo
+        working-directory: frontend
+        run: |
+          estado=0
+          for f in e2e/*.spec.js; do
+            echo "::group::$f"
+            npx playwright test "$f" || estado=1
+            echo "::endgroup::"
+          done
+          exit $estado
+      - name: Capturas de lo que falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-fallas
+          path: frontend/test-results
+          retention-days: 7

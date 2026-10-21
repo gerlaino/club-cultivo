@@ -12,6 +12,12 @@ import { execSync } from 'node:child_process'
 // el escenario por API desde acá sería una segunda verdad sobre cómo se ve una organización.
 export function sembrar (...tareas) {
   const cmd = tareas.map(t => `bundle exec rake e2e:${t}`).join(' && ')
+  // En el CI no hay docker: el backend corre en la misma máquina (`E2E_SEMBRAR_LOCAL=1`) y el
+  // rake se corre directo en su carpeta, con el entorno del job.
+  if (process.env.E2E_SEMBRAR_LOCAL) {
+    execSync(cmd, { cwd: new URL('../../backend', import.meta.url).pathname, stdio: 'pipe', shell: '/bin/bash' })
+    return
+  }
   try {
     execSync(`docker compose exec -T backend sh -lc '${cmd}'`, {
       cwd: new URL('../..', import.meta.url).pathname, stdio: 'pipe',
@@ -38,6 +44,8 @@ export const USUARIOS = {
   dispensador: 'dispensador@e2e.test',
   delivery:    'delivery@e2e.test',
   cultivador:  'cultivador@e2e.test',
+  manicura:    'manicura@e2e.test',
+  medico:      'medico@e2e.test',
   // El autocultivo de pruebas (`rake e2e:autocultivo`): otra cuenta, no la org `e2e`.
   casa:        'casa@e2e.test',
 }
