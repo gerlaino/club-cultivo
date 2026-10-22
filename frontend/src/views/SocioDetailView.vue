@@ -311,6 +311,11 @@ const TABS = computed(() => {
   })
 })
 
+// Un panel EXISTE sólo si el rol tiene esa solapa. Con `v-show` solo se montaban todos escondidos
+// y cada uno pedía lo suyo: el dispensador abría la ficha y se comía tres 403 (notas,
+// indicaciones, documentos) que no veía (21-oct-2026).
+const tieneTab = (key) => TABS.value.some(t => t.key === key)
+
 // `?tab=` abre la ficha en una solapa concreta (Contabilidad → Deudores manda a la cuenta
 // corriente). Va DESPUÉS de `ALL_TABS` a propósito: `activeTab` se declara arriba y esto lo
 // referencia al montar. Si el rol no ve esa solapa, `TABS` la filtra y queda la de siempre.
@@ -469,7 +474,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Datos ── -->
-      <div v-show="activeTab === 'info'" class="sd__tab-content">
+      <div v-if="tieneTab('info')" v-show="activeTab === 'info'" class="sd__tab-content">
         <div class="sd__card">
           <div class="sd__card-header">
             <div class="sd__card-icon sd__card-icon--blue"><User :size="15" /></div>
@@ -519,7 +524,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: REPROCANN ── -->
-      <div v-show="activeTab === 'reprocann'" class="sd__tab-content">
+      <div v-if="tieneTab('reprocann')" v-show="activeTab === 'reprocann'" class="sd__tab-content">
         <div class="sd__card" :class="reprocannStatus?.key === 'danger' ? 'sd__card--danger' : reprocannStatus?.key === 'warning' ? 'sd__card--warning' : ''">
           <div class="sd__card-header">
             <div class="sd__card-icon sd__card-icon--green"><ShieldCheck :size="15" /></div>
@@ -582,14 +587,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Indicaciones ── -->
-      <div v-show="activeTab === 'indicaciones'" class="sd__tab-content">
+      <div v-if="tieneTab('indicaciones')" v-show="activeTab === 'indicaciones'" class="sd__tab-content">
         <div class="sd__card">
           <IndicacionesMedicas :socio-id="socioId" />
         </div>
       </div>
 
       <!-- ── Tab: Dispensaciones ── -->
-      <div v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
+      <div v-if="tieneTab('dispensaciones')" v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
         <div class="sd__card">
           <Dispensaciones
             :socio-id="socioId"
@@ -613,7 +618,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Turnos ── -->
-      <div v-show="activeTab === 'turnos'" class="sd__tab-content">
+      <div v-if="tieneTab('turnos')" v-show="activeTab === 'turnos'" class="sd__tab-content">
         <div class="sd__turnos-header">
           <div>
             <div class="sd__turnos-title">Turnos médicos</div>
@@ -741,24 +746,24 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
       <!-- ── Tab: Historia clínica ── -->
-      <div v-show="activeTab === 'historia'" class="sd__tab-content">
+      <div v-if="tieneTab('historia')" v-show="activeTab === 'historia'" class="sd__tab-content">
         <SocioTabHistoria :socio-id="socioId" :s="s" />
       </div>
 
       <!-- ── Tab: Notas ── -->
-      <div v-show="activeTab === 'notas'" class="sd__tab-content">
+      <div v-if="tieneTab('notas')" v-show="activeTab === 'notas'" class="sd__tab-content">
         <SocioTabNotas :socio-id="socioId" :can-edit="canEdit" />
       </div>
 
       <!-- ── Tab: Documentos ── -->
-      <div v-show="activeTab === 'documentos'" class="sd__tab-content">
+      <div v-if="tieneTab('documentos')" v-show="activeTab === 'documentos'" class="sd__tab-content">
         <div class="sd__card">
           <PatientDocuments :socio-id="socioId" :socio-nombre="`${s.nombre} ${s.apellido}`" />
         </div>
       </div>
 
       <!-- ── Tab: Timeline ── -->
-      <div v-show="activeTab === 'timeline'" class="sd__tab-content">
+      <div v-if="tieneTab('timeline')" v-show="activeTab === 'timeline'" class="sd__tab-content">
         <SocioTabTimeline :timeline="timeline" :timeline-loading="timelineLoading" />
       </div>
 

@@ -163,24 +163,26 @@ namespace :e2e do
       # Y el mostrador ABIERTO y RECIBIDO, que es donde la plata y el producto tienen que entrar.
       # Lo deja el rake y no la prueba: armar el escenario a través de la pantalla haría que un
       # fallo del setup se lea como un fallo de lo que se está probando.
-      mostrador = sede.mostrador
-      TurnoMostrador.abiertos.where(mostrador_id: mostrador.id).find_each do |t|
-        t.update!(estado: 'anulado', cerrado_at: Time.current, cerrado_por: admin)
-      end
-      CajaTurno.where(club_id: club.id).activas.find_each { |c| c.update!(estado: 'anulada') }
-
-      disp = User.find_by(email: 'dispensador@e2e.test')
-      # Los dos pasos reales, de las dos personas: administración carga la mesa y quien atiende
-      # abre la caja contando lo que encuentra.
-      car = Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'carga del día',
-                                     cambios: [{ stock_id: stock.id, cantidad: 100 }])
-      abort "No se pudo cargar la mesa: #{car.error}" unless car.ok?
-      res = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: disp,
-                                        efectivo_contado_ars: 20_000)
-      abort "No se pudo abrir la caja: #{res.error}" unless res.ok?
+      abrir_mostrador_e2e!(club, sede: sede, stock: stock, admin: admin, mesa_g: 100)
 
       puts 'Beto cobró $100.000 en 2 entregas y trae 1 paquete de 25 g sin entregar'
       puts 'Mostrador abierto con 100 g y $20.000, recibido por Dana'
+    end
+  end
+
+  # La caja del mostrador ABIERTA con 300 g de flor sobre la mesa y $20.000 de fondo, para la
+  # prueba de la dispensa con cobro (21-oct-2026). Abrir la caja contando ya lo prueba
+  # `mostrador.spec`: acá es sólo el punto de partida.
+  desc 'Mesa cargada y caja abierta por la dispensadora e2e'
+  task caja_abierta: :environment do
+    club = ActsAsTenant.without_tenant { Club.unscoped.find_by(slug: SLUG_E2E) }
+    abort 'Corré antes rake e2e:seed' if club.nil?
+
+    ActsAsTenant.with_tenant(club) do
+      sede  = club.sedes.first
+      stock = club.stocks.where(sede_id: sede.id, forma_producto: 'flor_seca').first
+      abrir_mostrador_e2e!(club, sede: sede, stock: stock, admin: User.find_by(email: 'admin@e2e.test'), mesa_g: 300)
+      puts 'Mostrador abierto con 300 g y $20.000, recibido por Dana'
     end
   end
 
@@ -262,6 +264,23 @@ def png_liso(r, g, b, ancho = 64, alto = 48)
   filas = ([0] + [r, g, b] * ancho).pack('C*') * alto
   "\x89PNG\r\n\x1a\n".b + chunk.('IHDR', [ancho, alto, 8, 2, 0, 0, 0].pack('NNCCCCC')) +
     chunk.('IDAT', Zlib::Deflate.deflate(filas)) + chunk.('IEND', '')
+end
+
+# Administración carga la mesa y quien atiende abre la caja contando: los dos pasos reales, de las
+# dos personas. Antes anula lo que haya quedado abierto de otra corrida.
+def abrir_mostrador_e2e!(club, sede:, stock:, admin:, mesa_g:)
+  mostrador = sede.mostrador
+  TurnoMostrador.abiertos.where(mostrador_id: mostrador.id).find_each do |t|
+    t.update!(estado: 'anulado', cerrado_at: Time.current, cerrado_por: admin)
+  end
+  CajaTurno.where(club_id: club.id).activas.find_each { |c| c.update!(estado: 'anulada') }
+
+  disp = User.find_by(email: 'dispensador@e2e.test')
+  car = Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'carga del día',
+                                 cambios: [{ stock_id: stock.id, cantidad: mesa_g }])
+  abort "No se pudo cargar la mesa: #{car.error}" unless car.ok?
+  res = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: disp, efectivo_contado_ars: 20_000)
+  abort "No se pudo abrir la caja: #{res.error}" unless res.ok?
 end
 
 def usuario_e2e!(club, rol, nombre, apellido)

@@ -13,7 +13,7 @@
 //   · es un link del menú que rebota a otro lado;
 //   · se sale de la pantalla a lo ancho en el teléfono.
 import { test, expect, devices } from '@playwright/test'
-import { entrar, sembrar } from './helpers.js'
+import { entrar, sembrar, API } from './helpers.js'
 
 test.beforeAll(() => sembrar('seed', 'autocultivo'))
 
@@ -28,6 +28,32 @@ async function linksDelMenu (page) {
   await page.waitForTimeout(1500)
   const hrefs = await page.$$eval('aside a[href], nav a[href]', as => as.map(a => a.getAttribute('href')))
   return [...new Set(hrefs.filter(h => h && h.startsWith('/') && !h.includes('#')))]
+}
+
+// LAS FICHAS, no sólo las listas (21-oct-2026): la ficha del paciente le pedía al dispensador
+// notas, indicaciones y documentos (tres 403) y ninguna lista lo mostraba. Las listas abren la
+// ficha con un clic en la fila, no con un link, así que los ids salen de la API.
+async function fichas (page, rol) {
+  const ids = await page.evaluate(async (base) => {
+    const get = async (p) => {
+      try { const r = await fetch(base + p, { credentials: 'include' }); if (!r.ok) return []; const j = await r.json(); return j.data || j.pacientes || j.dispensaciones || j } catch { return [] }
+    }
+    const primero = (l) => (Array.isArray(l) && l.length ? l[0].id : null)
+    return {
+      paciente: primero(await get('/pacientes')), lote: primero(await get('/lotes')),
+      sala: primero(await get('/salas')), usuario: primero(await get('/usuarios')),
+      stock: primero(await get('/stocks')),
+    }
+  }, API)
+  const por = {
+    admin:       [ids.paciente && `/pacientes/${ids.paciente}`, ids.usuario && `/usuarios/${ids.usuario}`,
+                  ids.lote && `/lotes/${ids.lote}`, ids.sala && `/salas/${ids.sala}`, ids.stock && `/admin/stock/${ids.stock}`],
+    dispensador: [ids.paciente && `/pacientes/${ids.paciente}`],
+    medico:      [ids.paciente && `/medico/pacientes/${ids.paciente}`],
+    cultivador:  [ids.lote && `/lotes/${ids.lote}`, ids.sala && `/salas/${ids.sala}`],
+    casa:        [ids.lote && `/lotes/${ids.lote}`, ids.sala && `/salas/${ids.sala}`],
+  }
+  return (por[rol] || []).filter(Boolean)
 }
 
 function vigilar (page) {
@@ -80,7 +106,8 @@ for (const rol of ROLES) {
       // El menú se lee en la compu (en el teléfono vive en el ☰); en el teléfono se recorren las
       // mismas pantallas.
       const rutas = telefono ? test.info().annotations.find(a => a.type === `rutas-${rol}`)?.description.split(',') ?? []
-                             : [inicio, ...(await linksDelMenu(page)).filter(r => !NO_ES_PANTALLA.test(r) && r !== inicio)]
+                             : [inicio, ...(await linksDelMenu(page)).filter(r => !NO_ES_PANTALLA.test(r) && r !== inicio),
+                                ...(await fichas(page, rol))]
       if (!telefono) test.info().annotations.push({ type: `rutas-${rol}`, description: rutas.join(',') })
 
       for (const ruta of rutas) {
