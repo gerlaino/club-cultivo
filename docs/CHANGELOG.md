@@ -21,12 +21,15 @@ todo (la mesa estaba inflada, como en ST-26-0028) o sólo el depósito (el total
   rechazan diciendo por qué. Finalizar sí la vacía (es cerrar el stock a propósito).
 - **La ficha dice «Hay ahora» con su desglose** (depósito + mesa), y el modal también. La lista de
   stock no ofrece el reconteo de un número si hay mesa: manda a la ficha.
-- `stocks:mesa_de_mas` ya no tiene `CORREGIR=1` (bajaba producto que podía existir); nuevo
+- `stocks:mesa_de_mas CORREGIR=1` (decisión de Germán, «sin quilombos con dispensas ni plata»): **el total
+  manda**, la mesa baja al total con su movimiento a nombre del admin; saltea los stocks con caja abierta; no
+  toca dispensas, cobros, cuenta corriente ni asientos. Si la mesa era la real, el próximo cierre lo cuenta
+  como sobrante y administración lo carga. Nuevo
   `stocks:historia_mesa` (sólo lee): reconstruye total y mesa de cada stock, marca el momento en que
   la mesa pasó al total y los reconteos que contaron sólo el depósito.
 - Specs: `stock_mesa_no_supera_total_spec` (reescrito al AC nuevo), `stocks_historia_mesa_spec`,
   `stockRecontarLugares.test.js`. Visto con Playwright sobre Club Modelo.
-- **Para arreglar los 22**: recontar cada uno desde su ficha, pesando el depósito y la mesa.
+- **Para arreglar los 22**: `rake stocks:mesa_de_mas` (ver) y `CORREGIR=1` con el mostrador cerrado.
 
 ## Octubre 2026 (fx) — Las pantallas se prueban solas en cada push (21-oct)
 
