@@ -231,6 +231,13 @@ class StocksController < ApplicationController
         # Por qué no se puede eliminar (ya tiene dispensas, una seña…), o nil. La pantalla apaga el
         # botón y lo dice: no ofrece lo que el backend va a rechazar.
         eliminar_bloqueo:    @stock.deleted? ? 'Ya está eliminado.' : EliminarStockService.new(stock: @stock, usuario: current_user).motivo_bloqueo,
+        # El reconteo cuenta cada lugar (`Stocks::Recontar`): cada mesa donde está, con su sede, y
+        # cuánto puede volverle a un frasco de cosecha (lo que le sacaron reconteos anteriores).
+        mesas:               MostradorItem.unscoped.where(stock_id: @stock.id).where('cantidad > 0')
+                                          .includes(mostrador: :sede).map { |mi|
+                               { id: mi.id, sede: mi.mostrador&.sede&.nombre, cantidad: mi.cantidad.to_f }
+                             },
+        reconteo_devolvible: @stock.regulatorio? ? @stock.reconteo_devolvible.to_f : nil,
       ),
     }
   end
@@ -330,10 +337,18 @@ class StocksController < ApplicationController
       return render json: { error: motivo }, status: :unprocessable_entity
     end
 
+    # La mesa es parte del total: editarlo por debajo de lo que hay arriba es el mismo error que el
+    # reconteo del depósito (22-oct-2026). No se recorta la mesa en silencio: se dice.
+    en_mesa = @stock.apartado_para_mostrador.to_d
+    if attrs.key?(:cantidad) && attrs[:cantidad].to_d < en_mesa
+      return render json: { error: "Sobre la mesa hay #{en_mesa.round(2).to_f} #{@stock.unidad || 'g'}: la cantidad es el total " \
+                                   '(depósito + mesa) y no puede ser menos. Si falta en la mesa, bajalo desde el mostrador.' },
+                    status: :unprocessable_entity
+    end
+
     # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
     # manejan las operaciones y "Ajustar gramos"). Sin movimiento de stock.
     if @stock.update(attrs)
-      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: 'Cantidad corregida al editar el stock')
       render json: serialize_stock(@stock.reload)
     else
       render json: { errors: @stock.errors.full_messages }, status: :unprocessable_entity
@@ -354,12 +369,39 @@ class StocksController < ApplicationController
     return render json: { error: 'Tipo de ajuste inválido' }, status: :unprocessable_entity unless %w[merma reconteo perdida].include?(tipo_ajuste)
     return render json: { error: 'El motivo es obligatorio' }, status: :unprocessable_entity if motivo.blank?
 
+    # RECONTAR ES CONTAR LOS DOS LUGARES (22-oct-2026, ver `Stocks::Recontar`). Con producto sobre
+    # la mesa, un total contado «de una» es justo el error que dejó 22 stocks con más en la mesa que
+    # en el frasco: quien cuenta pesa el depósito y escribe eso. Se cuenta cada lugar por separado.
+    en_mesa = @stock.apartado_para_mostrador.to_d
+    if tipo_ajuste == 'reconteo' && params.key?(:deposito)
+      res = Stocks::Recontar.call(stock: @stock, usuario: current_user, deposito: params[:deposito],
+                                  mesas: params[:mesas] || {}, motivo: motivo)
+      return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+      return render json: serialize_stock(@stock.reload).merge(sin_cambios: res.sin_cambios)
+    end
+    if tipo_ajuste == 'reconteo' && en_mesa.positive?
+      return render json: { error: "Hay #{en_mesa.round(2).to_f} #{@stock.unidad || 'g'} sobre la mesa: contá por separado " \
+                                   'lo que hay en el depósito y lo que hay en la mesa.' },
+                    status: :unprocessable_entity
+    end
+
     gramos = if params[:cantidad_real].present?
       params[:cantidad_real].to_f - @stock.cantidad.to_f
     else
       params[:gramos].to_f
     end
     return render json: { error: 'La cantidad ingresada no cambia el stock (delta 0)' }, status: :unprocessable_entity if gramos.zero?
+
+    # LO QUE ESTÁ SOBRE LA MESA SE DESCUENTA DESDE LA MESA. Una merma o una pérdida declarada acá
+    # sale del depósito; si pasa de lo guardado, lo que falta estaba arriba y su puerta es el
+    # mostrador (bajar con «se perdió»), que deja el movimiento donde el arqueo lo ve.
+    if gramos.negative? && en_mesa.positive? && -gramos > @stock.en_deposito.to_f
+      return render json: { error: "En el depósito hay #{@stock.en_deposito.round(2).to_f} #{@stock.unidad || 'g'}; " \
+                                   "los otros #{en_mesa.round(2).to_f} están sobre la mesa. Lo que falta de la mesa " \
+                                   'se baja desde el mostrador.' },
+                    status: :unprocessable_entity
+    end
 
     # UN AJUSTE NO CREA PRODUCTO (22-sep-2026, Germán). En un stock que viene de una cosecha la
     # cantidad está justificada por el pesaje: sumar gramos acá sería cannabis que aparece de la
@@ -398,7 +440,6 @@ class StocksController < ApplicationController
       # El usuario viaja hasta el callback que cierra el lote: el evento de cierre necesita autor.
       @stock.usuario_movimiento = current_user
       @stock.update!(estado: 'agotado') if nueva_cantidad == 0
-      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: "#{tipo_ajuste.capitalize} del stock: #{motivo}")
     end
     render json: serialize_stock(@stock.reload)
   rescue ActiveRecord::RecordInvalid => e
@@ -426,6 +467,13 @@ class StocksController < ApplicationController
     return render json: { error: 'Indicá los gramos a utilizar (> 0)' }, status: :unprocessable_entity if gramos <= 0
     return render json: { error: 'Indicá la cantidad producida (> 0)' }, status: :unprocessable_entity if cantidad_out <= 0
     return render json: { error: "No hay tantos gramos disponibles (#{@stock.cantidad}g)" }, status: :unprocessable_entity if gramos > @stock.cantidad.to_f
+    # Se elabora con la flor GUARDADA: la de la mesa está a la vista del que atiende y su arqueo la
+    # espera. Para usarla, administración la baja primero desde el mostrador (22-oct-2026).
+    if @stock.apartado_para_mostrador.positive? && gramos > @stock.en_deposito.to_f
+      return render json: { error: "En el depósito hay #{@stock.en_deposito.round(2).to_f} g; el resto está sobre la mesa. " \
+                                   'Bajalo desde el mostrador antes de usarlo para elaborar.' },
+                    status: :unprocessable_entity
+    end
     if forma.blank? || forma == 'flor_seca'
       return render json: { error: 'Elegí el producto resultante (no flor seca)' }, status: :unprocessable_entity
     end
@@ -442,7 +490,6 @@ class StocksController < ApplicationController
       #    "finalizado". Se marca al final, cuando el derivado ya está en la base (paso 4).
       nueva_cant = @stock.cantidad.to_f - gramos
       @stock.update!(cantidad: nueva_cant)
-      @stock.bajar_mesa_al_total!(usuario: current_user, motivo: "Usado para elaborar #{forma.tr("_", " ")}")
 
       # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
       # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.

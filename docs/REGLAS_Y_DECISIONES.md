@@ -2,6 +2,19 @@
 
 > Archivo de referencia extraído de `CLAUDE.md` el 18-sep-2026 para que el briefing de sesión sea liviano. Es HISTORIA: refleja decisiones tomadas hasta esa fecha. Si contradice al código, el código manda. Se consulta cuando hace falta (grep por módulo o palabra clave), no se carga en cada sesión.
 
+## Regla: el total es depósito + mesa, y se cuenta cada lugar (22-oct-2026, bloque (fz))
+
+- `Stock#cantidad` es el TOTAL (depósito + mesa). El depósito no se guarda: es la resta
+  (`Stock#en_deposito`). La ficha lo muestra como «Hay ahora: depósito X + mesa Y».
+- **Recontar con producto sobre la mesa es contar los dos lugares** (`Stocks::Recontar`); nunca se
+  pide «la cantidad exacta» de una. Un frasco de cosecha recupera por reconteo sólo lo que un
+  reconteo anterior le sacó (`reconteo_devolvible`).
+- **Nada que no sea el mostrador baja la mesa en silencio**: merma/pérdida desde la ficha salen del
+  depósito; editar o elaborar por debajo de la mesa se rechaza. Sólo finalizar la vacía. (Revierte
+  la parte de (fu) del 20-oct que la bajaba: con un reconteo del depósito borraba producto real.)
+- Un rake que «corrige» bajando un número sin saber cuál de los dos miente no se escribe: se
+  recuenta.
+
 ## 📍 Dónde retomar (16-sep-2026)
 
 **El super admin visto por el dueño del negocio: los 7 puntos de la propuesta del 15-sep, HECHOS**

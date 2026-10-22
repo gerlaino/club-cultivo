@@ -240,6 +240,15 @@ class Stock < ApplicationRecord
     [cantidad.to_d - apartado_para_mostrador.to_d, 0.to_d].max
   end
 
+  # LO QUE UN RECONTEO PUEDE DEVOLVERLE A UN FRASCO DE COSECHA (22-oct-2026): lo que le sacaron los
+  # reconteos anteriores, neto de lo que ya volvió. Un reconteo que pesó sólo el depósito y lo cargó
+  # como total le sacó al frasco lo que estaba sobre la mesa; contarlo bien tiene que poder
+  # devolverlo, pero nunca más allá de eso: el resto sería producto que no salió del pesaje.
+  def reconteo_devolvible
+    neto = stock_movimientos.where(tipo: 'ajuste').where('notas LIKE ?', '[RECONTEO]%').sum(:gramos).to_d
+    [-neto, 0.to_d].max
+  end
+
   # LO QUE ENTRÓ EN TOTAL (20-oct-2026): lo del alta más cada «Entró mercadería». En un externo que
   # recibió más de lo mismo, `cantidad_inicial` sola decía «Total inicial 42 g» con 70 disponibles.
   def total_entrado

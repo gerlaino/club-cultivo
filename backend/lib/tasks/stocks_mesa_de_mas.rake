@@ -1,19 +1,20 @@
-# Stocks con más sobre la mesa que en el frasco.
+# Stocks con más sobre la mesa que en el frasco. SÓLO LISTA.
 #
-# Hasta el 20-oct-2026 ajustar, finalizar, producir o editar un stock bajaba el total sin tocar la
-# mesa: ST-26-0028 quedó con 70 g y «132 sobre la mesa». Desde ese día lo hace
-# `Stock#bajar_mesa_al_total!`; esto encuentra los que quedaron de antes.
-#
-#   bundle exec rake stocks:mesa_de_mas              # sólo lista
+#   bundle exec rake stocks:mesa_de_mas              # todos
 #   bundle exec rake stocks:mesa_de_mas CLUB=28      # una organización
-#   bundle exec rake stocks:mesa_de_mas CORREGIR=1   # baja la mesa al total, con movimiento
 #
-# El movimiento queda a nombre del primer admin de la organización, con el motivo dicho.
+# CORREGIR=1 QUEDÓ APAGADO (22-oct-2026). Bajaba la mesa al total, suponiendo que el total era el
+# bueno. La causa resultó ser el reconteo que pesaba sólo el depósito y lo cargaba como total: muchas
+# veces la mesa es la real y lo que borraba existía. Se corrige recontando cada stock desde su ficha
+# (depósito y mesa por separado, `Stocks::Recontar`); `stocks:historia_mesa` dice cómo llegó cada uno.
 namespace :stocks do
-  desc 'Lista los stocks con más sobre la mesa que en el frasco (CORREGIR=1 para bajar la mesa)'
+  desc 'Lista los stocks con más sobre la mesa que en el frasco (sólo lista)'
   task mesa_de_mas: :environment do
-    corregir = ENV['CORREGIR'].present?
-    club_id  = ENV['CLUB'].presence
+    if ENV['CORREGIR'].present?
+      abort 'CORREGIR=1 ya no existe: bajaría producto que puede estar sobre la mesa. Recontá cada stock ' \
+            '(depósito y mesa por separado) desde su ficha; `rake stocks:historia_mesa` muestra cómo llegó.'
+    end
+    club_id = ENV['CLUB'].presence
 
     ActsAsTenant.without_tenant do
       mesa = MostradorItem.unscoped.where('cantidad > 0').group(:stock_id).sum(:cantidad)
@@ -29,14 +30,8 @@ namespace :stocks do
       stocks.each do |s|
         puts format('%-28s %-12s frasco %8.2f  mesa %8.2f  %s', s.club&.slug, s.numero_lote_producto, s.cantidad.to_f,
                     mesa[s.id].to_f, s.estado)
-        next unless corregir
-
-        ActsAsTenant.with_tenant(s.club) do
-          admin = s.club.users.find_by(role: 'admin')
-          s.bajar_mesa_al_total!(usuario: admin, motivo: 'Corrección: la mesa tenía más que el frasco tras un ajuste del stock')
-        end
       end
-      puts corregir ? "#{stocks.size} stocks corregidos." : "#{stocks.size} stocks. CORREGIR=1 para bajar la mesa al total."
+      puts "#{stocks.size} stocks. Recontalos desde su ficha: depósito y mesa por separado."
     end
   end
 end

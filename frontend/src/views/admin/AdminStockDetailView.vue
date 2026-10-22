@@ -44,6 +44,16 @@
              El disponible es lo que se puede entregar hoy (el mismo techo que valida el
              backend); la mesa es un LUGAR y va aparte, no como resta. -->
         <div class="sd__hero-kpis">
+          <!-- LO QUE HAY AHORA, Y DÓNDE (22-oct-2026). La ficha no lo mostraba: Javi veía «Total
+               inicial 42 · Disponible 70 · Sobre la mesa 132» y ningún número decía cuánto había. El
+               total es depósito + mesa; el desglose está para que quien cuenta sepa qué contar. -->
+          <div class="sd__kpi">
+            <div class="sd__kpi-val">{{ Number(stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Hay ahora</div>
+            <div v-if="stock.en_mostrador_g > 0" class="sd__kpi-sub">
+              depósito {{ Number(stock.en_deposito_g).toFixed(1) }} + mesa {{ Number(stock.en_mostrador_g).toFixed(1) }}
+            </div>
+          </div>
           <div class="sd__kpi">
             <!-- Lo que entró en total (el alta + cada «Entró mercadería»): lo cuenta el backend. -->
             <div class="sd__kpi-val">{{ Number(stock.total_entrado ?? stock.cantidad_inicial ?? stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
@@ -456,7 +466,9 @@
               <div class="sd__modal-ico"><i class="bi bi-sliders"></i></div>
               <div>
                 <h2 class="sd__modal-title">Ajustar gramos</h2>
-                <p class="sd__modal-sub">Stock actual: <strong>{{ stock?.cantidad }}g</strong></p>
+                <p class="sd__modal-sub">Hay ahora: <strong>{{ stock?.cantidad }}{{ unidad }}</strong>
+                  <template v-if="hayMesa"> — depósito {{ fmtCant(stock.en_deposito_g) }} + sobre la mesa {{ fmtCant(stock.en_mostrador_g) }}</template>
+                </p>
               </div>
               <button class="sd__modal-close" @click="showAjustar = false"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -478,7 +490,28 @@
                      12 g más" es lo que la persona sabe; el total lo calcula la máquina. Merma y
                      pérdida siempre quitan, así que ahí no se pregunta. «Recontar» sigue estando
                      para quien pesó el frasco entero. -->
-                <div class="sd__field">
+                <!-- RECONTAR CON PRODUCTO SOBRE LA MESA ES CONTAR LOS DOS LUGARES (22-oct-2026). Pedir
+                     «la cantidad exacta» de una era el error: se pesa el frasco del depósito, se
+                     escribe eso, y el total queda sin lo de la mesa. El total lo suma la máquina. -->
+                <template v-if="recontarLugares">
+                  <div class="sd__field">
+                    <label class="sd__label">En el depósito <span class="sd__req">*</span></label>
+                    <div class="sd__input-row">
+                      <input type="number" min="0" step="0.01" class="sd__input" v-model.number="ajustarForm.deposito"
+                        :placeholder="`el sistema dice ${fmtCant(stock.en_deposito_g)}`" aria-label="Cuánto hay en el depósito" />
+                      <span class="sd__input-suf">{{ unidad }}</span>
+                    </div>
+                  </div>
+                  <div v-for="m in stock.mesas" :key="m.id" class="sd__field">
+                    <label class="sd__label">Sobre la mesa{{ stock.mesas.length > 1 && m.sede ? ` (${m.sede})` : '' }} <span class="sd__req">*</span></label>
+                    <div class="sd__input-row">
+                      <input type="number" min="0" step="0.01" class="sd__input" v-model.number="ajustarForm.mesas[m.id]"
+                        :aria-label="`Cuánto hay sobre la mesa${m.sede ? ' de ' + m.sede : ''}`" />
+                      <span class="sd__input-suf">{{ unidad }}</span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="sd__field">
                   <label class="sd__label">
                     <template v-if="esIngreso">Cuánto entró</template>
                     <template v-else-if="ajustarModo === 'recontar'">Cantidad exacta que tenés ahora</template>
@@ -519,11 +552,23 @@
                 <button type="button" class="sd__alert-link sd__alert-btn" @click="ajustarForm.tipo = 'ingreso'">Entró mercadería</button>:
                 así aparece como ingreso en los informes. El reconteo es para corregir un conteo.
               </div>
+              <div v-if="recontarLugares" class="sd__alert sd__alert--info">
+                Contá lo que ves en cada lugar. El total es la suma: no hace falta calcularlo.
+              </div>
+              <div v-if="hayMesa && !recontarLugares && !esIngreso" class="sd__alert sd__alert--info">
+                Esto sale del depósito (hay {{ fmtCant(stock.en_deposito_g) }} {{ unidad }}). Lo que falte de la mesa
+                se baja desde el mostrador.
+              </div>
               <!-- Si el reconteo da MÁS en un frasco de cosecha, se explica dónde se corrige en
-                   vez de dejar apretar y mostrar el error del backend. -->
-              <div v-if="vieneDeCosecha && ajustarSuma" class="sd__alert sd__alert--info">
-                En un frasco que vino de la cosecha, los gramos salen del pesaje del lote. Si pesaste de
-                más, corregilo en
+                   vez de dejar apretar y mostrar el error del backend. Lo que un reconteo anterior
+                   le sacó sí puede volver (`reconteo_devolvible`, lo calcula el backend). -->
+              <div v-if="vieneDeCosecha && ajustarSuma && ajustarDelta <= devolvible" class="sd__alert sd__alert--info">
+                Vuelven {{ formatG(ajustarDelta, 2) }}: los había sacado un reconteo anterior.
+              </div>
+              <div v-if="vieneDeCosecha && ajustarSuma && ajustarDelta > devolvible" class="sd__alert sd__alert--info">
+                <template v-if="devolvible > 0">Sólo pueden volver {{ formatG(devolvible, 2) }}, lo que sacaron reconteos anteriores. Volvé a pesar; si de verdad hay más, </template>
+                <template v-else>En un frasco que vino de la cosecha, los gramos salen del pesaje del lote. Si pesaste de
+                más, </template>corregilo en
                 <RouterLink v-if="stock?.lote_id" :to="`/lotes/${stock.lote_id}`" class="sd__alert-link">el lote {{ stock.lote_codigo || '' }}</RouterLink>
                 <template v-else>el lote</template>
                 (Manicura → reajustar peso) y el stock se actualiza solo.
@@ -535,7 +580,7 @@
             </div>
             <div class="sd__modal-ft">
               <button class="sd__btn-ghost" @click="showAjustar = false">Cancelar</button>
-              <button class="sd__btn-primary" :disabled="ajustando || (vieneDeCosecha && ajustarSuma)" @click="ejecutarAjustar">
+              <button class="sd__btn-primary" :disabled="ajustando || (vieneDeCosecha && ajustarSuma && ajustarDelta > devolvible)" @click="ejecutarAjustar">
                 <DsSpinner v-if="ajustando" :size="12" />
                 <i v-else class="bi bi-check-lg"></i>
                 {{ esIngreso ? 'Registrar ingreso' : 'Confirmar ajuste' }}
@@ -1065,8 +1110,15 @@ async function guardarEdit() {
 
 // ── Ajustar ────────────────────────────────────────────────────────────────────
 const showAjustar  = ref(false)
-const formAjusteVacio = () => ({ tipo: esExterno.value ? 'ingreso' : 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: hoyISO })
-const ajustarForm  = ref({ tipo: 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: null })
+const formAjusteVacio = () => ({
+  tipo: esExterno.value ? 'ingreso' : 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: hoyISO,
+  // Lo que el sistema cree que hay arriba, para corregir: el depósito se pesa en blanco.
+  deposito: null, mesas: Object.fromEntries((stock.value?.mesas || []).map(m => [m.id, m.cantidad])),
+})
+const ajustarForm  = ref({ tipo: 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: null, deposito: null, mesas: {} })
+const hayMesa = computed(() => Number(stock.value?.en_mostrador_g) > 0)
+const recontarLugares = computed(() => ajustarForm.value.tipo === 'reconteo' && (stock.value?.mesas || []).length > 0)
+const devolvible = computed(() => Number(stock.value?.reconteo_devolvible) || 0)
 const ajustarError = ref(null)
 const ajustando    = ref(false)
 
@@ -1094,21 +1146,33 @@ const ajustarSuma    = computed(() => ajustarDelta.value > 0)
 
 // El delta que va al backend, con signo. En «recontar» es total − actual.
 const ajustarDelta = computed(() => {
+  if (recontarLugares.value) {
+    const f = ajustarForm.value
+    if (!stock.value || f.deposito == null || f.deposito === '') return 0
+    return Number(f.deposito) + Object.values(f.mesas).reduce((a, x) => a + (Number(x) || 0), 0) - parseFloat(stock.value.cantidad)
+  }
   const c = ajustarForm.value.cantidad
   if (!stock.value || c == null) return 0
   const actual = parseFloat(stock.value.cantidad)
   if (ajustarModo.value === 'recontar') return c - actual
   return ajustarModo.value === 'quitar' ? -c : c
 })
-const ajustarPreview = computed(() =>
-  ajustarForm.value.cantidad != null && stock.value ? parseFloat(stock.value.cantidad) + ajustarDelta.value : null
-)
+const ajustarPreview = computed(() => {
+  if (!stock.value) return null
+  const lleno = recontarLugares.value ? ajustarForm.value.deposito != null && ajustarForm.value.deposito !== '' : ajustarForm.value.cantidad != null
+  return lleno ? parseFloat(stock.value.cantidad) + ajustarDelta.value : null
+})
 
 async function ejecutarAjustar() {
   ajustarError.value = null
   const motivo = ajustarForm.value.motivo.trim()
   if (esIngreso.value) return registrarIngreso(motivo)
   if (!motivo) { ajustarError.value = 'El motivo es obligatorio'; return }
+  if (recontarLugares.value) return recontarDosLugares(motivo)
+  if (hayMesa.value && ajustarDelta.value < 0 && -ajustarDelta.value > Number(stock.value.en_deposito_g)) {
+    ajustarError.value = `En el depósito hay ${fmtCant(stock.value.en_deposito_g)} ${unidad.value}; lo que falte de la mesa se baja desde el mostrador`
+    return
+  }
   if (ajustarForm.value.cantidad == null || ajustarForm.value.cantidad < 0) {
     ajustarError.value = ajustarModo.value === 'recontar' ? 'Ingresá la cantidad exacta que tenés ahora' : 'Ingresá cuántos gramos'; return
   }
@@ -1124,6 +1188,22 @@ async function ejecutarAjustar() {
     toast.success('Stock ajustado')
   } catch (e) {
     ajustarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al ajustar'
+  } finally { ajustando.value = false }
+}
+
+async function recontarDosLugares(motivo) {
+  const f = ajustarForm.value
+  const vacio = (x) => x == null || x === ''
+  if (vacio(f.deposito) || Object.values(f.mesas).some(vacio)) { ajustarError.value = 'Escribí lo que hay en cada lugar (0 si no queda nada)'; return }
+  if (Number(f.deposito) < 0 || Object.values(f.mesas).some(x => Number(x) < 0)) { ajustarError.value = 'Lo contado no puede ser negativo'; return }
+  ajustando.value = true
+  try {
+    const { data } = await ajustarStock(stock.value.id, { tipo: 'reconteo', deposito: f.deposito, mesas: f.mesas, motivo })
+    showAjustar.value = false
+    await recargar()
+    toast.success(data?.sin_cambios ? 'Coincide con lo que había: no hubo que corregir nada' : 'Stock recontado')
+  } catch (e) {
+    ajustarError.value = e?.response?.data?.error || 'Error al recontar'
   } finally { ajustando.value = false }
 }
 
@@ -1407,6 +1487,7 @@ function badgeVencLabel(s) {
 .sd__kpi { text-align: center; }
 .sd__kpi-val  { font-size: 1.6rem; font-weight: 900; color: var(--c-slate-900); line-height: 1; letter-spacing: -.04em; }
 .sd__kpi-unit { font-size: .9rem; font-weight: 500; color: var(--c-slate-400); margin-left: 1px; }
+.sd__kpi-sub  { font-size: .68rem; color: var(--c-slate-500); margin-top: .15rem; }
 .sd__kpi-lbl  { font-size: .62rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .06em; margin-top: .2rem; }
 .sd__kpi--warn .sd__kpi-val   { color: #15803d; }
 .sd__kpi--amber .sd__kpi-val  { color: #d97706; }

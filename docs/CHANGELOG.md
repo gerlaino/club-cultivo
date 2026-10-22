@@ -1,5 +1,33 @@
 # Changelog
 
+## Octubre 2026 (fz) — Recontar es contar los dos lugares: depósito y mesa (22-oct)
+
+Javi el 20-oct con ST-26-0028: «había 132, en realidad hay 70; ajusté como reconteo a 70 y sobre la
+mesa siguen quedando 132». En prod, `stocks:mesa_de_mas` dio **22 stocks de Mitocondria** con más en
+la mesa que en el frasco. La causa: el reconteo pedía «la cantidad exacta que tenés ahora» sin decir
+de dónde, y la ficha no mostraba cuánto había (sólo «Total inicial · Disponible · Sobre la mesa»).
+Con eso no se puede saber, desde los datos, cuál de los dos números miente: quien contó pudo pesar
+todo (la mesa estaba inflada, como en ST-26-0028) o sólo el depósito (el total quedó corto).
+
+- **Reconteo con producto sobre la mesa = contar cada lugar** (`Stocks::Recontar`): el depósito y
+  cada mesa por separado; el total es la suma. La mesa se corrige con su movimiento («Recuento del
+  stock — motivo») y el del total dice «(depósito X + mesa Y)». El total contado «de una» con mesa
+  se rechaza. Si coincide, no deja movimientos (`sin_cambios`).
+- **Un frasco de cosecha recupera lo que un reconteo anterior le sacó** y nada más
+  (`Stock#reconteo_devolvible`): deshacer un conteo mal hecho no es crear producto.
+- **Revierte la parte de (fu) que bajaba la mesa en silencio**: un reconteo, una merma, editar la
+  cantidad o elaborar ya no bajan la mesa. Merma/pérdida sólo salen del depósito (lo de la mesa se
+  baja desde el mostrador); editar por debajo de la mesa y elaborar con más que lo guardado se
+  rechazan diciendo por qué. Finalizar sí la vacía (es cerrar el stock a propósito).
+- **La ficha dice «Hay ahora» con su desglose** (depósito + mesa), y el modal también. La lista de
+  stock no ofrece el reconteo de un número si hay mesa: manda a la ficha.
+- `stocks:mesa_de_mas` ya no tiene `CORREGIR=1` (bajaba producto que podía existir); nuevo
+  `stocks:historia_mesa` (sólo lee): reconstruye total y mesa de cada stock, marca el momento en que
+  la mesa pasó al total y los reconteos que contaron sólo el depósito.
+- Specs: `stock_mesa_no_supera_total_spec` (reescrito al AC nuevo), `stocks_historia_mesa_spec`,
+  `stockRecontarLugares.test.js`. Visto con Playwright sobre Club Modelo.
+- **Para arreglar los 22**: recontar cada uno desde su ficha, pesando el depósito y la mesa.
+
 ## Octubre 2026 (fx) — Las pantallas se prueban solas en cada push (21-oct)
 
 - **Humo por rol** (`e2e/humoPorRol.spec.js`): admin, cultivador, manicura, médico, dispensador,

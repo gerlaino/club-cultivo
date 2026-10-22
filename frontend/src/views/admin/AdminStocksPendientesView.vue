@@ -563,6 +563,16 @@
                     <span class="stk__input-suf">g</span>
                   </div>
                 </div>
+                <!-- Con producto sobre la mesa, el reconteo cuenta depósito y mesa por separado, y eso
+                     vive en la ficha (`Stocks::Recontar`, 22-oct-2026). Acá no se ofrece el total «de una»:
+                     el backend lo rechaza. -->
+                <div class="stk__field stk__field--full" v-else-if="enMesaAjuste > 0">
+                  <div class="stk__alert">
+                    Hay {{ enMesaAjuste }} g sobre la mesa: el reconteo se hace desde
+                    <RouterLink :to="`/admin/stock/${ajustarTarget.id}`">la ficha del stock</RouterLink>,
+                    contando el depósito y la mesa por separado.
+                  </div>
+                </div>
                 <div class="stk__field" v-else>
                   <label class="stk__label">Nueva cantidad real (g) <span class="stk__req">*</span></label>
                   <div class="stk__input-row">
@@ -1250,6 +1260,8 @@ const ajustarPreviewClass = computed(() => {
   return ''
 })
 
+const enMesaAjuste = computed(() => Number(ajustarTarget.value?.en_mostrador_g) || 0)
+
 function openAjustar(s) {
   ajustarTarget.value = s
   ajustarForm.value   = { tipo: 'merma', gramos: null, nuevaCantidad: null, motivo: '' }
@@ -1268,6 +1280,7 @@ async function ejecutarAjustar() {
     if (!ajustarForm.value.gramos || ajustarForm.value.gramos <= 0) { ajustarError.value = 'Ingresá los gramos a descontar'; return }
     gramos = -ajustarForm.value.gramos
   } else {
+    if (enMesaAjuste.value > 0) { ajustarError.value = 'Recontá desde la ficha del stock: depósito y mesa por separado'; return }
     if (ajustarForm.value.nuevaCantidad == null) { ajustarError.value = 'Ingresá la nueva cantidad'; return }
     gramos = ajustarForm.value.nuevaCantidad - actual
     if (gramos === 0) { ajustarError.value = 'La nueva cantidad es igual a la actual'; return }
