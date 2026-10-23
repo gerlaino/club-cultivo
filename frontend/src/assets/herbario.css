@@ -29,6 +29,11 @@ body:has(.herbario) { padding-bottom: 0; }
   --hb-menta: #9FD1B0;
   --hb-ambar: #B98532;
   --hb-tierra: #8A6E55;
+  /* Trigo (23-oct-2026): el color de autocultivo en la portada, para que no se lea como lo mismo
+     que organizaciones. Cálido y de la misma familia que tierra y ámbar. */
+  --hb-trigo: #F3E7CF;
+  --hb-trigo-tinta: #5C4A36;
+  --hb-trigo-acento: #8A5B1E;
   --hb-error: #9B2C1E;
   --hb-serif: 'Fraunces', Georgia, serif;
   --hb-sans: 'Public Sans', system-ui, sans-serif;

@@ -1,5 +1,25 @@
 # Changelog
 
+## Octubre 2026 (gb) — La portada partida y el pie nuevo (23-oct)
+
+Pedido de Javi («cuando llegás tenemos dos secciones pero se lee como todo uno mismo») y aprobado por
+Germán sobre la propuesta con mockups.
+
+- **Portada partida** (`LandingView.vue`): 3/4 organizaciones en verde claro, con el texto de Javi
+  («Toda tu organización, en una plataforma»), tres puntos y **los dos planes** (precio con un pack y
+  con los dos, sedes, salas, plantas en floración, usuarios por rol). 1/4 autocultivo en **trigo**
+  (tokens nuevos `--hb-trigo*` en `herbario.css`) con la planta que crece, el precio y la prueba
+  gratis. En el teléfono se apilan. Sale la sección «¿Para qué la querés?»: la portada hace ese
+  trabajo. Todos los números salen de `Precios.lista_publica`; sin respuesta no se muestra ninguno.
+- **«Soy paciente»** en la barra de todas las páginas públicas (visible también en el teléfono):
+  `/paciente` lleva al login con el texto para el paciente (su usuario es `nombre.apellido@…paciente`)
+  y sin «olvidé mi contraseña» ni «probá gratis», que no le sirven. Cuando exista la entrada con DNI
+  (etapa 1 del portal), `/paciente` apunta ahí.
+- **El pie nuevo** (`PaginaPublica.vue`, todas las páginas públicas): degradé del papel al verde claro,
+  cuatro columnas (quiénes somos, plataforma, contacto, legales), botón de arrepentimiento destacado,
+  derechos reservados y «no vende ni entrega cannabis». Sin datos del titular (decisión del 6-oct).
+- `portadaPublica.test.js` (7). Visto con Playwright en compu y teléfono, sin desborde.
+
 ## Octubre 2026 (fz) — Recontar es contar los dos lugares: depósito y mesa (22-oct)
 
 Javi el 20-oct con ST-26-0028: «había 132, en realidad hay 70; ajusté como reconteo a 70 y sobre la

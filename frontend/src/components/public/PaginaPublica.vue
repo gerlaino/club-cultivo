@@ -8,6 +8,9 @@
           <RouterLink to="/bienvenida/autocultivo">Autocultivo</RouterLink>
           <RouterLink to="/contacto">Contacto</RouterLink>
         </nav>
+        <!-- El paciente no viene a informarse: viene a entrar a su portal (23-oct-2026). Queda a la
+             vista también en el teléfono, donde el menú de secciones se esconde. -->
+        <RouterLink to="/paciente" class="pp__paciente">Soy paciente</RouterLink>
         <RouterLink to="/login" class="pp__ingresar">Ingresar</RouterLink>
         <!-- El botón de arriba es el de ESA página: en proyectos manda al contacto, no al alta de
              autocultivo (antes una organización tocaba «Probar gratis» y caía en el registro personal). -->
@@ -22,17 +25,41 @@
       <slot />
     </main>
 
+    <!-- EL PIE (23-oct-2026): quiénes somos, la plataforma, contacto y legales, sobre un degradé que
+         sale del papel del cuerpo y termina en el verde claro de la barra de arriba. Sin nombre, CUIT
+         ni domicilio del titular (Germán, 6-oct): a una organización le llegan en el acuerdo. -->
     <footer class="pp__pie">
-      <div class="hb__wrap pp__pie-in">
-        <span class="pp__pie-marca">Cultivo Espacial</span>
-        <nav class="pp__pie-nav" aria-label="Legales">
-          <RouterLink to="/terminos">Términos y condiciones</RouterLink>
-          <RouterLink to="/privacidad">Privacidad</RouterLink>
-          <!-- Res. SCI 424/2020: el botón de arrepentimiento, a la vista en TODAS las páginas. -->
-          <RouterLink :to="{ path: '/contacto', query: { tipo: 'baja' } }" class="pp__arrep">Botón de arrepentimiento</RouterLink>
-          <RouterLink to="/login">Ingresar</RouterLink>
-        </nav>
-        <span class="pp__pie-copy">© {{ yr }}</span>
+      <div class="hb__wrap">
+        <div class="pp__pie-cols">
+          <div class="pp__pie-marca">
+            <span class="pp__pie-nombre">Cultivo Espacial</span>
+            <p>Software de gestión y trazabilidad para proyectos cannábicos de dispensa, investigación y autocultivo.</p>
+            <span class="pp__pie-hecho">Hecho en la Argentina</span>
+          </div>
+          <nav aria-label="Plataforma">
+            <p class="pp__pie-t">Plataforma</p>
+            <RouterLink to="/bienvenida/organizaciones">Organizaciones</RouterLink>
+            <RouterLink to="/bienvenida/autocultivo">Autocultivo</RouterLink>
+            <RouterLink to="/paciente">Portal del paciente</RouterLink>
+            <RouterLink :to="{ path: '/bienvenida/organizaciones', hash: '#precios' }">Precios</RouterLink>
+          </nav>
+          <nav aria-label="Contacto">
+            <p class="pp__pie-t">Contacto</p>
+            <RouterLink to="/contacto">Hablemos</RouterLink>
+            <span class="pp__pie-mail">{{ TITULAR.mail }}</span>
+          </nav>
+          <nav aria-label="Legales">
+            <p class="pp__pie-t">Legales</p>
+            <RouterLink to="/terminos">Términos y condiciones</RouterLink>
+            <RouterLink to="/privacidad">Política de privacidad</RouterLink>
+            <!-- Res. SCI 424/2020: el botón de arrepentimiento, a la vista en TODAS las páginas. -->
+            <RouterLink :to="{ path: '/contacto', query: { tipo: 'baja' } }" class="pp__arrep">Botón de arrepentimiento</RouterLink>
+          </nav>
+        </div>
+        <div class="pp__pie-base">
+          <span>© {{ yr }} Cultivo Espacial. Todos los derechos reservados.</span>
+          <span>Cultivo Espacial es un software de gestión: no vende ni entrega cannabis ni sus derivados.</span>
+        </div>
       </div>
     </footer>
   </div>
@@ -53,6 +80,7 @@ defineProps({
 })
 import { useRoute } from 'vue-router'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
+import { TITULAR } from '../../views/legal/titular.js'
 import '../../assets/herbario.css'
 
 cargarFuentesHerbario()
@@ -98,12 +126,31 @@ onBeforeUnmount(() => revelador?.disconnect())
   .pp__marca { font-size: 17px; }
 }
 
-.pp__pie { border-top: 1px solid var(--hb-tinta); padding: 28px 0 36px; }
-.pp__pie-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; font-size: 14px; color: var(--hb-tinta-2); }
-.pp__pie-marca { font: 600 17px var(--hb-serif); color: var(--hb-tinta); }
-.pp__pie-nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
-.pp__pie-nav a { color: var(--hb-tinta-2); text-decoration: none; }
-.pp__pie-nav a:hover { color: var(--hb-tinta); text-decoration: underline; }
-.pp__pie-nav a.pp__arrep { color: var(--hb-verde); font-weight: 600; }
-.pp__pie-copy { margin-left: auto; font: 13px var(--hb-mono); }
+.pp__paciente {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--hb-regla); background: var(--hb-papel-claro); color: var(--hb-tinta);
+  font-weight: 600; font-size: 14px; text-decoration: none; white-space: nowrap;
+}
+.pp__paciente::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--hb-verde); }
+.pp__paciente:hover { border-color: var(--hb-verde); }
+@media (max-width: 760px) {
+  .pp__paciente { margin-left: auto; padding: 0 11px; font-size: 13px; }
+  .pp__paciente + .pp__ingresar { margin-left: 0; }
+}
+
+.pp__pie { background: linear-gradient(180deg, var(--hb-papel) 0%, var(--hb-salvia-suave) 55%, color-mix(in srgb, var(--hb-salvia) 55%, var(--hb-salvia-suave)) 100%); padding: 48px 0 24px; color: var(--hb-tinta-2); }
+.pp__pie-cols { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: 28px; }
+@media (max-width: 860px) { .pp__pie-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .pp__pie-marca { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .pp__pie-cols { grid-template-columns: minmax(0, 1fr); } }
+.pp__pie-marca p { margin: 8px 0 0; max-width: 34ch; font-size: 14px; line-height: 1.5; }
+.pp__pie-nombre { font: 600 20px var(--hb-serif); color: var(--hb-tinta); }
+.pp__pie-hecho { display: block; margin-top: 12px; font: 500 11px var(--hb-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--hb-verde); }
+.pp__pie-cols nav { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 14px; }
+.pp__pie-t { margin: 0 0 4px; font: 500 11px var(--hb-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--hb-tinta-2); }
+.pp__pie-cols nav a { color: var(--hb-tinta); text-decoration: none; }
+.pp__pie-cols nav a:hover { text-decoration: underline; }
+.pp__pie-mail { color: var(--hb-tinta); overflow-wrap: anywhere; user-select: all; }
+.pp__pie-cols nav a.pp__arrep { margin-top: 2px; padding: 5px 12px; border: 1.5px solid var(--hb-verde); border-radius: 999px; background: var(--hb-papel-claro); color: var(--hb-verde); font-weight: 600; }
+.pp__pie-cols nav a.pp__arrep:hover { text-decoration: none; background: var(--hb-salvia-suave); }
+.pp__pie-base { margin-top: 32px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--hb-tinta) 14%, transparent); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; font-size: 13px; }
 </style>

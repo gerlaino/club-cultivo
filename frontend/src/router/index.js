@@ -79,6 +79,9 @@ const routes = [
   },
   // El primer nombre de esa página (5-oct, mismo día): por si alguien guardó el link.
   { path: "/bienvenida/casa", redirect: "/bienvenida/autocultivo" },
+  // «Soy paciente» de la página pública (23-oct-2026). Hasta que exista la entrada con DNI (etapa 1
+  // del portal), es el login de siempre con el texto para el paciente.
+  { path: "/paciente", redirect: { path: "/login", query: { paciente: "1" } } },
   {
     path: "/bienvenida/organizaciones",
     name: "landing-organizaciones",

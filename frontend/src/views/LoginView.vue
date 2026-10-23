@@ -14,13 +14,16 @@
         </RouterLink>
 
         <p class="hb-ceja">Cultivo Espacial</p>
-        <h1 class="hb-titulo">Ingresá</h1>
+        <h1 class="hb-titulo">{{ esPaciente ? 'Tu portal de paciente' : 'Ingresá' }}</h1>
+        <!-- El paciente llega desde «Soy paciente»: su usuario no es un mail suyo y no puede recuperar
+             la contraseña solo (el «olvidé» deja afuera a los pacientes), así que se le dice. -->
+        <p v-if="esPaciente" class="hb-bajada lv__paciente">Tu usuario te lo dio tu organización: tiene la forma <b>nombre.apellido@organizacion.paciente</b>.</p>
 
         <form @submit.prevent="onSubmit" novalidate class="hb-form">
           <div class="hb-campo">
             <label class="hb-label" for="lv-usuario">Usuario</label>
             <input id="lv-usuario" v-model.trim="email" type="email" class="hb-input"
-                   placeholder="tu@organizacion.org"
+                   :placeholder="esPaciente ? 'nombre.apellido@organizacion.paciente' : 'tu@organizacion.org'"
                    autocomplete="username" required :disabled="auth.loading" />
           </div>
 
@@ -41,7 +44,8 @@
                 </svg>
               </button>
             </div>
-            <RouterLink to="/olvide-contrasena" class="hb-link lv__olvide">¿Olvidaste tu contraseña?</RouterLink>
+            <p v-if="esPaciente" class="hb-ayuda lv__olvide">¿Te olvidaste la contraseña? Pedile una nueva a tu organización.</p>
+            <RouterLink v-else to="/olvide-contrasena" class="hb-link lv__olvide">¿Olvidaste tu contraseña?</RouterLink>
           </div>
 
           <!-- Espera larga pero normal (servidor despertando). No es un error: va como nota,
@@ -63,7 +67,7 @@
           </button>
         </form>
 
-        <p class="hb-pie">¿Cultivás en casa y no tenés cuenta? <RouterLink to="/registro" class="hb-link">Probá gratis</RouterLink></p>
+        <p v-if="!esPaciente" class="hb-pie">¿Cultivás en casa y no tenés cuenta? <RouterLink to="/registro" class="hb-link">Probá gratis</RouterLink></p>
       </div>
 
       <!-- Qué build está corriendo. Es la forma de saber, sin adivinar, si el dispositivo
@@ -74,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -92,6 +96,7 @@ function volver () {
   router.push('/bienvenida')
 }
 
+const esPaciente = computed(() => route.query.paciente === '1')
 const email      = ref('')
 const password   = ref('')
 const showPass   = ref(false)
@@ -163,6 +168,7 @@ async function onSubmit() {
 }
 .lv__eye:hover { color: var(--hb-tinta); }
 .lv__olvide { align-self: flex-end; margin-top: 2px; font-size: .8rem; }
+.lv__paciente { margin: 4px 0 0; text-align: center; font-size: .9rem; }
 
 .err-enter-active, .err-leave-active { transition: all .2s; }
 .err-enter-from, .err-leave-to { opacity: 0; transform: translateY(-4px); }
