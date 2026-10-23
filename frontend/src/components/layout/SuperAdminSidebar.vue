@@ -21,6 +21,8 @@
       >
         <component :is="t.icono" :size="17" :stroke-width="1.75" />
         <span class="sasb__link-txt">{{ t.label }}</span>
+        <span v-if="t.name === 'sa-consultas' && pendientes" class="sasb__badge"
+              :aria-label="`${pendientes} sin atender`">{{ pendientes }}</span>
         <span v-if="t.name === 'sa-estado' && puntoEstado" class="sasb__punto" :class="`sasb__punto--${puntoEstado}`"
               :title="puntoEstado === 'mal' ? 'Algo no funciona' : 'Hay algo para mirar'"></span>
       </RouterLink>
@@ -42,11 +44,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 import { getSuperAdminEstado } from '../../lib/api.js'
+import { useConsultasPendientes } from '../../composables/useConsultasPendientes.js'
 import { LayoutDashboard, Building2, Users, Gauge, MessageSquare, FileBarChart, LogOut } from 'lucide-vue-next'
 
 const auth   = useAuthStore()
@@ -63,6 +66,12 @@ const tabs = [
 ]
 // La ficha y el alta de una organización son parte de «Organizaciones».
 function esActiva(t) { return t.coincide.includes(route.name) }
+
+// Las consultas sin atender: se piden al entrar y cada vez que se cambia de sección, así un pedido
+// que llegó mientras uno trabajaba aparece en la próxima vuelta sin recargar.
+const { pendientes, refrescar: refrescarConsultas } = useConsultasPendientes()
+onMounted(refrescarConsultas)
+watch(() => route.name, refrescarConsultas)
 
 // El punto de Estado: se pide una vez al entrar. Si falla, no se muestra nada (no es una alarma).
 const puntoEstado = ref(null)
@@ -98,6 +107,11 @@ async function doLogout() {
 .sasb__link:hover { background: rgba(255,255,255,.08); }
 .sasb__link--on { background: var(--c-leaf-800); color: #fff; font-weight: 700; }
 .sasb__link-txt { flex: 1; }
+.sasb__badge {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; box-sizing: border-box;
+  background: var(--c-amber-500); color: var(--c-role-superadmin); font-size: .72rem; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+}
 .sasb__punto { width: 9px; height: 9px; border-radius: 9px; }
 .sasb__punto--atencion { background: var(--c-amber-500); }
 .sasb__punto--mal { background: var(--c-rust-600); }

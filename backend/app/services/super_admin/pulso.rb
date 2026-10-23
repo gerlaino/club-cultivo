@@ -31,6 +31,8 @@ module SuperAdmin
         salud:         salud,
         adopcion:      adopcion,
         totales:       { clubes_operando: @clubes.size },
+        # Lo que llegó por el formulario y nadie atendió: un pedido de alta esperando es plata.
+        consultas_pendientes: SolicitudContacto.pendientes.count,
       }
     end
 

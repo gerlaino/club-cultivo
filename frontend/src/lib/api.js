@@ -855,6 +855,7 @@ export const getSuperAdminPulso    = ()           => api.get('/super_admin/pulso
 export const getSuperAdminEstado = () => api.get('/super_admin/estado')
 // La bandeja de lo que llegó por el formulario de /bienvenida.
 export const listConsultas     = ()                  => api.get('/super_admin/consultas')
+export const getConsultasPendientes = ()             => api.get('/super_admin/consultas/pendientes')
 export const marcarConsulta    = (id, atendida)      => api.patch(`/super_admin/consultas/${id}`, { atendida })
 export const responderConsulta = (id, texto)         => api.post(`/super_admin/consultas/${id}/respuestas`, { texto })
 

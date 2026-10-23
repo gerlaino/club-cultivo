@@ -10,6 +10,7 @@ import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listConsultas, marcarConsulta, responderConsulta } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useConsultasPendientes } from '../../composables/useConsultasPendientes.js'
 import { Inbox, Mail, Phone, Building2, CheckCircle2, RotateCcw, Reply, Send, Clock, AlertTriangle } from 'lucide-vue-next'
 
 const toast = useToast()
@@ -20,9 +21,14 @@ const guardando = ref(null)
 
 const consultas = computed(() => datos.value?.consultas || [])
 
+// El número de la barra lateral es el mismo que el de esta bandeja: atender una lo baja ahí también.
+const { pendientes: pendientesBarra } = useConsultasPendientes()
+const sincronizarBarra = () => { pendientesBarra.value = datos.value?.pendientes || 0 }
+
 async function cargar () {
   try {
     datos.value = (await listConsultas()).data
+    sincronizarBarra()
     error.value = null
   } catch {
     error.value = 'No se pudieron cargar las consultas.'
@@ -37,6 +43,7 @@ async function marcar (c, atendida) {
     const { data } = await marcarConsulta(c.id, atendida)
     Object.assign(c, data)
     datos.value.pendientes += atendida ? -1 : 1
+    sincronizarBarra()
     toast.success(atendida ? 'Marcada como atendida.' : 'Volvió a pendientes.')
   } catch {
     toast.error('No se pudo guardar.')
@@ -56,6 +63,7 @@ async function enviarRespuesta (c) {
   try {
     const { data } = await responderConsulta(c.id, borrador.value.trim())
     if (!c.atendida_at && data.atendida_at) datos.value.pendientes -= 1
+    sincronizarBarra()
     Object.assign(c, data)
     respondiendo.value = null
     toast.success('Respuesta enviada.')

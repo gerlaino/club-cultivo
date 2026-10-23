@@ -35,6 +35,9 @@ const salud    = computed(() => pulso.value?.salud || {})
 // entra y no puede trabajar), después lo que se paga y no funciona, y al final lo que avisa
 // con tiempo.
 const GRUPOS = [
+  // Primero, lo que alguien pidió por el formulario y espera respuesta (22-oct-2026: llegaban pedidos
+  // de usuarios nuevos y nada lo avisaba).
+  { clave: 'consultas', titulo: 'Te escribieron',          tono: 'ambar' },
   { clave: 'perdiendo', titulo: 'Se está perdiendo plata', tono: 'rojo' },
   { clave: 'roto',      titulo: 'Paga y no le funciona',   tono: 'ambar' },
   { clave: 'agenda',    titulo: 'Quedaste en hacer',       tono: 'verde' },
@@ -52,6 +55,12 @@ const SUSPENDIDA = {
 
 const pendientes = computed(() => {
   const p = []
+  const nConsultas = pulso.value?.consultas_pendientes || 0
+  if (nConsultas) {
+    p.push({ id: 'consultas', grupo: 'consultas', nombre: 'Consultas',
+             texto: nConsultas === 1 ? 'Una consulta sin atender' : `${nConsultas} consultas sin atender`,
+             accion: 'Responder', ir: { name: 'sa-consultas' } })
+  }
   const add = (items, grupo, texto, accion) =>
     (items || []).forEach(c => p.push({ ...c, grupo, texto: texto(c), accion }))
 
@@ -180,7 +189,7 @@ onMounted(async () => {
               <li
                 v-for="(p, i) in g.items" :key="`${p.id}-${p.modulo || i}`"
                 class="sad__pend" :class="`sad__pend--${g.tono}`"
-                @click="irAlClub(p.id)"
+                @click="p.ir ? router.push(p.ir) : irAlClub(p.id)"
               >
                 <span class="sad__pend-club">{{ p.nombre }}</span>
                 <span class="sad__pend-txt">{{ p.texto }}</span>

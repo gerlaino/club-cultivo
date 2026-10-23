@@ -775,6 +775,7 @@ Rails.application.routes.draw do
       # Lo que llegó por el formulario de /bienvenida.
       resources :consultas, only: [:index, :update] do
         post :respuestas, on: :member, action: :responder
+        get :pendientes, on: :collection
       end
       resources :clubs, only: [:index, :show, :create, :update, :destroy] do
         # Un Club Modelo con datos inventados, para mostrarle la app a un prospecto. Era un

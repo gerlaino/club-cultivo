@@ -10,6 +10,13 @@ module SuperAdmin
       }
     end
 
+    # GET /super_admin/consultas/pendientes — sólo la cuenta, para el número de la barra lateral
+    # (22-oct-2026: llegaban pedidos y nada avisaba). «Pendiente» y no «sin leer»: abrir la bandeja
+    # no la descuenta, contestarla o marcarla atendida sí.
+    def pendientes
+      render json: { pendientes: SolicitudContacto.pendientes.count }
+    end
+
     # POST /super_admin/consultas/:id/respuestas — contestarle a quien escribió. Sale por el correo de
     # la plataforma (en un job: se anota si salió o por qué no) y deja la consulta como atendida.
     def responder
