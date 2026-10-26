@@ -4,6 +4,13 @@ class Users::SessionsController < Devise::SessionsController
   # Sin esto, cerrar sesión como super admin devolvería 409 en vez de desloguear.
   skip_before_action :block_super_admin_sin_contexto!, raise: false
 
+  # El filtro de Devise que contesta «ya estabas afuera» sin llegar a `destroy`. Mira la sesión de
+  # Rails (`_club_session`, que muere al cerrar el navegador), no la cookie del token (7 días): con
+  # el navegador reabierto creía que no había nadie, respondía 204 y NO borraba la cookie ni
+  # revocaba el token. «Cerrar sesión» te mandaba al login y volver a `/` te metía de nuevo
+  # (26-oct-2026). Cerrar sesión corre siempre; sin sesión, borrar una cookie que no está no daña.
+  skip_before_action :verify_signed_out_user
+
   def create
     self.resource = warden.authenticate!(auth_options)
 
@@ -32,6 +39,7 @@ class Users::SessionsController < Devise::SessionsController
   end
 
   def destroy
+    revocar_token
     sign_out(resource_name)
     # El delete DEBE usar el mismo domain que el set, si no el navegador no la borra.
     delete_opts = { path: '/' }
@@ -41,6 +49,21 @@ class Users::SessionsController < Devise::SessionsController
   end
 
   private
+
+  # Cerrar sesión DEJA DE VALER el token, no sólo borra la cookie: si alguien se lo llevó, ya no le
+  # sirve. Lo hacemos acá y no en el middleware de warden-jwt_auth porque aquel decodifica DESPUÉS
+  # de la respuesta y un token inválido (p. ej. firmado con un secreto ya rotado) le hace tirar un
+  # 500 que se come el Set-Cookie: la cookie quedaba y el logout fallaba. Acá un token que no se
+  # puede leer no tiene nada que revocar, y la cookie se borra igual.
+  def revocar_token
+    token = request.headers['Authorization'].to_s.sub(/\ABearer /i, '')
+    Warden::JWTAuth::TokenRevoker.new.call(token) if token.present?
+  rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+    nil
+  ensure
+    # Que el middleware no lo intente de nuevo (y no reviente con el mismo token).
+    request.env.delete('HTTP_AUTHORIZATION')
+  end
 
   def respond_to_on_destroy
     head :no_content

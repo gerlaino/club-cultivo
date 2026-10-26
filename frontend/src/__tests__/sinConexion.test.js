@@ -30,6 +30,15 @@ describe('El service worker sirve la app sin conexión', () => {
     expect(sw).toContain("createHandlerBoundToURL('index.html')")
   })
 
+  // Con señal, la navegación va a la red: servir siempre la cáscara guardada mostraba la versión
+  // anterior después de cada deploy (26-oct-2026). El caché es para cuando no hay red.
+  it('la navegación va primero a la red, con tope, y cae al shell guardado', () => {
+    const nav = sw.slice(sw.indexOf('registerRoute(new NavigationRoute'), sw.indexOf('denylist:'))
+    expect(sw).toMatch(/new NetworkOnly\(\{ networkTimeoutSeconds: \d \}\)/)
+    expect(nav).toContain('red.handle(')
+    expect(nav).toContain('return cascaraGuardada(')
+  })
+
   // Devolver el HTML de la app cuando alguien pide un PDF o la API es peor que fallar: parece que
   // anduvo y el error aparece más tarde y en otro lado.
   it('no le devuelve el shell a lo que no sirve la SPA', () => {

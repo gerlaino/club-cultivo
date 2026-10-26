@@ -150,17 +150,89 @@ RSpec.describe 'Autenticación por cookie httpOnly', type: :request do
       expect(response).to have_http_status(:no_content)
     end
 
-    it 'limpia la cookie jwt_token en el response' do
+    it 'manda a borrar la cookie jwt_token (Set-Cookie vencida, no la mera ausencia)' do
       delete '/users/sign_out'
-      # Rails marca una cookie eliminada con valor vacío o la ausencia del Set-Cookie con jwt_token
-      expect(response.cookies['jwt_token']).to be_blank
+      expect(borra_cookie_jwt?(response)).to be(true)
     end
 
-    it 'requests posteriores al logout con cookie limpia → 401' do
+    it 'el MISMO token deja de valer después del logout' do
+      token = cookies['jwt_token']
       delete '/users/sign_out'
-      cookies.delete('jwt_token')
+      con_solo_el_token(token)
       get '/me'
       expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  # El caso que fallaba en producción (26-oct-2026): navegador reabierto. La sesión de Rails
+  # (`_club_session`) murió al cerrarlo; la cookie del token (7 días) no. Devise creía que no había
+  # nadie, contestaba 204 sin borrar la cookie ni revocar el token, y volver a `/` te metía de nuevo.
+  describe 'DELETE /users/sign_out — navegador reabierto (sólo la cookie del token)' do
+    let(:token) do
+      sign_in_as(admin)
+      cookies['jwt_token']
+    end
+
+    before { con_solo_el_token(token) }
+
+    it 'la cookie sola autentica (el punto de partida es una sesión viva)' do
+      get '/me'
+      expect(response).to have_http_status(:ok)
+    end
+
+    it 'borra la cookie y el token queda revocado' do
+      delete '/users/sign_out'
+      expect(response).to have_http_status(:no_content)
+      expect(borra_cookie_jwt?(response)).to be(true)
+
+      con_solo_el_token(token)
+      get '/me'
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'cerrar sesión en un dispositivo NO saca a los demás' do
+      otro_token = token_de_un_login_nuevo(admin)
+      con_solo_el_token(token)
+      delete '/users/sign_out'
+
+      con_solo_el_token(otro_token)
+      get '/me'
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe 'DELETE /users/sign_out — con un token que no se puede leer' do
+    it 'igual borra la cookie y responde 204 (no se queda pegada)' do
+      con_solo_el_token('esto.no.es-un-jwt')
+      delete '/users/sign_out'
+      expect(response).to have_http_status(:no_content)
+      expect(borra_cookie_jwt?(response)).to be(true)
+    end
+
+    it 'un token firmado con otro secreto (rotado) tampoco rompe el logout' do
+      ajeno = JWT.encode({ 'sub' => admin.id.to_s, 'scp' => 'user', 'jti' => SecureRandom.uuid,
+                           'exp' => 1.day.from_now.to_i }, 'otro-secreto', 'HS256')
+      con_solo_el_token(ajeno)
+      delete '/users/sign_out'
+      expect(response).to have_http_status(:no_content)
+      expect(borra_cookie_jwt?(response)).to be(true)
+    end
+  end
+
+  def con_solo_el_token(valor)
+    reset!
+    cookies['jwt_token'] = valor
+  end
+
+  def token_de_un_login_nuevo(user)
+    reset!
+    post '/api/users/sign_in', params: { user: { email: user.email, password: AuthHelpers::DEFAULT_PASSWORD } }, as: :json
+    cookies['jwt_token']
+  end
+
+  def borra_cookie_jwt?(resp)
+    Array(resp.headers['Set-Cookie']).flat_map { |c| c.split("\n") }.any? do |c|
+      c.start_with?('jwt_token=;') && (c =~ /max-age=0/i || c.include?('1970'))
     end
   end
 

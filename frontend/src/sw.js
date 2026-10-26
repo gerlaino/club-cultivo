@@ -1,7 +1,7 @@
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
-import { NetworkFirst, CacheFirst } from 'workbox-strategies'
+import { NetworkFirst, NetworkOnly, CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
@@ -22,7 +22,7 @@ clientsClaim()
 precacheAndRoute(self.__WB_MANIFEST.filter((e) => !/manifest\.webmanifest$/.test(e.url)))
 cleanupOutdatedCaches()
 
-// ── Navegación: el shell sale del caché ───────────────────────────────────────
+// ── Navegación: la red primero; sin señal, el shell sale del caché ──────────
 //
 // Sin esto la PWA instalada NO ABRÍA sin internet. El motivo: `precacheAndRoute` guarda
 // `index.html`, pero una navegación a /m, /lotes o /mnc/pendientes no matchea esa entrada —
@@ -37,7 +37,22 @@ cleanupOutdatedCaches()
 // PDF de prescripción es una navegación—, el panel de Sidekiq, el cable y el health check. Sin
 // excluirlas, offline se les devolvería el HTML de la app en vez de fallar, que es peor: parece
 // que anduvo.
-registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
+//
+// PRIMERO LA RED, el caché sólo si no hay (26-oct-2026). Servir siempre la cáscara guardada hacía
+// que, después de un deploy, se viera la versión anterior hasta que el service worker nuevo se
+// instalaba y recargaba; y si el caché faltaba, el pedido moría en «Failed to fetch» sin nada que
+// mostrar. Ahora con señal se ve siempre la última versión; sin señal (o con el servidor caído, o
+// tardando más de 3 s) abre la que está guardada.
+const cascaraGuardada = createHandlerBoundToURL('index.html')
+const red = new NetworkOnly({ networkTimeoutSeconds: 3 })
+
+registerRoute(new NavigationRoute(async (opciones) => {
+  try {
+    const respuesta = await red.handle(opciones)
+    if (respuesta && respuesta.status < 500) return respuesta
+  } catch (_) { /* sin red o pasó el tope: la cáscara guardada */ }
+  return cascaraGuardada(opciones)
+}, {
   denylist: [/^\/api\//, /^\/rails\//, /^\/sidekiq/, /^\/cable/, /^\/up$/],
 }))
 

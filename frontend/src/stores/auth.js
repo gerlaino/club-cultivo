@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { signIn, signOut, me, clearAuthToken } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
+import { usePWA } from '../composables/usePWA.js'
 
 // Promesa del bootstrap en vuelo. Fuera del state a propósito: no es dato de la app, es un
 // candado para que dos navegaciones seguidas no disparen dos /me.
@@ -245,13 +246,16 @@ export const useAuthStore = defineStore("auth", {
         soltarCambios();   // nada de lo anotado vale para el próximo usuario; se cierra el WebSocket
         const { planData } = usePlan();
         planData.value = null;
-        // Borra TODOS los cachés del service worker (incl. el SW viejo aún instalado
-        // en la PWA): evita que tras el logout se sirva un /me viejo cacheado, que es
-        // la causa de "no cierra sesión" en mobile/PWA.
+        // Borra los cachés del service worker con datos de la sesión: las respuestas de la API y
+        // las imágenes (fotos subidas, documentos de pacientes), que en una compu compartida le
+        // quedarían al que se sienta después. Lo que NO se borra es la cáscara de la app
+        // (`workbox-precache-*`): borrarla con el service worker activo lo dejaba sin nada que
+        // servir —«Failed to fetch» en la consola— y la app instalada ya no abría sin señal
+        // (26-oct-2026). La cáscara no tiene nada de nadie.
         if (typeof caches !== 'undefined') {
           try {
             const keys = await caches.keys();
-            await Promise.all(keys.map((k) => caches.delete(k)));
+            await Promise.all(keys.filter((k) => !k.startsWith('workbox-precache')).map((k) => caches.delete(k)));
           } catch (_) {}
         }
         try {
@@ -264,7 +268,10 @@ export const useAuthStore = defineStore("auth", {
         } catch (_) {}
         // Hard reload (con replace) limpia todos los stores de Pinia y evita volver
         // atrás a una pantalla autenticada. Cache-bust para saltear cualquier SW.
-        window.location.replace('/login?loggedout=' + Date.now());
+        // A dónde: la misma regla que `/` sin sesión (router). En la web, la portada; en la app
+        // instalada, el login: quien la abre viene a trabajar, no a que le vendan la plataforma.
+        const destino = usePWA().isPWA() ? '/login' : '/bienvenida';
+        window.location.replace(destino + '?loggedout=' + Date.now());
       }
     },
 

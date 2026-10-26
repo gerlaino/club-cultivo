@@ -1,5 +1,28 @@
 # Changelog
 
+## Octubre 2026 (gc) — Cerrar sesión cierra la sesión; la portada siempre al día (26-oct)
+
+Germán en cultivoespacial.com: entraba logueado, cerraba sesión, iba a `/` y estaba adentro de nuevo;
+además veía una versión vieja y la consola mostraba `Failed to fetch` del `sw.js`. Eran tres cosas.
+
+- **El logout no hacía nada con el navegador reabierto** (`Users::SessionsController`). El filtro de
+  Devise `verify_signed_out_user` mira la sesión de Rails (`_club_session`, muere al cerrar el
+  navegador), no la cookie del token (7 días): creía que no había nadie y contestaba 204 SIN borrar la
+  cookie ni revocar el token. Se saltea; la revocación se hace en `destroy` y un token ilegible
+  (secreto rotado) ya no rompe el logout con un 500. Revoca por `jti`: los otros dispositivos siguen.
+  Los specs viejos no lo veían (uno borraba la cookie a mano); los nuevos fallan con el código anterior.
+- **`Cache-Control` para lo que sirve `public/`** (`config/initializers/cache_de_la_app.rb`): `index.html`,
+  `sw.js` y el manifest `no-cache`; `/assets/*` un año `immutable`. Sin header el navegador guardaba `/`
+  por su cuenta durante horas.
+- **Service worker: la navegación va primero a la red** (tope 3 s) y cae a la cáscara guardada sin señal
+  o con el servidor caído. Antes servía siempre la guardada: después de un deploy se veía la anterior.
+- **El logout borra los cachés con datos de la sesión** (API e imágenes, que incluyen fotos subidas) y
+  **conserva la cáscara de la app**: borrarla con el SW activo era el `Failed to fetch` y dejaba la app
+  instalada sin abrir offline. En la web termina en `/bienvenida`; en la app instalada, en `/login`.
+- `sessions_spec.rb`, `cache_de_la_app_spec.rb`, `logout.test.js`, `sinConexion.test.js`. Visto con
+  Playwright sobre el build servido por Rails: navegador reabierto → logout → `/` muestra la portada,
+  el token viejo da 401, sin señal abre.
+
 ## Octubre 2026 (gb) — La portada partida y el pie nuevo (23-oct)
 
 Pedido de Javi («cuando llegás tenemos dos secciones pero se lee como todo uno mismo») y aprobado por
