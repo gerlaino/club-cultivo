@@ -9,7 +9,7 @@
     <div class="hb__wrap">
       <header class="cs__cab">
         <p class="hb__ceja" :class="{ 'hb__ceja--claro': tema === 'oscuro' }">{{ ceja }}</p>
-        <h2 class="hb__h2 cs__h2">{{ titulo }}</h2>
+        <component :is="encabezado" class="hb__h2 cs__h2">{{ titulo }}</component>
         <p v-if="intro" class="cs__intro">{{ intro }}</p>
       </header>
 
@@ -72,6 +72,8 @@ const props = defineProps({
   intro:  { type: String, default: '' },
   ancla:  { type: String, default: 'como-se-hace' },
   tema:   { type: String, default: 'oscuro' },           // 'oscuro' (bosque) | 'claro'
+  // 'h1' cuando la sección ES la página (las demos de /bienvenida/*/demo); si no, un h2 más.
+  encabezado: { type: String, default: 'h2' },
   // [{ etiqueta, texto?, ids: { compu?: 'genetica-compu', telefono?: 'genetica-telefono' } }]
   flujos: { type: Array, required: true },
 })

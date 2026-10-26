@@ -40,6 +40,26 @@ body:has(.herbario) { padding-bottom: 0; }
   --hb-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
+/* ── Autocultivo en trigo (26-oct-2026) ──
+   Lo de autocultivo (su página y su demo) sigue el color de su cuarto de la portada. En vez de
+   tocar cada pieza, el contenido lleva `hb-trigo` y los mismos tokens pasan a la familia cálida:
+   el verde de acento a ámbar oscuro, el papel y la salvia a trigo. La barra y el pie quedan como
+   en todas las páginas. El botón principal va en bosque, como en la portada. */
+.hb-trigo {
+  --hb-papel: #F6EFE2;
+  --hb-papel-claro: #FBF7EE;
+  --hb-regla: #E8D9BA;
+  --hb-tinta-2: var(--hb-trigo-tinta);
+  --hb-verde: var(--hb-trigo-acento);
+  --hb-verde-osc: #6E4815;
+  --hb-salvia: #E3CFA6;
+  --hb-salvia-suave: var(--hb-trigo);
+  --hb-menta: #E2B670;
+  background: var(--hb-papel);
+}
+.hb-trigo .hb__btn:not(.hb__btn--linea):not(.hb__btn--claro):not(.hb__btn--linea-claro) { background: var(--hb-bosque); border-color: var(--hb-bosque); }
+.hb-trigo .hb__btn:not(.hb__btn--linea):not(.hb__btn--claro):not(.hb__btn--linea-claro):hover { background: #0F2A1E; }
+
 /* ── Página de una sola ficha (registro, ingresar, recuperar acceso) ── */
 .hb-pagina {
   /* Fija y por encima del patrón de fondo de las rutas a pantalla completa (theme.css). */

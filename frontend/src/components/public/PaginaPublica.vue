@@ -1,12 +1,13 @@
 <template>
-  <div class="herbario hb-sitio">
+  <div class="herbario hb-sitio" :class="{ 'hb-trigo': tono === 'trigo' }">
     <header class="pp__top">
       <div class="hb__wrap pp__top-in">
         <RouterLink to="/bienvenida" class="pp__marca">Cultivo Espacial</RouterLink>
         <nav class="pp__nav" aria-label="Secciones">
-          <RouterLink to="/bienvenida/organizaciones">Organizaciones</RouterLink>
-          <RouterLink to="/bienvenida/autocultivo">Autocultivo</RouterLink>
-          <RouterLink to="/contacto">Contacto</RouterLink>
+          <!-- Marca por dónde empieza la dirección: la demo de cada puerta también es «su» página. -->
+          <RouterLink to="/bienvenida/organizaciones" :class="{ 'is-aca': aca('/bienvenida/organizaciones') }">Organizaciones</RouterLink>
+          <RouterLink to="/bienvenida/autocultivo" :class="{ 'is-aca': aca('/bienvenida/autocultivo') }">Autocultivo</RouterLink>
+          <RouterLink to="/contacto" :class="{ 'is-aca': aca('/contacto') }">Contacto</RouterLink>
         </nav>
         <!-- El paciente no viene a informarse: viene a entrar a su portal (23-oct-2026). Queda a la
              vista también en el teléfono, donde el menú de secciones se esconde. -->
@@ -77,6 +78,8 @@ import { onMounted, onBeforeUnmount, nextTick } from 'vue'
 defineProps({
   // { label, to } del botón de arriba, o null para no mostrarlo (la portada ya tiene las dos puertas).
   accion: { type: Object, default: () => ({ label: 'Probar gratis', to: '/registro' }) },
+  // 'trigo' para lo de autocultivo (su página y su demo): el color de su cuarto de la portada.
+  tono: { type: String, default: 'verde' },
 })
 import { useRoute } from 'vue-router'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
@@ -85,6 +88,7 @@ import '../../assets/herbario.css'
 
 cargarFuentesHerbario()
 const route = useRoute()
+const aca = (base) => { const p = route.path || ''; return p === base || p.startsWith(base + '/') }
 const yr = new Date().getFullYear()
 
 let revelador = null
@@ -117,7 +121,9 @@ onBeforeUnmount(() => revelador?.disconnect())
 .pp__nav { display: flex; gap: 22px; margin-left: auto; }
 .pp__nav a { color: var(--hb-tinta-2); text-decoration: none; font-size: 15px; }
 .pp__nav a:hover { color: var(--hb-tinta); }
-.pp__nav a.router-link-active { color: var(--hb-verde); font-weight: 600; }
+/* Dónde estás, con el color de esa página (en autocultivo el acento es ámbar: `hb-trigo`). */
+.pp__nav a { padding-block: 4px; border-bottom: 2px solid transparent; }
+.pp__nav a.is-aca { color: var(--hb-tinta); font-weight: 600; border-bottom-color: var(--hb-verde); }
 .pp__ingresar { display: inline-flex; align-items: center; min-height: 38px; color: var(--hb-tinta); text-decoration: none; font-weight: 600; font-size: 15px; }
 @media (max-width: 760px) {
   .pp__nav { display: none; }
@@ -125,6 +131,9 @@ onBeforeUnmount(() => revelador?.disconnect())
   .pp__top-in { gap: 12px; }
   .pp__marca { font-size: 17px; }
 }
+/* En un teléfono angosto no entran marca, «Soy paciente», «Ingresar» y el botón: el botón se cortaba
+   (26-oct-2026). Se va el botón, que está grande en la primera pantalla de cada página. */
+@media (max-width: 480px) { .pp__top-in > .hb__btn { display: none; } }
 
 .pp__paciente {
   display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px; border-radius: 999px;

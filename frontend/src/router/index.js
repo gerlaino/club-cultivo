@@ -77,6 +77,15 @@ const routes = [
     component: () => import("../views/LandingAutocultivoView.vue"),
     meta: { public: true, fullscreen: true },
   },
+  // Las simulaciones de cómo se usa viven SÓLO acá, una demo por puerta (26-oct-2026): las páginas
+  // llevan con «Ver la demo» en vez de repetirlas.
+  {
+    path: "/bienvenida/autocultivo/demo",
+    name: "demo-autocultivo",
+    component: () => import("../views/DemoView.vue"),
+    props: { lado: 'autocultivo' },
+    meta: { public: true, fullscreen: true },
+  },
   // El primer nombre de esa página (5-oct, mismo día): por si alguien guardó el link.
   { path: "/bienvenida/casa", redirect: "/bienvenida/autocultivo" },
   // «Soy paciente» de la página pública (23-oct-2026). Hasta que exista la entrada con DNI (etapa 1
@@ -86,6 +95,13 @@ const routes = [
     path: "/bienvenida/organizaciones",
     name: "landing-organizaciones",
     component: () => import("../views/LandingOrganizacionesView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  {
+    path: "/bienvenida/organizaciones/demo",
+    name: "demo-organizaciones",
+    component: () => import("../views/DemoView.vue"),
+    props: { lado: 'organizaciones' },
     meta: { public: true, fullscreen: true },
   },
   // Hasta el 9-oct-2026 la página se llamaba «proyectos»: por si alguien guardó el link (con su #ancla).

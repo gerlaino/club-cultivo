@@ -5,7 +5,9 @@
       <div class="hb__wrap lp__portada-in">
         <div>
           <p class="hb__ceja">Organizaciones · asociaciones, fundaciones y producción</p>
-          <h1 class="hb__h1">Toda tu organización, <em>en un solo panel.</em></h1>
+          <!-- No repite el título de la portada («Toda tu organización, en una plataforma»): quien hizo
+               clic ya lo leyó (26-oct-2026). -->
+          <h1 class="hb__h1">Del cultivo a la dispensa, <em>cada área en su pantalla.</em></h1>
           <p class="hb__bajada">
             Cultivo, stock, dispensas, caja y consultorio, al día. Tu equipo trabaja desde el teléfono
             y vos sabés cómo va cada área sin estar en cada sala.
@@ -15,7 +17,11 @@
               Contanos de tu organización
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </a>
-            <a href="#precios" class="hb__btn hb__btn--linea">Ver precios</a>
+            <RouterLink to="/bienvenida/organizaciones/demo" class="hb__btn hb__btn--linea">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+              Ver la demo
+            </RouterLink>
+            <a href="#precios" class="lp__precios">Ver precios</a>
           </div>
           <p class="hb__nota">Armamos la cuenta con ustedes · cargamos tu padrón, genéticas y stock</p>
         </div>
@@ -33,10 +39,10 @@
       </div>
     </section>
 
-    <!-- ── La app de verdad, grabada: lo de todos los días de administración, en compu y teléfono ── -->
-    <ComoSeHace ceja="Mirá cómo se hace" titulo="Así se trabaja desde administración"
-                intro="Cargar una genética, armar un lote, dar de alta un paciente y dispensarle. Es la app real, en la compu y en el teléfono."
-                :flujos="FLUJOS_ADMIN" />
+    <!-- ── La app de verdad, grabada: vive en su demo; acá, la puerta (26-oct-2026) ── -->
+    <FranjaDemo to="/bienvenida/organizaciones/demo" titulo="Mirá cómo se trabaja"
+                texto="Cargar una genética, armar un lote, dar de alta un paciente y dispensarle. Grabado en la app, en la compu y en el teléfono."
+                :cuadros="['genetica-compu', 'dispensa-compu']" />
 
     <!-- ── Lo que ve administración: una fortaleza por fila, con su pantalla ── -->
     <section class="hb__sec" id="que-hace">
@@ -123,7 +129,7 @@ import { ref, onMounted } from 'vue'
 import PaginaPublica from '../components/public/PaginaPublica.vue'
 import PanelAdmin from '../components/public/PanelAdmin.vue'
 import Fortaleza from '../components/public/Fortaleza.vue'
-import ComoSeHace from '../components/public/ComoSeHace.vue'
+import FranjaDemo from '../components/public/FranjaDemo.vue'
 import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import OficiosVista from '../components/public/OficiosVista.vue'
@@ -138,13 +144,6 @@ import { getRegistroInfo } from '../lib/api.js'
 import { PREGUNTAS_PROYECTOS } from '../components/public/contenido.js'
 
 // Las grabaciones de «Mirá cómo se hace» (`npm run demos`), en el orden en que se trabaja.
-const FLUJOS_ADMIN = [
-  { etiqueta: 'Una genética nueva', ids: { compu: 'genetica-compu', telefono: 'genetica-telefono' } },
-  { etiqueta: 'Un lote',            ids: { compu: 'lote-compu',     telefono: 'lote-telefono' } },
-  { etiqueta: 'Un paciente',        ids: { compu: 'paciente-compu', telefono: 'paciente-telefono' } },
-  { etiqueta: 'Una dispensa',       ids: { compu: 'dispensa-compu', telefono: 'dispensa-telefono' } },
-]
-
 const ALCANCE = [
   { n: 8, que: 'áreas',     t: 'Cultivo, post-cosecha, stock, mostrador, consultorio, delivery, contabilidad e informes' },
   { n: 6, que: 'roles',     t: 'Cada persona entra con su usuario y ve su pantalla' },
@@ -160,10 +159,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* El verde claro de su lado de la portada (26-oct-2026): se entra al mismo color que se tocó. */
 .lp__portada {
   padding: clamp(40px, 7vw, 88px) 0 clamp(32px, 5vw, 64px);
-  background: radial-gradient(55% 70% at 85% 40%, color-mix(in srgb, var(--hb-salvia) 40%, transparent) 0%, transparent 70%);
+  background:
+    radial-gradient(55% 70% at 85% 40%, color-mix(in srgb, var(--hb-menta) 45%, transparent) 0%, transparent 70%),
+    var(--hb-salvia-suave);
 }
+.lp__portada .hb__acciones { align-items: center; }
+.lp__precios { color: var(--hb-verde); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; padding: 0 4px; }
 .lp__portada-in { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(28px, 4vw, 64px); align-items: center; }
 @media (max-width: 1000px) { .lp__portada-in { grid-template-columns: minmax(0, 1fr); } }
 

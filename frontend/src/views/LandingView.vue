@@ -23,6 +23,10 @@
               Conocer la plataforma
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </RouterLink>
+            <RouterLink to="/bienvenida/organizaciones/demo" class="hb__btn hb__btn--linea lp__btn-linea">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+              Ver la demo
+            </RouterLink>
             <RouterLink to="/contacto" class="hb__btn hb__btn--linea lp__btn-linea">Hablemos</RouterLink>
             <span class="hb__nota lp__nota">Armamos la cuenta y cargamos tu padrón</span>
           </div>
@@ -59,7 +63,7 @@
         <p class="lp__auto-d">Qué hacer hoy, lo que regaste y cómo va cada planta, desde el celular.</p>
         <p v-if="precioAuto" class="lp__auto-p">{{ precioAuto }} <span>por mes</span></p>
         <RouterLink to="/registro" class="hb__btn lp__auto-btn">Probar {{ diasPrueba }} días gratis</RouterLink>
-        <p class="lp__auto-nota">Sin tarjeta · <RouterLink to="/bienvenida/autocultivo">cómo funciona</RouterLink></p>
+        <p class="lp__auto-nota">Sin tarjeta · <RouterLink to="/bienvenida/autocultivo/demo">ver la demo</RouterLink> · <RouterLink to="/bienvenida/autocultivo">cómo funciona</RouterLink></p>
       </div>
     </section>
 

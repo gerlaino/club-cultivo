@@ -115,3 +115,22 @@ export function packsProyectos(precios) {
   })
   return packs
 }
+
+// ── LAS DEMOS (26-oct-2026) ──────────────────────────────────────────────────────────────────────
+// Lo que se grabó de la app (`public/demos/`, `npm run demos`), por puerta. Viven SÓLO en su demo
+// (`views/DemoView.vue`): las páginas llevan ahí con «Ver la demo».
+export const FLUJOS_ORGANIZACIONES = [
+  { etiqueta: 'Una genética nueva', ids: { compu: 'genetica-compu', telefono: 'genetica-telefono' } },
+  { etiqueta: 'Un lote',            ids: { compu: 'lote-compu',     telefono: 'lote-telefono' } },
+  { etiqueta: 'Un paciente',        ids: { compu: 'paciente-compu', telefono: 'paciente-telefono' } },
+  { etiqueta: 'Una dispensa',       ids: { compu: 'dispensa-compu', telefono: 'dispensa-telefono' } },
+]
+
+export const FLUJOS_AUTOCULTIVO = [
+  { etiqueta: 'Agregás tus plantas', texto: 'De a una o varias juntas: la genética, si es auto o foto, dónde está y desde cuándo.',
+    ids: { telefono: 'planta-autocultivo' } },
+  { etiqueta: 'Anotás al lado de la carpa', texto: 'Regar con cuánto y con qué, una foto o una nota: un toque, a una planta o a toda la carpa. O dictándolo.',
+    ids: { telefono: 'riego-autocultivo' } },
+  { etiqueta: 'La app te avisa lo que viene', texto: 'Cuánto le falta a cada planta, en su ficha y en la carpa. Y el aviso, al teléfono.',
+    ids: { telefono: 'avisa-autocultivo' } },
+]

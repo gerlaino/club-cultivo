@@ -1,5 +1,28 @@
 # Changelog
 
+## Octubre 2026 (gd) — «Ver la demo» y cada página con el color de su puerta (26-oct)
+
+Germán sobre la propuesta (artifact «Páginas de adentro»): las simulaciones de cómo se usa «no deberían
+estar en dos lugares... sólo en demo».
+
+- **Demo por puerta** (`DemoView.vue`, `/bienvenida/organizaciones/demo` y `/bienvenida/autocultivo/demo`):
+  el reproductor de siempre (`ComoSeHace`, ahora con `encabezado="h1"`) sobre el color de su lado, y al
+  final el paso siguiente (contacto / cuenta gratis). Los flujos pasaron a `contenido.js`
+  (`FLUJOS_ORGANIZACIONES`, `FLUJOS_AUTOCULTIVO`).
+- **Las grabaciones salen de las páginas**: en su lugar, `FranjaDemo` (dos o tres cuadros y «Ver la demo»).
+  «Ver la demo» también en la primera pantalla de cada página y en la portada (botón en organizaciones,
+  enlace en autocultivo). La planta que crece por fase (`RecorridoFases`) NO es una grabación y se queda
+  en la página de autocultivo.
+- **Organizaciones** abre en el verde claro de la portada y con título propio («Del cultivo a la
+  dispensa, cada área en su pantalla»); «Ver precios» queda como enlace.
+- **Autocultivo en trigo**: `PaginaPublica tono="trigo"` pone `hb-trigo` (en `herbario.css`), que pasa
+  los mismos tokens a la familia cálida (acento ámbar, papel y salvia a trigo, botón principal en bosque).
+  Vale para su página y su demo.
+- La barra marca dónde estás con un subrayado del color de la página, también dentro de la demo. En un
+  teléfono angosto se esconde el botón de la barra, que se cortaba desde que entró «Soy paciente».
+- `demoPublica.test.js` (7). Visto con Playwright en compu y teléfono: sin desborde, sin errores, los
+  videos de las dos demos corren.
+
 ## Octubre 2026 (gc) — Cerrar sesión cierra la sesión; la portada siempre al día (26-oct)
 
 Germán en cultivoespacial.com: entraba logueado, cerraba sesión, iba a `/` y estaba adentro de nuevo;

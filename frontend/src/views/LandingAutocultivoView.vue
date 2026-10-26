@@ -1,5 +1,5 @@
 <template>
-  <PaginaPublica>
+  <PaginaPublica tono="trigo">
     <!-- ── Portada de casa ────────────────────────────────── -->
     <section class="lc__portada">
       <div class="hb__wrap lc__portada-in">
@@ -15,7 +15,10 @@
               Crear mi cuenta gratis
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </RouterLink>
-            <a href="#que-hace" class="hb__btn hb__btn--linea">Ver qué hace</a>
+            <RouterLink to="/bienvenida/autocultivo/demo" class="hb__btn hb__btn--linea">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+              Ver la demo
+            </RouterLink>
           </div>
           <p class="hb__nota">{{ diasPrueba }} días gratis · sin tarjeta · entrás en el momento</p>
         </div>
@@ -29,9 +32,10 @@
 
     <CultivoEnPapeles />
 
-    <!-- ── Para arrancar: los tres pasos, cada uno con su grabación en el teléfono (9-oct-2026) ── -->
-    <ComoSeHace ceja="Así se usa" titulo="Para arrancar, tres cosas" tema="claro" ancla="para-arrancar"
-                intro="Tocá cada una y mirala en la app, tal como se usa en el teléfono." :flujos="PASOS" />
+    <!-- ── Para arrancar: las grabaciones viven en su demo; acá, la puerta (26-oct-2026) ── -->
+    <FranjaDemo to="/bienvenida/autocultivo/demo" tema="claro" telefono titulo="Para arrancar, tres cosas"
+                texto="Agregar tus plantas, anotar al lado de la carpa y que la app te avise lo que viene. Grabado en el teléfono."
+                :cuadros="['planta-autocultivo', 'riego-autocultivo', 'avisa-autocultivo']" />
 
     <Packs :packs="packs" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
 
@@ -70,20 +74,12 @@ import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import Packs from '../components/public/Packs.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import TelefonoMiCultivo from '../components/public/TelefonoMiCultivo.vue'
-import ComoSeHace from '../components/public/ComoSeHace.vue'
+import FranjaDemo from '../components/public/FranjaDemo.vue'
 import { PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
 // Los tres pasos, cada uno con su grabación (`npm run demos`).
-const PASOS = [
-  { etiqueta: 'Agregás tus plantas', texto: 'De a una o varias juntas: la genética, si es auto o foto, dónde está y desde cuándo.',
-    ids: { telefono: 'planta-autocultivo' } },
-  { etiqueta: 'Anotás al lado de la carpa', texto: 'Regar con cuánto y con qué, una foto o una nota: un toque, a una planta o a toda la carpa. O dictándolo.',
-    ids: { telefono: 'riego-autocultivo' } },
-  { etiqueta: 'La app te avisa lo que viene', texto: 'Cuánto le falta a cada planta, en su ficha y en la carpa. Y el aviso, al teléfono.',
-    ids: { telefono: 'avisa-autocultivo' } },
-]
 // El precio lo dice el backend (`Precios.lista_publica`); acá sólo las palabras.
 const packs = ref([])
 onMounted(async () => {
@@ -96,9 +92,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* El trigo de su cuarto de la portada (26-oct-2026): se entra al mismo color que se tocó. */
 .lc__portada {
   padding: clamp(40px, 7vw, 88px) 0 clamp(24px, 4vw, 48px);
-  background: radial-gradient(55% 70% at 85% 40%, color-mix(in srgb, var(--hb-menta) 30%, transparent) 0%, transparent 70%);
+  background:
+    radial-gradient(55% 70% at 85% 40%, color-mix(in srgb, var(--hb-ambar) 16%, transparent) 0%, transparent 70%),
+    var(--hb-trigo);
 }
 .lc__portada-in { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(24px, 5vw, 64px); align-items: center; }
 .lc__tel { justify-self: center; }
