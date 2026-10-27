@@ -91,6 +91,9 @@ export default defineConfig({
           'vendor-vue':    ['vue', 'vue-router', 'pinia'],
           'vendor-charts': ['chart.js'],
           'vendor-qr':     ['qrcode'],
+          // Con nombre propio para que NO caiga en `assets/index-*` del precache: son ~350 KB que
+          // se bajan sólo si el build trae DSN (`lib/sentry.js` lo importa recién entonces).
+          'vendor-sentry': ['@sentry/vue'],
         }
       }
     }

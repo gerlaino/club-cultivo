@@ -25,7 +25,13 @@ bundle install
 echo "==> Building frontend..."
 cd "$FRONTEND_DIR"
 npm ci
-VITE_API_URL=/api npm run build
+# Sentry del navegador: el DSN propio del front si lo hay, si no el mismo del backend; sin ninguno
+# queda apagado (frontend/src/lib/sentry.js). La versión es el commit que se está publicando.
+VITE_API_URL=/api \
+VITE_SENTRY_DSN="${SENTRY_DSN_FRONTEND:-${SENTRY_DSN:-}}" \
+VITE_SENTRY_ENVIRONMENT="${SENTRY_ENVIRONMENT:-production}" \
+VITE_SENTRY_RELEASE="${RENDER_GIT_COMMIT:-}" \
+npm run build
 
 # 3) Publicar el build dentro de public/ para que Rails lo sirva
 echo "==> Copiando build del frontend a backend/public ..."

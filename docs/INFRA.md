@@ -140,6 +140,11 @@ Uno por vez. Si algo no coincide con lo que ves en la pantalla, mandá una captu
 5. Lo mismo en **`club-cultivo-worker`**.
 6. Opcional: `SENTRY_URL` = la dirección de tu proyecto en Sentry (para el botón «Abrir» del panel).
 7. Guardar. Render reinicia solo.
+8. **El navegador queda prendido con el mismo DSN**: el build del front lo toma de `SENTRY_DSN`
+   (`bin/render-build.sh` → `frontend/src/lib/sentry.js`), así que los errores de pantalla llegan
+   al mismo proyecto en el próximo deploy. Si querés separarlos, creá en Sentry un segundo proyecto
+   **Vue** y cargá su DSN como `SENTRY_DSN_FRONTEND` en `cultivo-staging-api` (sólo ahí: el worker
+   no arma el front). Como el DSN entra en el build, cambiarlo pide un deploy, no sólo reiniciar.
 
 ### Paso 2 — Llave de Render (para el panel de Estado) · 5 min
 1. **Render → tu avatar (arriba a la derecha) → Account Settings → API Keys → Create API Key**.

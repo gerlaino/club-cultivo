@@ -244,6 +244,9 @@ def limpiar_operativo_e2e!(club)
   CuentaCorrienteMovimiento.unscoped
                            .where(cuenta_corriente_id: CuentaCorriente.unscoped.where(ids).select(:id))
                            .delete_all
+  # El saldo está GUARDADO en la cuenta, no se recalcula de los movimientos: sin esto la deuda de
+  # la corrida anterior seguía ahí y cada corrida de `dispensaConCobro` debía el doble.
+  CuentaCorriente.unscoped.where(ids).update_all(saldo_disponible: 0, saldo_disponible_g: 0)
   Cobro.unscoped.where(ids).delete_all
   DispensacionItem.unscoped.where(dispensacion_id: disps).delete_all
   Reserva.unscoped.where(ids).delete_all

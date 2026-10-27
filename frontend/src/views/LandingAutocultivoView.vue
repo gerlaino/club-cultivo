@@ -32,11 +32,6 @@
 
     <CultivoEnPapeles />
 
-    <!-- ── Para arrancar: las grabaciones viven en su demo; acá, la puerta (26-oct-2026) ── -->
-    <FranjaDemo to="/bienvenida/autocultivo/demo" tema="claro" telefono titulo="Para arrancar, tres cosas"
-                texto="Agregar tus plantas, anotar al lado de la carpa y que la app te avise lo que viene. Grabado en el teléfono."
-                :cuadros="['planta-autocultivo', 'riego-autocultivo', 'avisa-autocultivo']" />
-
     <Packs :packs="packs" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
 
     <PreguntasFrecuentes titulo="Lo que nos preguntan en autocultivo" :preguntas="PREGUNTAS_AUTOCULTIVO"
@@ -74,12 +69,10 @@ import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import Packs from '../components/public/Packs.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import TelefonoMiCultivo from '../components/public/TelefonoMiCultivo.vue'
-import FranjaDemo from '../components/public/FranjaDemo.vue'
 import { PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
-// Los tres pasos, cada uno con su grabación (`npm run demos`).
 // El precio lo dice el backend (`Precios.lista_publica`); acá sólo las palabras.
 const packs = ref([])
 onMounted(async () => {

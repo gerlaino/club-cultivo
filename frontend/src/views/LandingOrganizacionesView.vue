@@ -39,11 +39,6 @@
       </div>
     </section>
 
-    <!-- ── La app de verdad, grabada: vive en su demo; acá, la puerta (26-oct-2026) ── -->
-    <FranjaDemo to="/bienvenida/organizaciones/demo" titulo="Mirá cómo se trabaja"
-                texto="Cargar una genética, armar un lote, dar de alta un paciente y dispensarle. Grabado en la app, en la compu y en el teléfono."
-                :cuadros="['genetica-compu', 'dispensa-compu']" />
-
     <!-- ── Lo que ve administración: una fortaleza por fila, con su pantalla ── -->
     <section class="hb__sec" id="que-hace">
       <div class="hb__wrap">
@@ -129,7 +124,6 @@ import { ref, onMounted } from 'vue'
 import PaginaPublica from '../components/public/PaginaPublica.vue'
 import PanelAdmin from '../components/public/PanelAdmin.vue'
 import Fortaleza from '../components/public/Fortaleza.vue'
-import FranjaDemo from '../components/public/FranjaDemo.vue'
 import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import OficiosVista from '../components/public/OficiosVista.vue'

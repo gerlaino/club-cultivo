@@ -341,7 +341,9 @@ onMounted(async () => {
   document.addEventListener('keydown', escapeHandler, true)
   try {
     await store.fetchOne(socioId)
-    await store.fetchNotas(socioId)
+    // Las notas son clínicas (sólo admin y médico, `PacienteNotasController`): sin la solapa no se
+    // piden. El badge de la solapa las contaba desde acá y el dispensador se comía el 403 igual.
+    if (tieneTab('notas')) await store.fetchNotas(socioId)
   } catch {
     error.value = store.error || 'No se pudo cargar el paciente'
   } finally {

@@ -28,7 +28,8 @@ describe('Las grabaciones viven sólo en la demo', () => {
     const w = await montarPagina('LandingOrganizacionesView')
     expect(w.findComponent({ name: 'ComoSeHace' }).exists()).toBe(false)
     expect(links(w)).toContain('/bienvenida/organizaciones/demo')
-    expect(w.findComponent({ name: 'FranjaDemo' }).props('to')).toBe('/bienvenida/organizaciones/demo')
+    // Un solo «Ver la demo», arriba: la franja con cuadros salió (Germán: «con ese alcanza»).
+    expect(links(w).filter((l) => l === '/bienvenida/organizaciones/demo')).toHaveLength(1)
   })
 
   it('la de autocultivo tampoco, pero la planta que crece por fase se queda', async () => {
@@ -36,7 +37,7 @@ describe('Las grabaciones viven sólo en la demo', () => {
     expect(w.findComponent({ name: 'ComoSeHace' }).exists()).toBe(false)
     expect(w.findComponent({ name: 'RecorridoFases' }).exists()).toBe(true)
     expect(links(w)).toContain('/bienvenida/autocultivo/demo')
-    expect(w.findComponent({ name: 'FranjaDemo' }).props('to')).toBe('/bienvenida/autocultivo/demo')
+    expect(links(w).filter((l) => l === '/bienvenida/autocultivo/demo')).toHaveLength(1)
   })
 
   it('la portada lleva a la demo de cada lado', async () => {

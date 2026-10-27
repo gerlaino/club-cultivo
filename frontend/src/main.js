@@ -24,6 +24,7 @@ import {useClubStore} from "./stores/club.js";
 
 import { registerSW } from 'virtual:pwa-register'
 import { anotarReload, leerReloads } from './utils/reloadTrace.js'
+import { iniciarSentry } from './lib/sentry.js'
 
 // Para leer desde la consola por qué se recargó sola la pantalla: `ceReloads()`.
 window.ceReloads = leerReloads
@@ -112,6 +113,9 @@ document.addEventListener('wheel', (e) => {
 }, { passive: true })
 
 app.mount("#app");
+
+// Errores del navegador a Sentry, sólo si el build trae VITE_SENTRY_DSN (lib/sentry.js).
+iniciarSentry(app, router);
 
 // Bootstrap en segundo plano (sesión + preferencias del club).
 //

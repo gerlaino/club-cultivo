@@ -16,8 +16,10 @@ const CSS = readdirSync(DIST)
 
 // Los estilos del componente son SCOPED: sin el atributo `data-v-xxxx` no aplica ni una regla y
 // el test mide el layout por defecto del navegador — verde por la razón equivocada, que ya pasó
-// una vez en esta misma sesión. El scope se saca del propio CSS para que sobreviva a los rebuilds.
-const SCOPE = (CSS.match(/\[(data-v-[0-9a-f]+)\]/) || [])[1]
+// una vez en esta misma sesión. El scope se saca del propio CSS para que sobreviva a los rebuilds,
+// y de la regla del PIE: el archivo del modal trae también el CSS de otros componentes que Vite
+// metió en el mismo pedazo (`.sde`, primero desde octubre), y el primer `data-v` era el de ellos.
+const SCOPE = (CSS.match(/\.mnd__barra-acc\[(data-v-[0-9a-f]+)\]/) || [])[1]
 
 // El pie tal como lo arma el componente en el paso 1, con el total de la captura.
 const PIE = (total) => `

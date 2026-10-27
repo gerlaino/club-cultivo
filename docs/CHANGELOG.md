@@ -1,5 +1,38 @@
 # Changelog
 
+## Octubre 2026 (ge) — Pantallas del CI en verde, dispensa con cobro de punta a punta, Sentry en el navegador (26-oct)
+
+Pendientes de la lista. El job «Pantallas (Playwright)» fallaba en GitHub desde que se creó (21-oct) y
+no frenaba el deploy (`continue-on-error`). Corrido igual que el CI en local, eran tres cosas:
+
+- **Un error real**: el dispensador abría la ficha de un paciente y se comía un 403 de
+  `/pacientes/:id/notas`. Las notas son clínicas (sólo admin y médico, `PacienteNotasController`); el
+  arreglo del 21-oct había sacado los paneles de quien no tiene la solapa, pero el `onMounted` de
+  `SocioDetailView` las seguía pidiendo para el contador. Ahora se piden sólo con la solapa.
+- **Dos pruebas que miraban otra cosa**: `pieDispensaTelefono` tomaba el primer `data-v` del CSS del
+  modal, que desde octubre trae también el de otro componente (`.sde`), y no aplicaba ninguna regla;
+  ahora toma el de `.mnd__barra-acc`. `regarDesdeElMas` tocaba el primer botón «Regar» de la página, que
+  ahora es el acceso rápido de la ficha del lote tapado por el menú; ahora toca el del menú.
+- `rendicion.spec` fallaba de a ratos en el login (ver `entrar()` abajo). Después del arreglo: tres de tres.
+- **e2e de dispensa con cobro** (`dispensaConCobro.spec.js`, sobre `rake e2e:caja_abierta`): la
+  dispensadora entrega 10 g a $1.000, cobra $6.000 en efectivo y deja $4.000 a cuenta. Verifica que el
+  carrito ofrece sólo lo de la mesa, que el faltante se avisa antes de confirmar, el resumen, la deuda en
+  la cuenta corriente (−$4.000), la mesa (300 → 290) y que el cierre espera fondo + efectivo ($26.000)
+  sin la parte a cuenta. De paso, `rake e2e:seed` pone en cero el saldo de las cuentas corrientes de la
+  org `e2e`: borraba los movimientos pero el saldo es una columna guardada, y cada corrida debía el doble.
+- **Sentry en el navegador** (`lib/sentry.js`, `@sentry/vue` 8): apagado si el build no trae
+  `VITE_SENTRY_DSN`, y entonces ni se baja (chunk propio `vendor-sentry`, fuera del precache del service
+  worker). `bin/render-build.sh` lo arma desde `SENTRY_DSN_FRONTEND` o, si no hay, `SENTRY_DSN`: con el
+  DSN del backend cargado quedan los dos lados (`docs/INFRA.md` paso 1.8). Sin datos de la persona:
+  sin `sendDefaultPii`, sin grabación, sin consola; DNI y mails borrados del mensaje, y las direcciones
+  sin `?…` en el evento, el `Referer`, las migas y los tramos de rendimiento. Probado con un DSN falso
+  interceptando el envío. `sentryFront.test.js` (5).
+- **Sale la franja «Mirá cómo se trabaja»** de organizaciones y de autocultivo (Germán: «que quede sólo
+  el botón de ver demo, con ese alcanza»). La demo se alcanza desde el «Ver la demo» de la primera
+  pantalla; `FranjaDemo.vue` se borró.
+- `entrar()` de las e2e verifica lo escrito en el login y lo reescribe si el formulario se redibujó y lo
+  borró: era el «botón deshabilitado un minuto» que tumbaba `rendicion.spec` de a ratos.
+
 ## Octubre 2026 (gd) — «Ver la demo» y cada página con el color de su puerta (26-oct)
 
 Germán sobre la propuesta (artifact «Páginas de adentro»): las simulaciones de cómo se usa «no deberían

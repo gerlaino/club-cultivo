@@ -3,6 +3,7 @@
 // Las credenciales salen de `rake e2e:seed`. Si cambian allá, cambian acá — es la única
 // duplicación aceptable, porque el seed vive en el backend y el test en el frontend.
 import { execSync } from 'node:child_process'
+import { expect } from '@playwright/test'
 
 // Cada archivo siembra SU escenario antes de correr. Sin esto los casos comparten el mismo
 // mostrador —uno solo por sede, igual que en la vida real— y se pisan según el orden en que
@@ -65,8 +66,23 @@ export async function entrar (page, quien) {
   await page.goto('/login')
   await page.waitForSelector('input[type="password"]', { timeout: 15_000 })
 
-  await page.fill('input[type="email"], input[name="email"]', USUARIOS[quien])
-  await page.fill('input[type="password"]', CLAVE)
+  // El formulario puede volver a dibujarse justo después de aparecer (el arranque de la sesión
+  // termina tarde) y borrar lo escrito: el botón queda deshabilitado con los campos vacíos y la
+  // prueba espera un minuto un click que nunca llega. Se escribe, se verifica y se reescribe.
+  const usuario = page.locator('input[type="email"], input[name="email"]').first()
+  const clave = page.locator('input[type="password"]').first()
+  for (let intento = 0; ; intento++) {
+    await usuario.fill(USUARIOS[quien])
+    await clave.fill(CLAVE)
+    try {
+      await expect(usuario).toHaveValue(USUARIOS[quien], { timeout: 1500 })
+      await expect(clave).toHaveValue(CLAVE, { timeout: 500 })
+      await expect(page.locator('button[type="submit"]')).toBeEnabled({ timeout: 5000 })
+      break
+    } catch (e) {
+      if (intento >= 2) throw e
+    }
+  }
   await page.click('button[type="submit"]')
   await page.waitForURL(u => !u.pathname.includes('/login'), { timeout: 20_000 })
 

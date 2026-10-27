@@ -15,7 +15,9 @@ async function regarDesdeElMas (page, codigo) {
   await page.locator('.msh__fab').click()
   // El «+» trae lotes y camas al abrirse: tocar «Regar» antes es elegir sobre una lista vacía.
   await page.waitForLoadState('networkidle')
-  await page.locator('button', { hasText: /^\s*Regar\s*$/ }).first().click()
+  // El «Regar» DEL MENÚ: la ficha del lote tiene el suyo entre sus accesos rápidos, y el primer
+  // botón de la página que dice «Regar» era ése, tapado por el menú abierto.
+  await page.locator('.msheet button:visible', { hasText: /^\s*Regar\s*$/ }).first().click()
   const opcion = page.locator('.msh__mas-item').filter({ hasText: codigo })
   if (await opcion.count()) await opcion.first().click()
 }

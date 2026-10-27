@@ -29,7 +29,7 @@
 <script setup>
 // LAS DEMOS (/bienvenida/organizaciones/demo y /bienvenida/autocultivo/demo, 26-oct-2026): la app de
 // verdad, grabada (`ComoSeHace`, los videos de `public/demos/`). Germán: «no debería estar en dos
-// lugares, sólo en la demo». Las páginas de cada puerta llevan acá con «Ver la demo» (`FranjaDemo`).
+// lugares, sólo en la demo». Las páginas de cada puerta llevan acá con el botón «Ver la demo» de su primera pantalla.
 // La planta que crece por fase (`RecorridoFases`) NO es una grabación y se queda en la página de
 // autocultivo: cuenta qué te da, no cómo se usa.
 import { computed } from 'vue'
