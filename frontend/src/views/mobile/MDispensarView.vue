@@ -92,7 +92,7 @@
       :saldo-cc="ficha?.saldo_cc"
       :limite-cc="ficha?.limite_cc"
       :descuento-porcentaje="ficha?.descuento_porcentaje || 0"
-      @created="onDispensado"
+      @saved="onDispensado"
     />
   </div>
 </template>
@@ -184,9 +184,10 @@ function dispensar() {
   dispensaOpen.value = true
 }
 
+// El modal avisa con `saved` (antes se escuchaba `created`, que nunca llegaba: la lista no se
+// refrescaba). El toast ya lo da el modal: uno solo por acción.
 function onDispensado() {
   dispensaOpen.value = false
-  toast.success('Dispensación registrada')
   buscar()
 }
 

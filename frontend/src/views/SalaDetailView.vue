@@ -141,7 +141,7 @@ async function saveCamera() {
   savingCamera.value = true
   try {
     await updateSala(salaId, { camera_stream_url: url, camera_snapshot_url: '' })
-    await salas.fetchOne(salaId)
+    await salas.fetchSala(salaId)
     showCameraForm.value = false
     toast.success('Cámara guardada')
     refreshSnapshot()
@@ -153,7 +153,7 @@ async function eliminarCamara() {
   savingCamera.value = true
   try {
     await updateSala(salaId, { camera_stream_url: '', camera_snapshot_url: '' })
-    await salas.fetchOne(salaId)
+    await salas.fetchSala(salaId)
     cameraError.value = false
     toast.success('Cámara eliminada')
   } catch { toast.error('Error') }

@@ -101,7 +101,8 @@ const toast   = useToast()
 const ccRefreshKey = ref(0)
 function onDispensacionCreada() {
   ccRefreshKey.value++
-  store.fetchOne(socioId)
+  // La dispensa ya quedó; si la recarga falla, la ficha sigue con lo que tenía.
+  store.fetchOne(socioId).catch(() => {})
 }
 
 // «Que se replique»: si otra pantalla cambia a este paciente (el médico inicia el trámite, alguien

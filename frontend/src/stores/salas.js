@@ -4,6 +4,9 @@ import {
   listSalas, getSala, createSala, updateSala, deleteSala
 } from "../lib/api";
 
+// El último pedido de la ficha: una respuesta que llega después de otra más nueva se descarta.
+let ultimoPedido = null;
+
 export const useSalasStore = defineStore("salas", {
   state: () => ({
     items: [],
@@ -40,18 +43,23 @@ export const useSalasStore = defineStore("salas", {
       }
     },
 
+    // Recargar la MISMA ficha (después de guardar, o por un aviso) no la vacía: la pantalla
+    // seguía mostrando «no encontrado» o la ruedita mientras viajaba el pedido, y rearmaba todas
+    // sus solapas. Sólo cambiar de ficha la vacía. Y si llegan dos respuestas, gana la última.
     async fetchSala(id, { silencioso = false } = {}) {
-      if (!silencioso) { this.loading = true; this.error = null; this.currentSala = null; }
+      const mismo = String(this.currentSala?.id) === String(id);
+      if (!silencioso && !mismo) { this.loading = true; this.error = null; this.currentSala = null; }
+      const pedido = (ultimoPedido = {});
       try {
         const { data } = await getSala(id);
-        this.currentSala = data;
+        if (pedido === ultimoPedido) this.currentSala = data;
         return data;
       } catch (e) {
         logger.error("Salas.fetchSala", e);
-        this.error = e?.response?.data?.error || e.message;
+        if (pedido === ultimoPedido) this.error = e?.response?.data?.error || e.message;
         throw e;
       } finally {
-        this.loading = false;
+        if (pedido === ultimoPedido) this.loading = false;
       }
     },
 

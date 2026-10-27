@@ -4,6 +4,9 @@ import {
   listPacienteNotas, createPacienteNota, deletePacienteNota
 } from "../lib/api"
 
+// El último `fetchOne` pedido: una respuesta que llega después de otra más nueva se descarta.
+let ultimoPedido = null
+
 export const usePacientesStore = defineStore("pacientes", {
   state: () => ({
     items: [],
@@ -61,17 +64,23 @@ export const usePacientesStore = defineStore("pacientes", {
       } catch { /* idem */ }
     },
 
+    // Recargar la MISMA ficha (después de guardar, o por un aviso) no la vacía: la pantalla
+    // seguía mostrando «no encontrado» o la ruedita mientras viajaba el pedido, y rearmaba todas
+    // sus solapas. Sólo cambiar de ficha la vacía. Y si llegan dos respuestas, gana la última.
     async fetchOne(id) {
-      this.loading = true; this.error = null; this.current = null
+      const mismo = String(this.current?.id) === String(id)
+      if (!mismo) { this.loading = true; this.current = null }
+      this.error = null
+      const pedido = (ultimoPedido = {})
       try {
         const { data } = await getPaciente(id)
-        this.current = data?.data || data
-        return this.current
+        if (pedido === ultimoPedido) this.current = data?.data || data
+        return data?.data || data
       } catch (e) {
-        this.error = e?.response?.data?.error || e.message
+        if (pedido === ultimoPedido) this.error = e?.response?.data?.error || e.message
         throw e
       } finally {
-        this.loading = false
+        if (pedido === ultimoPedido) this.loading = false
       }
     },
 

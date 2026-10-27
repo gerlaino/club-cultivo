@@ -1,5 +1,23 @@
 # Changelog
 
+## Octubre 2026 (gf) — Sin cartel rojo al recargar una ficha; la portada sin «Ver la demo» (27-oct)
+
+- **El cartel rojo de un instante** (Germán: «cuando confirmás una dispensa, por un milisegundo
+  aparece un cartel rojo… y no es el único lugar»). Al recargar la ficha que se estaba mirando, los
+  stores la vaciaban antes de pedirla: la pantalla decía «Paciente no encontrado.» (o «Planta…»,
+  «Usuario…», «Sala…», o la ruedita en el lote) y rearmaba todas sus solapas. Ahora `fetchOne` /
+  `fetchSala` de pacientes, usuarios, plantas, lotes y salas: **recargar la misma ficha no la vacía
+  ni prende `loading`; sólo cambiar de ficha la vacía**, y si llegan dos respuestas gana la del
+  último pedido. Cubre ~35 llamadas (dispensar, editar, cuenta corriente, aprobar alta, cambiar rol,
+  fases, mover lotes, avisos por cable de camas) sin tocar las vistas. Tests:
+  `fichaSinParpadeo.test.js` (los cinco stores) y la e2e `fichaSinParpadeo.spec.js`, que dispensa
+  desde la ficha mirando cada cambio de la página (con el código viejo atrapa el cartel).
+- **De paso:** la sala llamaba a `salas.fetchOne`, que no existe: guardar o quitar la cámara decía
+  «Error al guardar la cámara» aunque se guardaba. Y en el teléfono, después de dispensar la lista no
+  se refrescaba: la pantalla escuchaba `created` y el modal avisa con `saved` (el toast queda uno
+  solo, el del modal).
+- **La portada no lleva a la demo**: «Ver la demo» queda dentro de organizaciones y de autocultivo.
+
 ## Octubre 2026 (ge) — Pantallas del CI en verde, dispensa con cobro de punta a punta, Sentry en el navegador (26-oct)
 
 Pendientes de la lista. El job «Pantallas (Playwright)» fallaba en GitHub desde que se creó (21-oct) y

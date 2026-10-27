@@ -9,6 +9,9 @@ import {
   deleteLote,
 } from "../lib/api";
 
+// El último pedido de la ficha: una respuesta que llega después de otra más nueva se descarta.
+let ultimoPedido = null;
+
 export const useLotesStore = defineStore("lotes", {
   state: () => ({
     items: [],
@@ -87,10 +90,16 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
+    // Recargar la MISMA ficha (después de guardar, o por un aviso) no la vacía: la pantalla
+    // seguía mostrando «no encontrado» o la ruedita mientras viajaba el pedido, y rearmaba todas
+    // sus solapas. Sólo cambiar de ficha la vacía. Y si llegan dos respuestas, gana la última.
     async fetchOne(id, { silencioso = false } = {}) {
-      if (!silencioso) { this.loading = true; this.error = null; this.current = null; }
+      const mismo = String(this.current?.id) === String(id);
+      if (!silencioso && !mismo) { this.loading = true; this.error = null; this.current = null; }
+      const pedido = (ultimoPedido = {});
       try {
         const { data } = await getLote(id);
+        if (pedido !== ultimoPedido) return data;
         this.current = data;
         // Mantener la lista en sync: si el lote ya está en items / itemsBySala, lo
         // reemplazamos para que /lotes (y la sala) no queden con el estado viejo tras editar.
@@ -105,10 +114,10 @@ export const useLotesStore = defineStore("lotes", {
         return data;
       } catch (e) {
         logger.error("Lotes.fetchOne", e);
-        this.error = e?.response?.data?.error || e.message;
+        if (pedido === ultimoPedido) this.error = e?.response?.data?.error || e.message;
         throw e;
       } finally {
-        this.loading = false;
+        if (pedido === ultimoPedido) this.loading = false;
       }
     },
 
