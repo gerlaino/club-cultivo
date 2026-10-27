@@ -9,7 +9,7 @@
 
       <!-- Escritorio -->
       <nav class="pnb__nav" aria-label="Secciones">
-        <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
+        <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}<span v-if="l.chat && sinLeer" class="pnb__badge">{{ sinLeer }}</span></RouterLink>
         <span class="pnb__sep" aria-hidden="true"></span>
         <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
       </nav>
@@ -22,7 +22,7 @@
 
     <!-- Teléfono -->
     <nav v-if="abierto" class="pnb__movil" aria-label="Secciones">
-      <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
+      <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}<span v-if="l.chat && sinLeer" class="pnb__badge">{{ sinLeer }}</span></RouterLink>
       <div class="pnb__msep"></div>
       <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <RouterLink to="/portal/cuenta" class="pnb__mlink" @click="abierto = false">Mis datos</RouterLink>
@@ -51,9 +51,11 @@ import LeafSeal from '@/design-system/icons/LeafSeal.vue'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { useAuthStore } from '@/stores/auth'
 import { getPortalCuentaCorriente } from '@/lib/portalApi'
+import { usePortalChatStore } from '@/stores/portalChat'
 
 const router = useRouter()
 const { club } = storeToRefs(usePortalClubStore())
+const { sinLeer } = storeToRefs(usePortalChatStore())
 
 const abierto = ref(false)
 const tieneCC = ref(false)
@@ -62,7 +64,8 @@ const tieneCC = ref(false)
 const MIAS = [
   { to: '/portal',           txt: 'Inicio' },
   { to: '/portal/mi-salud',  txt: 'Mi salud' },
-  { to: '/portal/historial', txt: 'Mis retiros' },
+  { to: '/portal/historial', txt: 'Mis dispensas' },
+  { to: '/portal/mensajes',  txt: 'Mensajes', chat: true },
 ]
 
 const conCuenta = computed(() => [
@@ -70,7 +73,10 @@ const conCuenta = computed(() => [
   ...(tieneCC.value ? [{ to: '/portal/cuenta-corriente', txt: 'Mi cuenta' }] : []),
 ])
 
-const DE_LA_ORG = [{ to: '/portal/organizacion', txt: 'Mi organización' }]
+const DE_LA_ORG = [
+  { to: '/portal/catalogo',     txt: 'Catálogo' },
+  { to: '/portal/organizacion', txt: 'Mi organización' },
+]
 
 onMounted(async () => {
   try {
@@ -150,5 +156,9 @@ async function salir() {
   .pnb__nav { display: flex; }
   .pnb__ham { display: none; }
   .pnb__movil { display: none; }
+}
+.pnb__badge {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+  border-radius: 999px; background: var(--p-urgente); color: var(--p-papel); font-size: .7rem; font-weight: 700;
 }
 </style>

@@ -30,6 +30,10 @@
 
       <span class="pcr__ver"><Maximize2 :size="13" :stroke-width="2" /> Mostrar</span>
     </button>
+    <!-- Por vencer o vencido: la renovación se sube desde el portal (27-oct-2026). -->
+    <RouterLink v-if="['por_vencer', 'vencido'].includes(c.reprocann_categoria)" to="/portal/mi-salud#reprocann" class="pcr__renovar">
+      Subir la renovación del REPROCANN
+    </RouterLink>
 
     <!-- Pantalla completa: brillo al máximo mental, nada más que lo que el que atiende necesita
          leer. Sin scroll, sin navegación, sin nada que tocar por accidente. -->
@@ -275,4 +279,9 @@ watch(abierta, async (v) => {
 .pcr__full-estado--bloqueado { color: var(--p-urgente); }
 .pcr__full-detalle { color: var(--p-suave); font-size: var(--fs-14); margin: var(--sp-1) 0 0; line-height: var(--lh-base); }
 .pcr__full-rep { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--p-tenue); margin: var(--sp-3) 0 0; }
+.pcr__renovar {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: .6rem;
+  border-radius: 12px; border: 1px solid var(--p-atencion); color: var(--p-atencion); background: var(--p-atencion-bg);
+  font-weight: 700; font-size: .9rem; text-decoration: none;
+}
 </style>

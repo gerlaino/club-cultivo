@@ -162,6 +162,7 @@
 </template>
 
 <script setup>
+import { useChatPacientesStore } from '../../stores/chatPacientes'
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
@@ -223,12 +224,15 @@ const clubInitials = computed(() => {
 // inicio a propósito —esa pantalla es a dónde va ahora— pero si nada se lo dice, se va a su casa
 // con la recaudación. Un punto, no un número: acá no se cuenta plata, se avisa que hay.
 const cajaDelivery = useCajaDeliveryStore()
+// Las conversaciones del chat que esperan respuesta (las carga y escucha `AvisoMensajePaciente`).
+const chatPacientes = useChatPacientesStore()
 // El punto avisa que hay algo esperando: la plata que lleva el repartidor, o pesajes de manicura
 // por confirmar (el mismo contador que la barra del escritorio, al día por los avisos de cambios).
 const { aprobPendientes, refreshBadges } = useNavContext()
 const conPunto = (item) =>
   (item.punto === 'caja_delivery' && cajaDelivery.llevaEfectivo) ||
-  (item.punto === 'pesajes' && aprobPendientes.value > 0)
+  (item.punto === 'pesajes' && aprobPendientes.value > 0) ||
+  (item.punto === 'chat' && chatPacientes.sinResponder > 0)
 const veAprobar = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 onMounted(() => { if (veAprobar.value) refreshBadges() })
 useRecargaEnCambios('pesajes', () => { if (veAprobar.value) refreshBadges() })
@@ -256,6 +260,8 @@ const NAV = {
   // no lleva a ningún lado.
   admin: { fab: true, items: [
     { to: '/m/admin/home',    icon: 'bi-grid-1x2',      label: 'Inicio'  },
+    // El chat con los pacientes del portal: la lista de chats y, al tocar, la conversación.
+    { to: '/m/chat',          icon: 'bi-chat-dots',     label: 'Chat',      feature: 'vista_paciente', punto: 'chat' },
     { to: '/m/admin/sedes',   icon: 'bi-diagram-3',     label: 'Cultivo',   feature: 'cultivo' },
     { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar',   feature: 'cultivo', punto: 'pesajes' },
     { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },

@@ -1,0 +1,9 @@
+Hola <%= @paciente.nombre.to_s.split.first %>,
+
+<% if @invita %><%= @club.name %> te invita a tu portal de paciente: tu credencial, tus dispensas, tus papeles y un chat con la organización.<% else %>Pediste una clave nueva para tu portal de paciente de <%= @club.name %>.<% end %>
+
+<%= @invita ? 'Activalo acá' : 'Elegí la clave nueva acá' %> (te pide tu DNI; sirve una vez y vence el <%= @vence.strftime('%d/%m a las %H:%M') %>):
+<%= @link %>
+<% unless @invita %>
+Si no lo pediste, ignorá este mail: sin abrir el link nadie puede cambiar tu clave.
+<% end %>

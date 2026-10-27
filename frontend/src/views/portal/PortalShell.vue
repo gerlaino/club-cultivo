@@ -6,6 +6,7 @@
       <RouterView />
     </main>
     <PortalFooter />
+    <PortalChatBoton />
   </div>
 </template>
 
@@ -23,12 +24,19 @@ import { RouterView } from 'vue-router'
 import PortalNavBar from '@/components/portal/PortalNavBar.vue'
 import PortalFooter from '@/components/portal/PortalFooter.vue'
 import PortalAvisos from '@/components/portal/PortalAvisos.vue'
+import PortalChatBoton from '@/components/portal/PortalChatBoton.vue'
+import { usePortalChatStore } from '@/stores/portalChat'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { storeToRefs } from 'pinia'
 
 const store = usePortalClubStore()
 const { club } = storeToRefs(store)
 onMounted(() => store.fetchClub())
+
+// El chat con la organización: se escucha desde que entra (los «sin leer» del botón flotante y
+// de la barra se ven en cualquier pantalla del portal).
+const chat = usePortalChatStore()
+onMounted(() => { chat.escuchar(); chat.cargar({ silencioso: true }) })
 
 // Sólo se pisan las variables de marca, no la paleta entera: el fondo, la tinta y los semánticos
 // siguen saliendo del DS. Una organización puede elegir un color feo; no puede romper la

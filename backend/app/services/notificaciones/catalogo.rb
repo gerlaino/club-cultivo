@@ -49,6 +49,21 @@ module Notificaciones
       { clave: 'plan_vence',       grupo: TE_PIDEN, label: 'Plan por vencer',
         desc: 'Una semana antes y el día que vence.',
         roles: %w[admin], feature: nil, default: true },
+      # El chat del portal (27-oct-2026): a administración cuando un paciente escribe, y al paciente
+      # cuando la organización le contesta. Sin el texto (puede ser de su salud): quién y a dónde ir.
+      { clave: 'mensaje_paciente', grupo: TE_PIDEN, label: 'Mensajes de pacientes',
+        desc: 'Un paciente te escribió por el chat del portal.',
+        roles: ConversacionPaciente::ROLES_ATIENDEN, feature: 'vista_paciente', personal: false, default: true },
+      { clave: 'respuesta_organizacion', grupo: TE_PIDEN, label: 'Respuestas de tu organización',
+        desc: 'Tu organización te contestó en el chat del portal.',
+        roles: %w[paciente], feature: 'vista_paciente', personal: false, default: true },
+      # La renovación del REPROCANN que sube el paciente desde el portal (27-oct-2026).
+      { clave: 'renovacion_subida', grupo: TE_PIDEN, label: 'Renovaciones de REPROCANN para revisar',
+        desc: 'Un paciente subió la constancia de renovación desde su portal.',
+        roles: %w[admin], feature: 'vista_paciente', personal: false, default: true },
+      { clave: 'renovacion_revisada', grupo: TE_PIDEN, label: 'Tu renovación del REPROCANN',
+        desc: 'Tu organización aprobó (o te comentó algo de) la renovación que subiste.',
+        roles: %w[paciente], feature: 'vista_paciente', personal: false, default: true },
       # De la PLATAFORMA: le llega al super admin, que no tiene organización.
       { clave: 'consulta_nueva',   grupo: TE_PIDEN, label: 'Consulta nueva desde la página',
         desc: 'Alguien dejó sus datos en cultivoespacial.com (organización, uso personal o arrepentimiento), o una organización pidió un usuario.',

@@ -24,7 +24,7 @@
               <span class="pe__f-m">{{ mes(e.fecha_inicio) }}</span>
             </span>
             <span class="pe__c">
-              <span class="pe__t">{{ e.titulo }}</span>
+              <span class="pe__t">{{ e.titulo }}<span v-if="e.asistire" class="pe__va">Asistiré ✓</span></span>
               <span class="pe__m">
                 <Clock :size="12" :stroke-width="1.75" /> {{ hora(e.fecha_inicio) }}
                 <template v-if="e.lugar">
@@ -99,4 +99,5 @@ onMounted(() => ver(false))
 .pe__m { display: flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; font-size: var(--fs-13); color: var(--p-tenue); }
 .pe__foto { width: 68px; height: 52px; object-fit: cover; border-radius: var(--p-radio-sm); flex: 0 0 auto; }
 .pe__i:hover .pe__t { text-decoration: underline; text-underline-offset: 3px; }
+.pe__va { margin-left: .5rem; font-size: .72rem; font-weight: 700; padding: .1rem .5rem; border-radius: 999px; background: var(--p-marca-suave); color: var(--p-marca); vertical-align: middle; }
 </style>

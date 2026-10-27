@@ -3,6 +3,9 @@ class Evento < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
 
+  # Los pacientes que marcaron «Asistiré» en el portal (27-oct-2026).
+  has_many :asistencias, class_name: 'AsistenciaEvento', dependent: :destroy
+
   # Active Storage para imágenes
   has_many_attached :imagenes
 

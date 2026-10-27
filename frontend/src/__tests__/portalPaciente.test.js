@@ -206,7 +206,7 @@ describe('El inicio del portal', () => {
     await flushPromises()
 
     expect(w.text()).toContain('Lo mío')
-    expect(w.text()).toContain('Mis retiros')
+    expect(w.text()).toContain('Mis dispensas')
     // Se mira el ENCABEZADO de sección, no el texto suelto: "Mi organización" es además el
     // respaldo del nombre del club cuando la ficha todavía no cargó.
     expect(w.findAll('.pmi__sec-t').map(h => h.text())).not.toContain('Mi organización')
@@ -313,7 +313,7 @@ describe('La barra y el pie', () => {
     await flushPromises()
 
     const links = w.findAll('.pnb__nav .pnb__link').map(a => a.text())
-    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis retiros', 'Mi organización'])
+    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis dispensas', 'Mensajes', 'Catálogo', 'Mi organización'])
   })
 
   it('la barra ofrece la cuenta sólo si la organización se la abrió', async () => {

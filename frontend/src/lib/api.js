@@ -46,7 +46,9 @@ api.interceptors.response.use(
       cuerpo.error = cuerpo.errors.join(" · ");
     }
 
-    if (status === 401 && !url.includes('/users/sign_in')) {
+    // La puerta del paciente contesta 401 a una clave equivocada: es la respuesta del formulario,
+    // no una sesión vencida (igual que el login del equipo).
+    if (status === 401 && !url.includes('/users/sign_in') && !url.includes('/portal_acceso/')) {
       let loggingOut = false;
       let auth = null;
       try {
@@ -78,7 +80,10 @@ api.interceptors.response.use(
         // encontrarlo suele ser un poll de fondo (la campana late cada 60 s) y no algo que la
         // persona haya tocado. Desde afuera se ve como que la app se refrescó sola.
         anotarReload('http-401', { pedido: url });
-        window.location.href = `/login?redirect=${retorno}`;
+        // El paciente vuelve a SU puerta (DNI y clave): el login del equipo no le sirve.
+        window.location.href = path.startsWith('/portal')
+          ? '/paciente'
+          : `/login?redirect=${retorno}`;
       }
     }
 
@@ -156,6 +161,14 @@ export const solicitarRestablecimiento = (usuario) => api.post('/password', { us
 export const restablecerContrasena     = (token, password, password_confirmation) =>
   api.put('/password', { token, password, password_confirmation })
 export const me               = () => api.get("/me");
+// La puerta del portal del paciente (sin sesión): DNI + clave, el link de invitación o de «me
+// olvidé la clave», y pedir ese link. Entrar y activar dejan la sesión abierta (cookie).
+export const entrarPortal   = (dni, password, organizacion_id = null) =>
+  api.post('/portal_acceso/sesion', { dni, password, organizacion_id }, { timeout: 45000 })
+export const linkPortal     = (token) => api.get(`/portal_acceso/links/${encodeURIComponent(token)}`)
+export const activarPortal  = (token, dni, password, password_confirmation) =>
+  api.post(`/portal_acceso/links/${encodeURIComponent(token)}/activar`, { dni, password, password_confirmation }, { timeout: 45000 })
+export const recuperarPortal = (dni) => api.post('/portal_acceso/recuperar', { dni })
 
 // -------- Salas --------
 export const listSalas   = () => api.get("/salas");
@@ -329,8 +342,19 @@ export const deleteReprocannRenovacion   = (pacienteId, id) => api.delete(`/paci
 
 export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${pacienteId}/notas`);
 // Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña nueva.
-export const crearAccesoPaciente       = (id) => api.post(`/pacientes/${id}/acceso`)
-export const restablecerAccesoPaciente = (id) => api.post(`/pacientes/${id}/acceso/restablecer`)
+// El link para que el paciente entre a su portal (la primera vez o cuando perdió la clave).
+export const invitarPortalPaciente = (id) => api.post(`/pacientes/${id}/acceso/invitar`)
+// El chat del portal, del lado de la organización (27-oct-2026).
+export const listChatPacientes   = (params = {}) => api.get('/mensajes_pacientes', { params })
+export const getChatPaciente     = (id) => api.get(`/pacientes/${id}/mensajes`)
+export const enviarChatPaciente  = (id, { texto, archivo }) => {
+  if (!archivo) return api.post(`/pacientes/${id}/mensajes`, { texto })
+  const fd = new FormData()
+  if (texto) fd.append('texto', texto)
+  fd.append('adjunto', archivo)
+  return api.post(`/pacientes/${id}/mensajes`, fd, { timeout: 60000, headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const resolverChatPaciente = (id) => api.post(`/pacientes/${id}/mensajes/resolver`)
 
 export const createPacienteNota = (pacienteId, c) => api.post(`/pacientes/${pacienteId}/notas`, { nota: { contenido: c } });
 export const deletePacienteNota = (notaId) => api.delete(`/paciente_notas/${notaId}`);

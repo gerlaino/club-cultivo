@@ -3,12 +3,12 @@
     <div v-if="estado === 'cargando'" class="pgd__cargando"><DsSpinner :size="32" /></div>
 
     <PortalVacio v-else-if="estado === 'no_encontrada'"
-                 titulo="Esta variedad no está disponible"
+                 titulo="Esta genética no está disponible"
                  texto="Puede que tu organización la haya sacado del catálogo."
                  hacia-a="/portal/geneticas" hacia-txt="Ver el catálogo" />
 
     <template v-else>
-      <PortalCabecera :titulo="gen.nombre" volver-a="/portal/geneticas" volver-txt="Variedades" />
+      <PortalCabecera :titulo="gen.nombre" volver-a="/portal/geneticas" volver-txt="Genéticas" />
 
       <div class="pgd__chips">
         <span v-if="gen.tipo" class="pgd__chip">{{ TIPOS[gen.tipo] || gen.tipo }}</span>
@@ -55,7 +55,7 @@
       </section>
 
       <section v-if="gen.descripcion" class="pgd__sec">
-        <h2 class="pgd__sec-t">Sobre esta variedad</h2>
+        <h2 class="pgd__sec-t">Sobre esta genética</h2>
         <p class="pgd__desc">{{ gen.descripcion }}</p>
       </section>
 

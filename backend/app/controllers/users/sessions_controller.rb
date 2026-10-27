@@ -12,6 +12,12 @@ class Users::SessionsController < Devise::SessionsController
   skip_before_action :verify_signed_out_user
 
   def create
+    # ENTRAR ES CON LO QUE SE ESCRIBIÓ. Warden, antes de mirar usuario y clave, devuelve el que ya
+    # esté en la sesión de Rails (`_club_session`): con esa cookie del usuario anterior viva —una
+    # respuesta tardía la repone, o quedó del navegador— entrar como otra persona dejaba adentro al
+    # anterior, con el token del anterior (27-oct-2026: lo destapó `rendicion.spec` al cambiar de
+    # dispensadora a repartidor). Se suelta la sesión vieja y se autentica de cero.
+    warden.logout(resource_name) if warden.authenticated?(resource_name)
     self.resource = warden.authenticate!(auth_options)
 
     # Las credenciales son válidas, pero el club apagó el módulo del que vive este rol. Se

@@ -60,7 +60,7 @@
         <RouterLink to="/portal/historial" class="pmi__ficha">
           <span class="pmi__ico"><PackageCheck :size="18" :stroke-width="1.75" /></span>
           <span class="pmi__ficha-c">
-            <span class="pmi__ficha-l">Mis retiros</span>
+            <span class="pmi__ficha-l">Mis dispensas</span>
             <span class="pmi__ficha-v">
               {{ ultimoRetiro ? `Último: ${fechaCorta(ultimoRetiro.fecha)}` : 'Todavía no retiraste nada' }}
             </span>

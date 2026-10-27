@@ -4,86 +4,70 @@
       <div class="stp__header-icon"><component :is="KeyRound" :size="15" /></div>
       <div>
         <div class="stp__title">Acceso al portal</div>
-        <div class="stp__subtitle">Con esta cuenta el paciente entra a ver lo suyo</div>
+        <div class="stp__subtitle">Entra con su DNI y una clave que elige él: nadie de la organización la conoce</div>
       </div>
     </div>
 
-    <!-- Ya tiene cuenta -->
-    <template v-if="acceso?.tiene">
-      <div class="stp__dato">
-        <span class="stp__lbl">Usuario</span>
-        <code class="stp__val">{{ acceso.email }}</code>
-      </div>
+    <template v-if="acceso">
       <div class="stp__dato">
         <span class="stp__lbl">Estado</span>
-        <span class="stp__pill" :class="acceso.activo ? 'stp__pill--on' : 'stp__pill--off'">
-          {{ acceso.activo ? 'Puede entrar' : 'No puede entrar' }}
+        <span class="stp__pill" :class="estado.clase" data-testid="portal-estado">{{ estado.texto }}</span>
+      </div>
+      <div v-if="acceso.ultimo_ingreso" class="stp__dato">
+        <span class="stp__lbl">Entró</span>
+        <span class="stp__txt">{{ fechaHora(acceso.ultimo_ingreso) }}</span>
+      </div>
+      <div v-if="acceso.link_vigente" class="stp__dato">
+        <span class="stp__lbl">Link</span>
+        <span class="stp__txt">
+          {{ acceso.link_vigente.motivo === 'recuperacion' ? 'Pidió una clave nueva' : 'Invitación mandada' }} el
+          {{ fechaHora(acceso.link_vigente.creado_at) }} · vence {{ fechaHora(acceso.link_vigente.expira_at) }}
         </span>
       </div>
 
-      <p v-if="!acceso.activo" class="stp__nota stp__nota--warn">
-        El paciente está desactivado en la organización, así que su cuenta no entra al portal.
-        Se reactiva desde <strong>Datos</strong>, con el mismo interruptor que le permite retirar.
+      <p v-if="!acceso.portal_abierto" class="stp__nota stp__nota--warn">
+        Tu organización tiene el portal <strong>cerrado</strong>. Abrilo en Configuración → Portal del paciente
+        y después mandale el link.
       </p>
-      <p v-else-if="acceso.mail_posible" class="stp__nota">
-        La contraseña no se guarda en ningún lado. Si la perdió, generá una nueva: le llega por mail
-        y también te la mostramos acá para pasársela.
+      <p v-else-if="!acceso.activo" class="stp__nota stp__nota--warn">
+        El paciente está dado de baja, así que no entra al portal. Se reactiva desde <strong>Datos</strong>,
+        con el mismo interruptor que le permite retirar.
       </p>
-      <p v-else class="stp__nota stp__nota--warn">
-        La contraseña no se guarda en ningún lado, y a este paciente <strong>no se la podemos mandar
-        por mail</strong>: {{ acceso.mail_falta }} Si la perdió, generá una nueva y pasásela vos.
+      <p v-else-if="acceso.activado" class="stp__nota">
+        Si perdió la clave, la recupera solo con «Me olvidé la clave»{{ acceso.tiene_mail ? '' : ' (le llega por mail, y no tiene uno cargado)' }}.
+        También podés mandarle un link nuevo desde acá.
+      </p>
+      <p v-else class="stp__nota">
+        Mandale el link: lo abre, pone su DNI y elige su clave. {{ acceso.tiene_mail ? 'Le llega también a su mail.' : 'No tiene mail cargado: mandáselo por WhatsApp.' }}
       </p>
 
-      <div v-if="acceso.puede_gestionar" class="stp__acts">
-        <button class="stp__btn" :disabled="trabajando" @click="restablecer">
-          <RefreshCw :size="13" />
-          Generar contraseña nueva
+      <div v-if="acceso.puede_gestionar && acceso.portal_abierto && acceso.activo" class="stp__acts">
+        <button class="stp__btn stp__btn--primary" :disabled="trabajando" data-testid="portal-invitar" @click="invitar">
+          <Send :size="13" />
+          {{ acceso.activado || acceso.link_vigente ? 'Mandar un link nuevo' : 'Invitar al portal' }}
         </button>
       </div>
-    </template>
-
-    <!-- Todavía no tiene -->
-    <template v-else>
-      <p class="stp__nota">
-        Todavía no tiene cuenta. La reciben los pacientes que se dan de alta desde que existe el
-        portal; a los de antes hay que crearla acá.
-      </p>
-      <p v-if="acceso && !acceso.mail_posible" class="stp__nota stp__nota--warn">
-        La contraseña <strong>no se le va a poder mandar por mail</strong>: {{ acceso.mail_falta }}
-        Vas a tener que pasársela vos, y se muestra una sola vez.
-      </p>
-      <div v-if="acceso?.sugerido" class="stp__dato">
-        <span class="stp__lbl">Le quedaría</span>
-        <code class="stp__val">{{ acceso.sugerido }}</code>
-      </div>
-
-      <div v-if="acceso?.puede_gestionar" class="stp__acts">
-        <button class="stp__btn stp__btn--primary" :disabled="trabajando" @click="crear">
-          <KeyRound :size="13" />
-          Crear su acceso
-        </button>
-      </div>
-      <p v-else class="stp__nota stp__nota--warn">
-        Sólo un administrador o el médico puede crear el acceso.
+      <p v-else-if="!acceso.puede_gestionar" class="stp__nota stp__nota--warn">
+        Sólo administración o el médico puede mandarle el link.
       </p>
     </template>
 
-    <CredencialesNuevas :datos="credenciales" @cerrar="credenciales = null" />
+    <LinkPortalNuevo :datos="link" @cerrar="link = null" />
   </div>
 </template>
 
 <script setup>
-// La cuenta del portal, en la ficha del paciente.
+// El acceso al portal, en la ficha del paciente (27-oct-2026).
 //
-// Antes la contraseña inicial se mostraba UNA vez al dar el alta y después no había ningún lugar
-// donde ver siquiera cuál era el usuario. Y los pacientes cargados antes del portal no tenían
-// cuenta ni forma de conseguirla más que borrarlos y volverlos a cargar.
-import { ref } from 'vue'
-import { KeyRound, RefreshCw } from 'lucide-vue-next'
-import { crearAccesoPaciente, restablecerAccesoPaciente } from '../../lib/api.js'
+// Antes acá se creaba la cuenta y se mostraba UNA vez una contraseña para dictársela; si la
+// perdía, se generaba otra. Ahora el paciente entra con su DNI y elige su clave desde un link:
+// la ficha dice si ya lo activó, cuándo entró y si tiene un link vigente, y manda uno nuevo.
+import { computed, ref } from 'vue'
+import { KeyRound, Send } from 'lucide-vue-next'
+import { invitarPortalPaciente } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
-import CredencialesNuevas from '../ui/CredencialesNuevas.vue'
+import LinkPortalNuevo from './LinkPortalNuevo.vue'
 
 const props = defineProps({
   socioId: { type: [String, Number], required: true },
@@ -94,39 +78,42 @@ const emit = defineEmits(['actualizado'])
 
 const toast = useToast()
 const { confirm } = useConfirm()
-const trabajando  = ref(false)
-const credenciales = ref(null)
+const trabajando = ref(false)
+const link = ref(null)
 
-async function crear() {
-  trabajando.value = true
-  try {
-    const { data } = await crearAccesoPaciente(props.socioId)
-    credenciales.value = { ...data.credenciales, nombre: props.nombre }
-    emit('actualizado')
-  } catch (e) {
-    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo crear el acceso')
-  } finally {
-    trabajando.value = false
-  }
+const estado = computed(() => {
+  const a = props.acceso || {}
+  if (!a.portal_abierto) return { texto: 'Portal cerrado', clase: 'stp__pill--off' }
+  if (!a.activo) return { texto: 'Dado de baja', clase: 'stp__pill--off' }
+  if (a.activado) return { texto: 'Activó su portal', clase: 'stp__pill--on' }
+  if (a.link_vigente) return { texto: 'Invitado, sin activar', clase: 'stp__pill--espera' }
+  return { texto: 'Sin invitar', clase: 'stp__pill--off' }
+})
+
+const fechaHora = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-async function restablecer() {
-  // Se avisa antes: la clave vieja deja de servir en el acto, y si el paciente la tenía anotada
-  // se queda afuera sin entender por qué.
-  const ok = await confirm({
-    title: 'Generar una contraseña nueva',
-    message: 'La contraseña actual deja de servir en el momento. Vas a tener que pasarle la nueva.',
-    confirmText: 'Generar',
-  })
-  if (!ok) return
-
+async function invitar() {
+  // Si ya hay un link sin usar, el nuevo lo anula: el paciente que lo tenía guardado se encuentra
+  // con «este link ya no sirve». Se avisa antes.
+  if (props.acceso?.link_vigente) {
+    const ok = await confirm({
+      title: 'Mandar un link nuevo',
+      message: 'El link que le mandaste antes deja de servir. Mandale este.',
+      confirmText: 'Generar link nuevo',
+    })
+    if (!ok) return
+  }
   trabajando.value = true
   try {
-    const { data } = await restablecerAccesoPaciente(props.socioId)
-    credenciales.value = { ...data.credenciales, nombre: props.nombre }
+    const { data } = await invitarPortalPaciente(props.socioId)
+    link.value = { ...data.link, nombre: props.nombre }
     emit('actualizado')
   } catch (e) {
-    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo restablecer la contraseña')
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo generar el link')
   } finally {
     trabajando.value = false
   }
@@ -161,6 +148,8 @@ async function restablecer() {
 }
 .stp__pill--on  { background: #dcfce7; color: #15803d; }
 .stp__pill--off { background: var(--c-slate-100); color: var(--c-slate-500); }
+.stp__pill--espera { background: var(--c-amber-100); color: var(--c-gold-500); }
+.stp__txt { font-size: .85rem; color: var(--c-slate-700); }
 
 .stp__nota { font-size: .82rem; color: var(--c-slate-500); margin: .9rem 0 0; line-height: 1.55; }
 .stp__nota--warn { color: #92400e; }

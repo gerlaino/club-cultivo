@@ -169,6 +169,7 @@ RSpec.describe 'Portal — el historial del paciente', type: :request do
 
     fila = JSON.parse(response.body)['data'].first
     # `envio` sí: es parte de lo que él pagó (23-sep-2026), no un dato interno.
-    expect(fila.keys).to contain_exactly('id', 'fecha', 'token', 'gramos', 'total', 'envio', 'items')
+    # `numero`, `sede` y `anulada` (27-oct-2026): para la lista de «Mis dispensas».
+    expect(fila.keys).to contain_exactly('id', 'numero', 'fecha', 'sede', 'anulada', 'token', 'gramos', 'total', 'envio', 'items')
   end
 end

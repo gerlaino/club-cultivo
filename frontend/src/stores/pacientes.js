@@ -87,8 +87,8 @@ export const usePacientesStore = defineStore("pacientes", {
     // Devuelve `{ paciente, aviso, acceso }`. El `aviso` es para lo que salió distinto de lo
     // pedido sin que el alta falle — típicamente que el mail de bienvenida no pudo salir. El
     // paciente se creó igual, así que no es un error: es algo que el usuario tiene que saber.
-    // `acceso` trae la cuenta del portal recién creada (usuario y contraseña inicial), y sólo
-    // viene si la organización tiene el módulo y el alta quedó aprobada.
+    // `acceso` trae el link para que el paciente entre a su portal (`{ link }` o `{ error }`), y
+    // sólo viene si la organización tiene el portal abierto y el alta quedó aprobada.
     async create(payload, { enviarBienvenida = false, turno = null } = {}) {
       this.saving = true; this.error = null
       try {

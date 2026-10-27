@@ -1,11 +1,11 @@
 <template>
   <div class="pg">
-    <PortalCabecera titulo="Variedades" bajada="Lo que se cultiva y está en el catálogo de la organización." />
+    <PortalCabecera titulo="Genéticas" bajada="Las que cultiva la organización: de dónde vienen y qué tienen." />
 
     <div v-if="cargando" class="pg__cargando"><DsSpinner :size="32" /></div>
 
     <PortalVacio v-else-if="!geneticas.length"
-                 titulo="Todavía no hay variedades publicadas"
+                 titulo="Todavía no hay genéticas publicadas"
                  texto="Cuando tu organización publique su catálogo, lo vas a ver acá." />
 
     <template v-else>

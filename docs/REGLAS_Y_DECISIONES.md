@@ -1663,6 +1663,28 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `vista_paciente_activa` existió meses **sin que lo leyera nadie**: se guardaba, se mostraba en
   pantalla y el paciente entraba igual. Toda spec que contrate `vista_paciente` tiene que pasar
   `vista_paciente_activa: true`.
+- **EL PACIENTE ENTRA CON SU DNI Y UNA CLAVE QUE ELIGE ÉL** (27-oct-2026). Nadie de la organización
+  conoce ni dicta su clave: la elige desde un link (`AccesoPortal`, un uso, vence, pide el DNI, se
+  cae a los 5 errores, el nuevo anula al anterior, en la base va el hash). Las cuentas para entrar
+  salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
+  contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
+  respuestas de la puerta no dicen si un DNI existe.
+- **El paciente NO escucha `ClubChannel`** (le contaba cada cambio del equipo): escucha
+  `PacienteChannel` (su ficha, nunca un parámetro). Todo lo del portal que cambia en vivo va por ahí.
+- **El chat del portal**: una conversación por paciente, texto cifrado, la atiende administración
+  (`ConversacionPaciente::ROLES_ATIENDEN`). Los push del chat y de la renovación NO llevan el texto
+  (se leen con el teléfono bloqueado). Un mensaje sólo cita una dispensa del mismo paciente.
+- **Lo que sube el paciente no cambia nada solo**: la renovación del REPROCANN queda «en revisión»
+  hasta que administración la aprueba con el vencimiento nuevo o la devuelve con el motivo.
+- **Al paciente nunca se le muestra quién lo atendió, ni el costo, ni cantidades del stock**: el
+  catálogo dice «Hay / Quedan pocos / No hay hoy»; «Asistiré» le dice si él va, no cuántos van.
+- **Toda subida de archivo va `multipart/form-data`**: la instancia de axios manda JSON por defecto
+  y un FormData con ese encabezado llega vacío (`subidasMultipart.test.js`).
+- **ENTRAR ES CON LO QUE SE ESCRIBIÓ** (27-oct-2026): `Users::SessionsController#create` suelta
+  la sesión de Rails anterior antes de autenticar. Warden devolvía al que estaba en `_club_session`
+  sin mirar usuario ni clave.
+- **La primera instalación del service worker NO recarga la página** (`main.js`): sólo una
+  actualización. Recargar en la primera visita borraba lo que la persona estaba escribiendo.
 - **Lo clínico del paciente se serializa con LISTA BLANCA campo por campo, nunca `as_json`.**
   `Turno#notas_post` son las notas del médico PARA EL MÉDICO y no salen jamás. Los campos
   encriptados de `IndicacionMedica` sí se le sirven al paciente: son suyos y los pide él. Con

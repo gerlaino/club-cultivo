@@ -1,0 +1,344 @@
+require 'rails_helper'
+
+# LA ENTRADA AL PORTAL DEL PACIENTE (27-oct-2026, Germán: «que los pacientes ya puedan usar el
+# portal, teniendo en cuenta todas las entradas»).
+#
+# AC:
+#   - El paciente entra con su DNI y su clave. Si es paciente en más de una organización, elige a
+#     cuál DESPUÉS de validar la clave (la lista nunca se muestra a quien no la sabe).
+#   - La primera vez (y cuando perdió la clave) entra por un link: sirve una vez, vence, pide su
+#     DNI y ahí elige la clave. Un link nuevo anula al anterior; 5 DNI equivocados lo tiran.
+#   - «Me olvidé la clave» con el DNI: si tiene mail, le llega un link. La respuesta es la misma
+#     exista o no el DNI.
+#   - No entra: el dado de baja, el que no fue aprobado, el de una organización con el portal
+#     cerrado o sin contratar.
+RSpec.describe 'La entrada al portal del paciente', type: :request do
+  include AuthHelpers
+
+  def club!(nombre, abierto: true, contratado: true)
+    create(:club, name: nombre, vista_paciente_activa: abierto,
+                  features: { 'produccion_dispensa' => true, 'vista_paciente' => contratado })
+  end
+
+  let(:club) { club!('Raíces') }
+
+  # Como en producción: el pedido llega SIN organización (no hay sesión). El hook general de specs
+  # fija `club` como tenant de prueba y eso tapaba un NoTenantSet al abrir el link.
+  before { ActsAsTenant.test_tenant = nil }
+
+  def sin_tenant(&) = ActsAsTenant.without_tenant(&)
+
+  def ficha!(en: club, dni: '30.111.222', nombre: 'Lucía', **attrs)
+    ActsAsTenant.with_tenant(en) do
+      create(:paciente, club: en, dni: dni, nombre: nombre, apellido: 'Fernández',
+                        aprobado_at: Time.current, email: 'lucia@example.com', **attrs)
+    end
+  end
+
+  # Una cuenta ya activada con esta clave (como si hubiera usado su link).
+  def con_clave!(paciente, clave = 'clave-larga-1')
+    ActsAsTenant.with_tenant(paciente.club) do
+      user = Pacientes::Acceso.crear!(paciente).user
+      user.update!(password: clave, password_confirmation: clave)
+      paciente.reload
+    end
+  end
+
+  def entrar(dni, password, **extra)
+    post '/api/portal_acceso/sesion', params: { dni: dni, password: password, **extra }, as: :json
+  end
+
+  def json = JSON.parse(response.body)
+
+  def quien_soy
+    get '/api/me'
+    response.status == 200 ? json['email'] || json.dig('user', 'email') : nil
+  end
+
+  describe 'entrar con DNI y clave' do
+    it 'con el DNI escrito como sea (con o sin puntos) y su clave, entra a SU cuenta' do
+      paciente = con_clave!(ficha!)
+
+      entrar('30111222', 'clave-larga-1')
+
+      expect(response).to have_http_status(:ok), response.body
+      expect(json['role']).to eq('paciente')
+      expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+
+    it 'con la clave equivocada no entra, y el mensaje no dice si el DNI existe' do
+      con_clave!(ficha!)
+
+      entrar('30111222', 'otra-clave')
+      equivocada = json['error']
+      entrar('99888777', 'otra-clave')
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(json['error']).to eq(equivocada)
+      expect(quien_soy).to be_nil
+    end
+
+    it 'la cuenta que nunca activó su link no entra con nada que alguien sepa' do
+      paciente = ficha!
+      ActsAsTenant.with_tenant(club) { Pacientes::Acceso.crear!(paciente) }
+
+      entrar('30111222', '')
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    describe 'paciente en dos organizaciones' do
+      let(:otra) { club!('Mundo Verde') }
+
+      it 'si la clave sirve en las dos, recién ahí le pregunta a cuál entra' do
+        con_clave!(ficha!)
+        con_clave!(ficha!(en: otra))
+
+        entrar('30111222', 'clave-larga-1')
+
+        expect(response).to have_http_status(:ok)
+        expect(json['elegir'].map { |o| o['nombre'] }).to contain_exactly('Raíces', 'Mundo Verde')
+        expect(quien_soy).to be_nil
+      end
+
+      it 'y con la que elige, entra a esa' do
+        con_clave!(ficha!)
+        en_otra = con_clave!(ficha!(en: otra))
+
+        entrar('30111222', 'clave-larga-1', organizacion_id: otra.id)
+
+        expect(quien_soy).to eq(sin_tenant { en_otra.reload.user.email })
+      end
+
+      it 'si la clave sirve sólo en una, entra directo: la otra no aparece en ningún lado' do
+        propia = con_clave!(ficha!)
+        con_clave!(ficha!(en: otra), 'clave-de-la-otra')
+
+        entrar('30111222', 'clave-larga-1')
+
+        expect(json).not_to have_key('elegir')
+        expect(quien_soy).to eq(sin_tenant { propia.reload.user.email })
+      end
+
+      it 'con la clave equivocada no se entera de en qué organizaciones está' do
+        con_clave!(ficha!)
+        con_clave!(ficha!(en: otra))
+
+        entrar('30111222', 'nada-que-ver')
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(response.body).not_to include('Mundo Verde')
+      end
+    end
+
+    describe 'quién no entra aunque la clave esté bien' do
+      it 'el paciente dado de baja' do
+        con_clave!(ficha!(es_paciente: false))
+        entrar('30111222', 'clave-larga-1')
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'el que todavía no fue aprobado (alta del mostrador)' do
+        pendiente = ficha!
+        pendiente.update_column(:aprobado_at, nil) # el alta lo aprueba sola si no viene del mostrador
+        con_clave!(pendiente)
+        entrar('30111222', 'clave-larga-1')
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'el de una organización con el portal cerrado' do
+        con_clave!(ficha!(en: club!('Cerrada', abierto: false)))
+        entrar('30111222', 'clave-larga-1')
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'el de una organización sin el portal contratado' do
+        con_clave!(ficha!(en: club!('Sin portal', contratado: false)))
+        entrar('30111222', 'clave-larga-1')
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'el de una organización eliminada' do
+        borrada = club!('Borrada')
+        con_clave!(ficha!(en: borrada))
+        borrada.update_column(:deleted_at, Time.current)
+
+        entrar('30111222', 'clave-larga-1')
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+  end
+
+  describe 'el link (invitación o «me olvidé la clave»)' do
+    let(:paciente) { ficha! }
+
+    def link!(motivo: 'invitacion')
+      ActsAsTenant.with_tenant(club) { AccesoPortal.emitir!(paciente, motivo: motivo) }.token
+    end
+
+    def activar(token, dni: '30111222', password: 'mi-clave-nueva', confirmacion: password)
+      post "/api/portal_acceso/links/#{token}/activar",
+           params: { dni: dni, password: password, password_confirmation: confirmacion }, as: :json
+    end
+
+    it 'dice de qué organización es y a quién saluda, sin datos de salud ni el DNI' do
+      get "/api/portal_acceso/links/#{link!}"
+
+      expect(response).to have_http_status(:ok)
+      expect(json['nombre']).to eq('Lucía')
+      expect(json['organizacion']['nombre']).to eq('Raíces')
+      expect(response.body).not_to include('30111222')
+    end
+
+    it 'con su DNI y una clave elige su clave y queda adentro' do
+      activar(link!)
+
+      expect(response).to have_http_status(:ok), response.body
+      expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+
+    it 'después entra con DNI y la clave que eligió' do
+      activar(link!)
+      reset!
+
+      entrar('30111222', 'mi-clave-nueva')
+      expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+
+    it 'le crea la cuenta si no la tenía (los pacientes de antes del portal)' do
+      expect(sin_tenant { paciente.user }).to be_nil
+
+      activar(link!)
+
+      expect(sin_tenant { paciente.reload.user }).to be_present
+    end
+
+    it 'sirve una sola vez' do
+      token = link!
+      activar(token)
+      reset!
+
+      activar(token, password: 'otra-clave-mas')
+
+      expect(response).to have_http_status(:gone)
+      expect(json['error']).to include('ya se usó')
+    end
+
+    it 'vence: la invitación a las 72 horas' do
+      token = link!
+      travel 73.hours do
+        get "/api/portal_acceso/links/#{token}"
+        expect(response).to have_http_status(:gone)
+        expect(json['error']).to include('venció')
+      end
+    end
+
+    it 'el de «me olvidé la clave» vence antes, a las 6 horas' do
+      token = link!(motivo: 'recuperacion')
+      travel 7.hours do
+        activar(token)
+        expect(response).to have_http_status(:gone)
+      end
+    end
+
+    it 'un link nuevo anula el anterior' do
+      viejo = link!
+      link!
+
+      get "/api/portal_acceso/links/#{viejo}"
+      expect(response).to have_http_status(:gone)
+      expect(json['error']).to include('más nuevo')
+    end
+
+    it 'con otro DNI no sirve: si se lo reenviaron a alguien, no entra' do
+      activar(link!, dni: '99888777')
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(quien_soy).to be_nil
+    end
+
+    it 'a los 5 DNI equivocados el link se cae, aunque después pongan el correcto' do
+      token = link!
+      5.times { activar(token, dni: '11111111') }
+
+      activar(token)
+
+      expect(response).to have_http_status(:gone)
+      expect(quien_soy).to be_nil
+    end
+
+    it 'pide una clave de 8 caracteres o más, y las dos iguales' do
+      token = link!
+      activar(token, password: 'corta')
+      expect(json['error']).to include('8 caracteres')
+
+      activar(token, password: 'clave-larga', confirmacion: 'clave-larguisima')
+      expect(json['error']).to include('no son iguales')
+    end
+
+    it 'con el portal cerrado después de mandarlo, no entra' do
+      token = link!
+      club.update!(vista_paciente_activa: false)
+
+      activar(token)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(json['error']).to include('cerrado')
+    end
+
+    it 'un link inventado no existe' do
+      get '/api/portal_acceso/links/cualquier-cosa'
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'en la base queda el hash, no el link' do
+      token = link!
+      expect(AccesoPortal.unscoped.where(token_digest: token)).to be_empty
+    end
+  end
+
+  describe '«Me olvidé la clave»' do
+    def recuperar(dni) = post('/api/portal_acceso/recuperar', params: { dni: dni }, as: :json)
+
+    it 'con mail cargado le llega el link de recuperación' do
+      con_clave!(ficha!)
+
+      expect { recuperar('30.111.222') }.to have_enqueued_mail(AccesoMailer, :portal_link)
+      expect(AccesoPortal.unscoped.last.motivo).to eq('recuperacion')
+    end
+
+    it 'la respuesta es la misma para un DNI que no está: no dice quién es paciente' do
+      con_clave!(ficha!)
+      recuperar('30111222')
+      existe = response.body
+
+      expect { recuperar('99888777') }.not_to have_enqueued_mail
+      expect(response.body).to eq(existe)
+    end
+
+    it 'sin mail en la ficha no se manda nada (ni se le anula el link que tenía)' do
+      paciente = con_clave!(ficha!(email: nil))
+      ActsAsTenant.with_tenant(club) { AccesoPortal.emitir!(paciente) }
+
+      expect { recuperar('30111222') }.not_to have_enqueued_mail
+      expect(AccesoPortal.unscoped.where(paciente_id: paciente.id, anulado_at: nil).count).to eq(1)
+    end
+
+    it 'el link que manda sirve para elegir la clave nueva' do
+      paciente = con_clave!(ficha!)
+      token = nil
+      allow(AccesoMailer).to receive(:portal_link).and_wrap_original do |m, **kw|
+        token = kw[:token]
+        m.call(**kw)
+      end
+
+      recuperar('30111222')
+      post "/api/portal_acceso/links/#{token}/activar",
+           params: { dni: '30111222', password: 'clave-recuperada', password_confirmation: 'clave-recuperada' }, as: :json
+      reset!
+      entrar('30111222', 'clave-recuperada')
+
+      expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+  end
+end

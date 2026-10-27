@@ -10,9 +10,28 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_27_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "accesos_portal", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "paciente_id", null: false
+    t.bigint "creado_por_id"
+    t.string "motivo", default: "invitacion", null: false
+    t.string "token_digest", null: false
+    t.datetime "expira_at", null: false
+    t.datetime "usado_at"
+    t.datetime "anulado_at"
+    t.integer "intentos_fallidos", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_accesos_portal_on_club_id"
+    t.index ["creado_por_id"], name: "index_accesos_portal_on_creado_por_id"
+    t.index ["paciente_id", "usado_at"], name: "index_accesos_portal_on_paciente_id_and_usado_at"
+    t.index ["paciente_id"], name: "index_accesos_portal_on_paciente_id"
+    t.index ["token_digest"], name: "index_accesos_portal_on_token_digest", unique: true
+  end
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
@@ -196,6 +215,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.index ["dispensacion_id"], name: "index_ariccame_registros_on_dispensacion_id"
     t.index ["estado"], name: "index_ariccame_registros_on_estado"
     t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
+  end
+
+  create_table "asistencias_evento", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "evento_id", null: false
+    t.bigint "paciente_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_asistencias_evento_on_club_id"
+    t.index ["evento_id", "paciente_id"], name: "index_asistencias_evento_on_evento_id_and_paciente_id", unique: true
+    t.index ["evento_id"], name: "index_asistencias_evento_on_evento_id"
+    t.index ["paciente_id"], name: "index_asistencias_evento_on_paciente_id"
   end
 
   create_table "asistente_correcciones", force: :cascade do |t|
@@ -666,6 +697,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.index ["club_id"], name: "index_conversaciones_asistente_on_club_id"
     t.index ["user_id", "fecha"], name: "index_conversaciones_asistente_on_user_id_and_fecha", unique: true
     t.index ["user_id"], name: "index_conversaciones_asistente_on_user_id"
+  end
+
+  create_table "conversaciones_paciente", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "paciente_id", null: false
+    t.datetime "ultimo_mensaje_at"
+    t.string "ultimo_autor"
+    t.datetime "leida_org_at"
+    t.datetime "leida_paciente_at"
+    t.datetime "resuelta_at"
+    t.bigint "resuelta_por_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "ultimo_mensaje_at"], name: "index_conversaciones_paciente_on_club_id_and_ultimo_mensaje_at"
+    t.index ["club_id"], name: "index_conversaciones_paciente_on_club_id"
+    t.index ["paciente_id"], name: "index_conversaciones_paciente_on_paciente_id", unique: true
+    t.index ["resuelta_por_id"], name: "index_conversaciones_paciente_on_resuelta_por_id"
   end
 
   create_table "costo_lotes", force: :cascade do |t|
@@ -1565,6 +1613,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.index ["paciente_id"], name: "index_medico_pacientes_on_paciente_id"
   end
 
+  create_table "mensajes_paciente", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "conversacion_id", null: false
+    t.bigint "user_id"
+    t.string "autor", null: false
+    t.text "texto"
+    t.bigint "dispensacion_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_mensajes_paciente_on_club_id"
+    t.index ["conversacion_id", "created_at"], name: "index_mensajes_paciente_on_conversacion_id_and_created_at"
+    t.index ["conversacion_id"], name: "index_mensajes_paciente_on_conversacion_id"
+    t.index ["dispensacion_id"], name: "index_mensajes_paciente_on_dispensacion_id"
+    t.index ["user_id"], name: "index_mensajes_paciente_on_user_id"
+  end
+
   create_table "metricas_respuesta", force: :cascade do |t|
     t.datetime "hora", null: false
     t.string "endpoint", null: false
@@ -2241,6 +2305,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.string "origen", default: "organizacion", null: false
+    t.bigint "revisada_por_id"
+    t.datetime "revisada_at"
     t.index ["club_id"], name: "index_reprocann_renovaciones_on_club_id"
     t.index ["deleted_at"], name: "index_reprocann_renovaciones_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_reprocann_renovaciones_on_deleted_by_id"
@@ -2248,6 +2315,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.index ["iniciada_por_id"], name: "index_reprocann_renovaciones_on_iniciada_por_id"
     t.index ["paciente_id", "estado"], name: "index_reprocann_renovaciones_on_paciente_id_and_estado"
     t.index ["paciente_id"], name: "index_reprocann_renovaciones_on_paciente_id"
+    t.index ["revisada_por_id"], name: "index_reprocann_renovaciones_on_revisada_por_id"
   end
 
   create_table "resenas_producto", force: :cascade do |t|
@@ -2790,6 +2858,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
     t.index ["created_by_id"], name: "index_webhooks_on_created_by_id"
   end
 
+  add_foreign_key "accesos_portal", "clubs"
+  add_foreign_key "accesos_portal", "pacientes"
+  add_foreign_key "accesos_portal", "users", column: "creado_por_id"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "ajustes_plataforma", "users", column: "actualizado_por_id"
@@ -2816,6 +2887,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
   add_foreign_key "ariccame_registros", "users", column: "deleted_by_id"
+  add_foreign_key "asistencias_evento", "clubs"
+  add_foreign_key "asistencias_evento", "eventos"
+  add_foreign_key "asistencias_evento", "pacientes"
   add_foreign_key "asistente_correcciones", "clubs"
   add_foreign_key "asistente_correcciones", "users"
   add_foreign_key "auditorias", "clubs"
@@ -2889,6 +2963,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
   add_foreign_key "consulta_respuestas", "users"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
+  add_foreign_key "conversaciones_paciente", "clubs"
+  add_foreign_key "conversaciones_paciente", "pacientes"
+  add_foreign_key "conversaciones_paciente", "users", column: "resuelta_por_id"
   add_foreign_key "costo_lotes", "clubs"
   add_foreign_key "costo_lotes", "lotes"
   add_foreign_key "costo_lotes", "users", column: "calculado_por_id"
@@ -3030,6 +3107,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
   add_foreign_key "medico_pacientes", "pacientes"
   add_foreign_key "medico_pacientes", "users", column: "created_by_id"
   add_foreign_key "medico_pacientes", "users", column: "medico_id"
+  add_foreign_key "mensajes_paciente", "clubs"
+  add_foreign_key "mensajes_paciente", "conversaciones_paciente", column: "conversacion_id"
+  add_foreign_key "mensajes_paciente", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "mensajes_paciente", "users"
   add_foreign_key "mostrador_items", "clubs"
   add_foreign_key "mostrador_items", "mostradores"
   add_foreign_key "mostrador_items", "stocks"
@@ -3133,6 +3214,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_20_120000) do
   add_foreign_key "reprocann_renovaciones", "pacientes"
   add_foreign_key "reprocann_renovaciones", "users", column: "deleted_by_id"
   add_foreign_key "reprocann_renovaciones", "users", column: "iniciada_por_id"
+  add_foreign_key "reprocann_renovaciones", "users", column: "revisada_por_id"
   add_foreign_key "resenas_producto", "clubs"
   add_foreign_key "resenas_producto", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "resenas_producto", "geneticas"

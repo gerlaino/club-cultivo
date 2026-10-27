@@ -23,6 +23,20 @@ class AccesoMailer < ApplicationMailer
     mail(to: cuentas.first.first.email_real, subject: 'Elegí una contraseña nueva — Cultivo Espacial')
   end
 
+  # El link del portal del paciente: la invitación de la organización o el «me olvidé la clave».
+  # Va al mail de la FICHA del paciente (su usuario de ingreso es su DNI, no un mail). No lleva
+  # ningún dato de salud: sólo el nombre, la organización y el link.
+  def portal_link(acceso:, token:)
+    @paciente = acceso.paciente
+    @club     = acceso.club
+    @invita   = acceso.motivo == 'invitacion'
+    @link     = "#{App.base_url}/portal/entrar/#{token}"
+    @vence    = acceso.expira_at.in_time_zone('America/Argentina/Buenos_Aires')
+    adjuntar_logo(@club)
+    asunto = @invita ? "#{@club.name} te invita a tu portal de paciente" : 'Elegí una clave nueva para tu portal'
+    mail(to: @paciente.email, subject: asunto)
+  end
+
   # Aviso de que la contraseña cambió. Como el perfil ya no pide la actual para cambiarla, esto es
   # lo que le avisa al dueño si no fue él (y le dice cómo recuperarla).
   def contrasena_cambiada(user:)

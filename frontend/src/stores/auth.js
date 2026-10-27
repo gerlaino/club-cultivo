@@ -1,6 +1,6 @@
 import { engancharCambios, soltarCambios } from '../lib/cambiosStores.js';
 import { defineStore } from "pinia";
-import { signIn, signOut, me, clearAuthToken } from "../lib/api";
+import { signIn, signOut, me, clearAuthToken, entrarPortal, activarPortal } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 import { usePWA } from '../composables/usePWA.js'
@@ -153,6 +153,31 @@ export const useAuthStore = defineStore("auth", {
     // `conservarError`: en un reintento automático NO se borra el mensaje anterior. Se borraba
     // siempre, así que entre el "Reintentando…" y la respuesta el formulario quedaba mudo: un
     // spinner sin una línea de texto, que es exactamente lo que parece un cuelgue.
+    // El paciente entra por su puerta: DNI + clave (`entrarPortal`) o el link de invitación
+    // (`activarPortal`). Las dos dejan la sesión abierta igual que el login del equipo. Si la clave
+    // sirve en más de una organización, el backend contesta `{ elegir: [...] }` y esto lo devuelve
+    // sin entrar: la pantalla pregunta a cuál y vuelve a llamar con `organizacionId`.
+    async loginPaciente(dni, password, organizacionId = null) {
+      return this._entrarAlPortal(() => entrarPortal(dni, password, organizacionId))
+    },
+
+    async activarPortalPaciente(token, dni, password, confirmacion) {
+      return this._entrarAlPortal(() => activarPortal(token, dni, password, confirmacion))
+    },
+
+    async _entrarAlPortal(pedir) {
+      authEpoch++;
+      bootstrapPromise = null;
+      this.loggingOut = false;
+      const { data } = await pedir();
+      if (data?.elegir) return data;
+      await this.fetchMe();
+      if (!this.user) throw new Error('No se pudo abrir tu sesión. Probá de nuevo.');
+      const { default: router } = await import("../router");
+      router.push('/portal');
+      return data;
+    },
+
     async login(email, password, redirect = null, { conservarError = false } = {}) {
       authEpoch++;           // invalida cualquier /me en vuelo del arranque
       bootstrapPromise = null;
@@ -234,6 +259,7 @@ export const useAuthStore = defineStore("auth", {
       this.loading = true;
       this.error = null;
       this.loggingOut = true;   // los 401 en vuelo no deben setear ?redirect
+      const eraPaciente = this.user?.role === 'paciente';
       try {
         await signOut();
       } catch (_) {
@@ -270,7 +296,8 @@ export const useAuthStore = defineStore("auth", {
         // atrás a una pantalla autenticada. Cache-bust para saltear cualquier SW.
         // A dónde: la misma regla que `/` sin sesión (router). En la web, la portada; en la app
         // instalada, el login: quien la abre viene a trabajar, no a que le vendan la plataforma.
-        const destino = usePWA().isPWA() ? '/login' : '/bienvenida';
+        // El paciente vuelve a SU puerta (DNI y clave), no al login del equipo ni a la portada.
+        const destino = eraPaciente ? '/paciente' : (usePWA().isPWA() ? '/login' : '/bienvenida');
         window.location.replace(destino + '?loggedout=' + Date.now());
       }
     },

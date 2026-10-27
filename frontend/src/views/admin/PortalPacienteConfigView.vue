@@ -5,7 +5,7 @@
     <div class="wpv__header">
       <div>
         <h1 class="wpv__title">Portal del paciente</h1>
-        <p class="wpv__subtitle">Qué ve tu gente cuando entra: variedades, novedades y eventos</p>
+        <p class="wpv__subtitle">Qué ve tu gente cuando entra: genéticas, novedades y eventos</p>
       </div>
     </div>
 
@@ -22,7 +22,7 @@
     <div v-if="activeTab === 'geneticas'" class="wpv__section">
       <div class="wpv__section-header">
         <div>
-          <h2 class="wpv__section-title">Variedades que ve el paciente</h2>
+          <h2 class="wpv__section-title">Genéticas que ve el paciente</h2>
           <p class="wpv__section-sub">Activá las genéticas que querés mostrarle a tu gente en su portal.</p>
         </div>
       </div>
@@ -120,6 +120,16 @@
                 <span><i class="bi bi-clock"></i> {{ getHora(e.fecha_inicio) }}</span>
               </div>
               <div v-if="e.descripcion" class="wpv__evento-desc">{{ truncate(e.descripcion, 80) }}</div>
+              <!-- Los que marcaron «Asistiré» en el portal (27-oct-2026). -->
+              <button v-if="e.asistentes" type="button" class="wpv__asist" @click="verAsistentes(e)">
+                <i class="bi bi-people"></i> {{ e.asistentes }} {{ e.asistentes === 1 ? 'asistirá' : 'asistirán' }}
+                · {{ asistentesDe[e.id] ? 'ocultar' : 'ver quiénes' }}
+              </button>
+              <ul v-if="asistentesDe[e.id]" class="wpv__asist-lista">
+                <li v-for="a in asistentesDe[e.id]" :key="a.paciente_id">
+                  <RouterLink :to="`/pacientes/${a.paciente_id}`">{{ a.nombre }}</RouterLink>
+                </li>
+              </ul>
             </div>
             <div class="wpv__evento-card-actions">
               <span class="wpv__pill" :class="e.activo ? 'wpv__pill--green' : 'wpv__pill--gray'">
@@ -409,6 +419,16 @@ import { logger } from '../../utils/logger.js'
 import { useClubStore } from '../../stores/club'
 import { storeToRefs } from 'pinia'
 import api from '../../lib/api'
+
+// Quiénes marcaron «Asistiré» en cada evento: se pide al tocar, no con la lista.
+const asistentesDe = ref({})
+async function verAsistentes(e) {
+  if (asistentesDe.value[e.id]) { const { [e.id]: _, ...resto } = asistentesDe.value; asistentesDe.value = resto; return }
+  try {
+    const { data } = await api.get(`/eventos/${e.id}/asistentes`)
+    asistentesDe.value = { ...asistentesDe.value, [e.id]: data.data || [] }
+  } catch (err) { logger.error('asistentes', err) }
+}
 import { useConfirm } from '../../composables/useConfirm.js'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -425,7 +445,7 @@ const activeTab = ref('config')
 // la misma cosa es lo que ya costó caro en otras pantallas.
 const tabs = [
   { key: 'config',    label: 'Configuración del portal', icon: 'bi-gear'           },
-  { key: 'geneticas', label: 'Variedades',               icon: 'bi-diagram-3'      },
+  { key: 'geneticas', label: 'Genéticas',                icon: 'bi-diagram-3'      },
   { key: 'noticias',  label: 'Novedades',                icon: 'bi-newspaper'      },
   { key: 'eventos',   label: 'Eventos',                  icon: 'bi-calendar-event' },
 ]
@@ -963,4 +983,7 @@ onMounted(async () => {
   .wpv__table-row > span:nth-child(3),
   .wpv__table-row > div:nth-child(4) { display: none; }
 }
+.wpv__asist { margin-top: 8px; border: 0; background: var(--c-leaf-100); color: var(--c-leaf-800); font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.wpv__asist-lista { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+.wpv__asist-lista a { color: var(--c-leaf-700); }
 </style>

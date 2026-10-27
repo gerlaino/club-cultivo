@@ -5,7 +5,7 @@
 // cambios dispara una recarga (agrupado en 300 ms) y nunca pisa una que está en vuelo.
 //
 // Se engancha al entrar (con usuario) y se suelta al salir: lo anotado no vale para el próximo.
-import { alCambiar, alCambiarAgrupado, olvidarCambios } from './cambios.js'
+import { alCambiar, alCambiarAgrupado, olvidarCambios, usarCanal } from './cambios.js'
 import { cerrarCable } from './cableConsumer.js'
 import { useLotesStore }  from '../stores/lotes.js'
 import { useSalasStore }  from '../stores/salas.js'
@@ -20,6 +20,10 @@ let enganchado = false
 export function engancharCambios() {
   if (enganchado) return
   enganchado = true
+  // El paciente escucha SU canal y nada de lo de la organización: las pantallas del portal se
+  // anotan solas por lo suyo (`mensajes`).
+  if (useAuthStore().user?.role === 'paciente') { usarCanal('PacienteChannel'); return }
+  usarCanal('ClubChannel')
   const lotes  = useLotesStore()
   const salas  = useSalasStore()
   const plants = usePlantsStore()

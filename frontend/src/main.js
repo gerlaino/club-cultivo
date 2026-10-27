@@ -74,10 +74,19 @@ const updateSW = registerSW({
   },
 })
 
-// Cuando el SW nuevo toma control, recargar para servir assets frescos
+// Cuando el SW nuevo toma control, recargar para servir assets frescos.
+//
+// PERO SÓLO SI ES UNA ACTUALIZACIÓN. La primera vez que alguien abre la app en un navegador no hay
+// service worker; el que se instala toma el control (`clientsClaim`) y eso también dispara
+// `controllerchange`: la página se recargaba sola a los pocos segundos y borraba lo que la persona
+// estaba escribiendo. Le pasaba a todo el que entraba por primera vez —el paciente que abre su
+// invitación en el teléfono es exactamente ese caso— y era el «formulario que se redibuja y borra
+// lo escrito» del login (27-oct-2026). En la primera instalación la página ya vino de la red: no
+// hay nada viejo que refrescar.
+const habiaServiceWorker = !!navigator.serviceWorker?.controller
 let swRecargando = false
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  if (swRecargando) return
+  if (swRecargando || !habiaServiceWorker) return
   swRecargando = true
   anotarReload('sw-controllerchange')
   window.location.reload()

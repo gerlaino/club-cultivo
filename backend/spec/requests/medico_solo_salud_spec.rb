@@ -54,7 +54,7 @@ RSpec.describe 'El médico sólo se ocupa de la salud', type: :request do
   end
 
   it 'no gestiona el acceso al portal' do
-    post "/api/pacientes/#{paciente.id}/acceso"
+    post "/api/pacientes/#{paciente.id}/acceso/invitar"
     expect(response).to have_http_status(:forbidden)
   end
 

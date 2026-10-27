@@ -11,6 +11,11 @@
 // lo que pasó con los cuatro canales anteriores.
 import { consumidorCable } from './cableConsumer.js'
 
+// Qué canal se escucha: el de la organización (`ClubChannel`) o, para el paciente, el suyo
+// (`PacienteChannel`, 27-oct-2026): el de la organización le contaba lo que hacía el equipo.
+let canal = 'ClubChannel'
+export function usarCanal(nombre) { canal = nombre }
+
 const handlers = new Map()   // recurso → Set<fn>
 const recargas = new Set()   // las recargas de `alCambiarAgrupado`: lo que se re-pide al volver
 let subscription = null
@@ -41,7 +46,7 @@ function alVolverALaApp() {
 function asegurarSuscripcion() {
   if (subscription) return
   try {
-    subscription = consumidorCable().subscriptions.create('ClubChannel', {
+    subscription = consumidorCable().subscriptions.create(canal, {
       // La primera conexión no: la pantalla recién cargó. Las siguientes son un corte que terminó.
       connected() {
         if (conecto) resincronizar()
@@ -60,6 +65,12 @@ function asegurarSuscripcion() {
     console.warn('[cambios] WebSocket no disponible', e?.message)
   }
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', alVolverALaApp)
+}
+
+// Le avisa algo al backend por el mismo canal (hoy: «está escribiendo» en el chat).
+export function avisarAlCanal(accion, datos = {}) {
+  asegurarSuscripcion()
+  try { subscription?.perform(accion, datos) } catch { /* sin cable: no es grave, es un aviso */ }
 }
 
 // Anota un handler para uno o varios recursos. Devuelve la función para desanotarse.

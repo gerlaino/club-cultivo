@@ -7,7 +7,7 @@
           <template v-if="i > 0"> · </template>{{ a.texto }}
         </span>
       </p>
-      <RouterLink to="/portal" class="pav__bt">Mi credencial</RouterLink>
+      <RouterLink :to="hayReprocann ? '/portal/mi-salud#reprocann' : '/portal'" class="pav__bt">{{ hayReprocann ? 'Subir la renovación' : 'Mi credencial' }}</RouterLink>
     </div>
   </div>
 </template>
@@ -28,6 +28,8 @@ import { getPortalMiEstado } from '@/lib/portalApi'
 const todos = ref([])
 
 const avisos = computed(() => todos.value.filter(a => a.nivel === 'urgente'))
+// Si lo que impide retirar es el REPROCANN, el botón lleva a subir la renovación (27-oct-2026).
+const hayReprocann = computed(() => avisos.value.some(a => a.tipo === 'reprocann_vencido'))
 
 onMounted(async () => {
   try {

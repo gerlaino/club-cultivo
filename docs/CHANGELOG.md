@@ -1,5 +1,54 @@
 # Changelog
 
+## Octubre 2026 (gg) — El portal del paciente, para usarse: entrada con DNI, dispensas con trazabilidad, chat, renovación del REPROCANN, «Asistiré» y catálogo (27-oct)
+
+Germán: «quiero que implementes y desarrolles el portal del paciente, teniendo en cuenta todas las
+entradas». Cinco etapas, cada una probada (rspec, vitest y Playwright contra el backend real).
+
+- **La entrada** (`PortalAccesoController`, tabla `accesos_portal`). El paciente entra con **DNI y
+  clave** (`/paciente`). La primera vez y cuando pierde la clave, por un **link** (`/portal/entrar/:token`):
+  sirve una vez, vence (invitación 72 h, «me olvidé» 6 h), pide el DNI (si se lo reenvían a otro no
+  sirve) y se cae a los 5 DNI equivocados; un link nuevo anula al anterior; en la base queda el hash.
+  Si es paciente en varias organizaciones elige a cuál **después** de validar la clave. «Me olvidé la
+  clave» con el DNI manda el link al mail de la ficha (respuesta igual exista o no). No entra el dado
+  de baja, el sin aprobar, ni el de una organización con el portal cerrado/sin contratar/eliminada.
+  rack-attack por IP y por DNI. **Nadie de la organización ve ni dicta la clave**: al dar el alta,
+  al aprobarla y desde la ficha («Invitar al portal» / «Mandar un link nuevo») sale el link para
+  WhatsApp (y por mail si hay). Se borraron «Crear su acceso», «Generar contraseña nueva», el mail
+  con la contraseña y sus specs. La ficha dice si lo activó, cuándo entró y si hay link vigente.
+- **Mis dispensas**: lista con número, sede y lote, y el **detalle** (`/portal/dispensas/:id`,
+  `Portal::DetalleDispensa`): cómo pagó y, por producto, la trazabilidad del lote del frasco
+  (etapas con fecha, sala y días; pesado en seco, envasado, entrega), el análisis de laboratorio, la
+  nutrición y las aplicaciones con su carencia, y el enlace a la genética (sólo si se publica). Sin
+  costo, sin otros pacientes y sin quién atendió (regla vieja: es interno).
+- **Chat** (tablas `conversaciones_paciente` + `mensajes_paciente`, texto cifrado, adjunto foto/PDF,
+  cita de una dispensa suya). Paciente: «Mensajes» y botón flotante con los sin leer. Equipo
+  (admin/supervisor): solapa «Chat» en la ficha, bandeja «Chat con pacientes» (compu y `/m/chat`) con
+  la ficha resumida al costado, alerta en vivo con «Responder», respuestas rápidas, «Marcar como
+  resuelta» (un mensaje nuevo la reabre). Tildes ✓/✓✓ (leído), «está escribiendo…», push a los dos
+  lados SIN el texto. **El paciente ya no escucha `ClubChannel`** (le llegaba cada cambio del equipo):
+  tiene `PacienteChannel`.
+- **Mi REPROCANN** (en Mi salud): sube la constancia de renovación y queda en revisión
+  (`ReprocannRenovacion`, que no tenía pantalla: `origen`, `revisada_por`, constancia adjunta). En la
+  ficha, la tarjeta para aprobarla con el vencimiento nuevo (queda activo) o devolverla con el motivo,
+  que el paciente ve. Avisos en vivo y push a los dos lados.
+- **«Asistiré»** en los eventos (tabla `asistencias_evento`); administración ve cuántos y quiénes en
+  Configuración → Portal; el paciente sólo si él va.
+- **Catálogo** (`/portal/catalogo`): lo que hay hoy sobre la mesa de cada sede, con precio y «Hay /
+  Quedan pocos / No hay hoy» (nunca la cantidad), sólo de las genéticas que se publican.
+- **«Genéticas», nunca «Variedades»**, en el portal y en su configuración.
+- **Arreglos que salieron en el camino**: (1) la primera vez que alguien abre la app, el service
+  worker se instalaba y **recargaba la página a los segundos, borrando lo que se estaba escribiendo**
+  (`main.js`: sólo se recarga en una actualización) — era también el login que «se redibujaba» en las
+  pruebas; (2) el 401 de una clave equivocada del paciente se tomaba como sesión vencida y lo mandaba
+  al login del equipo; la sesión vencida en el portal ahora vuelve a `/paciente`; (3) las subidas
+  nuevas van `multipart/form-data` (con el JSON por defecto el archivo llegaba vacío); (4) **el
+  login no validaba lo que se escribía si quedaba otra sesión abierta**: Warden devolvía al usuario
+  que estaba en `_club_session` e ignoraba usuario y clave (hasta una clave equivocada daba 200 y
+  dejaba adentro al anterior). `Users::SessionsController#create` suelta la sesión vieja antes de
+  autenticar (`login_con_otra_sesion_spec.rb`). Lo destapó `rendicion.spec` al cambiar de usuario.
+- e2e: `portalEntrada`, `portalChat`, `portalRecorrido` (escenario `rake e2e:portal`).
+
 ## Octubre 2026 (gf) — Sin cartel rojo al recargar una ficha; la portada sin «Ver la demo» (27-oct)
 
 - **El cartel rojo de un instante** (Germán: «cuando confirmás una dispensa, por un milisegundo

@@ -1,64 +1,20 @@
 module Pacientes
-  # La cuenta con la que el paciente entra a SU portal.
+  # La cuenta del paciente para SU portal.
   #
-  # Un paciente no tiene por qué tener mail —muchos dan de alta sin uno, y el que dan es el de un
-  # familiar— así que la cuenta no se apoya en su correo: se le arma un usuario propio con la
-  # forma `nombre.apellido@organizacion.paciente`. No es una casilla real y no recibe nada; es un
-  # identificador para entrar, y por eso se puede dictar por teléfono sin que nadie tipee mal un
-  # dominio.
+  # Desde el 27-oct-2026 entra con su DNI y una clave que elige él desde un link
+  # (`PortalAcceso::Invitar`): nadie de la organización la conoce. La cuenta igual necesita un
+  # `email` único (Devise): se le arma `nombre.apellido@organizacion.paciente`, que no es una
+  # casilla y no recibe nada. Es el identificador de las cuentas de antes, que pueden seguir
+  # entrando con él por el login de siempre.
   #
-  # La contraseña la genera `User.password_temporal` y es DISTINTA para cada uno. Una clave fija
-  # sería fatal acá y peor que en el equipo: el usuario se deriva del nombre, así que cualquiera
-  # que conozca a un paciente de la organización lo deduce, y con una clave común entraría a su
-  # historia clínica y a sus dispensaciones. La cambia el paciente desde su perfil; el usuario no.
+  # La clave inicial la genera `User.password_temporal`, distinta para cada uno, y NO se muestra
+  # ni se manda: hasta que abre el link, la cuenta no tiene una clave que alguien sepa.
   class Acceso
     Resultado = Struct.new(:user, :password_inicial, :error, :mail, keyword_init: true) do
       def ok? = error.nil?
     end
 
     def self.crear!(paciente) = new(paciente).crear!
-
-    # Le da una contraseña nueva a quien ya tiene cuenta. Es la única forma de recuperarla: la
-    # inicial se muestra una vez y no se guarda en claro en ningún lado.
-    def self.restablecer!(paciente) = new(paciente).restablecer!
-
-    # Cómo se vería su usuario si se le creara la cuenta. Sirve para mostrarlo ANTES de crearla,
-    # así quien la crea sabe qué le va a quedar.
-    def self.previsualizar(paciente) = email_base(paciente, paciente.club)
-
-    # Le manda la contraseña por mail, si se puede.
-    #
-    # Es la vía práctica: mostrarla una sola vez en pantalla obliga a quien la creó a anotarla y a
-    # hacérsela llegar por su cuenta, y con veinte pacientes eso no pasa. La pantalla la sigue
-    # mostrando igual —es la única salida cuando el paciente no tiene mail o la organización no
-    # tiene casilla.
-    #
-    # Devuelve `true` / `false` / `nil` (no se intentó), que es lo que la pantalla necesita para
-    # decir "también se lo mandamos" o "pasásela vos".
-    #
-    # La contraseña NO queda en el historial de correo: el registro dice que se le mandó el
-    # acceso, no cuál es. Guardarla en claro en `mails_enviados.cuerpo` sería peor que no mandar
-    # nada.
-    def self.enviar_por_mail(paciente, password, remitente:, nueva: false)
-      club = paciente.club
-      return nil unless club.feature?('mailer')
-      return false if paciente.email.blank? || !club.smtp_configured?
-
-      PacienteMailer.acceso_portal(paciente: paciente, password: password, club: club,
-                                   remitente: remitente, nueva: nueva).deliver_now
-
-      MailEnviado.create(
-        paciente: paciente, user: remitente, club: club,
-        asunto: nueva ? 'Tu nueva contraseña' : 'Tu acceso al portal',
-        # Sin la contraseña, a propósito.
-        cuerpo: "Se le envió su usuario (#{paciente.user&.email}) y una contraseña para entrar al portal.",
-        tipo: 'acceso_portal', email_destino: paciente.email, enviado_at: Time.current
-      )
-      true
-    rescue => e
-      Rails.logger.warn("[acceso paciente] no se pudo enviar el mail: #{e.message}")
-      false
-    end
 
     def initialize(paciente)
       @paciente = paciente
@@ -84,15 +40,6 @@ module Pacientes
       return Resultado.new(error: user.errors.full_messages.to_sentence) unless user.save
 
       @paciente.update_column(:user_id, user.id)
-      Resultado.new(user: user, password_inicial: password)
-    end
-
-    def restablecer!
-      user = @paciente.user
-      return Resultado.new(error: 'Este paciente todavía no tiene cuenta.') if user.nil?
-
-      password = User.password_temporal
-      user.update!(password: password, password_confirmation: password)
       Resultado.new(user: user, password_inicial: password)
     end
 

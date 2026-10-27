@@ -4,8 +4,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 // AC (23-oct-2026, Javi y Germán): la portada se parte en organizaciones (con los dos planes) y
 // autocultivo, cada una con su color; los precios y límites salen del backend (sin respuesta, no
 // aparece ningún número); arriba hay «Soy paciente»; el pie tiene los legales y el botón de
-// arrepentimiento en todas las páginas. Al paciente el login no le ofrece «olvidé mi contraseña»,
-// que el backend no le deja usar.
+// arrepentimiento en todas las páginas. El paciente entra por su puerta (DNI), no por el login.
 const PRECIOS = {
   moneda: 'USD',
   autocultivo: { precio: 8 },
@@ -21,9 +20,10 @@ let respuesta
 vi.mock('../lib/api.js', () => ({ getRegistroInfo: () => respuesta() }))
 vi.mock('../lib/fuentesHerbario.js', () => ({ cargarFuentesHerbario: () => {} }))
 let query = {}
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query, hash: '' }),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => router,
 }))
 
 const stubs = {
@@ -95,17 +95,24 @@ describe('El armado de las páginas públicas', () => {
 })
 
 describe('El login desde «Soy paciente»', () => {
-  it('le explica al paciente su usuario y no le ofrece «olvidé mi contraseña»', async () => {
+  // Desde el 27-oct-2026 el paciente tiene su propia puerta (DNI y clave, en /paciente): el link
+  // viejo `/login?paciente=1` lleva ahí, y el login del equipo le indica el camino.
+  it('el link viejo de paciente lleva a su puerta con DNI', async () => {
     query = { paciente: '1' }
+    router.replace.mockClear()
     const { createPinia, setActivePinia } = await import('pinia')
     setActivePinia(createPinia())
     const { default: L } = await import('../views/LoginView.vue')
+    mount(L, { global: { stubs } })
+    expect(router.replace).toHaveBeenCalledWith('/paciente')
+  })
+
+  it('el login del equipo le dice al paciente dónde entrar', async () => {
+    query = {}
+    const { default: L } = await import('../views/LoginView.vue')
     const w = mount(L, { global: { stubs } })
-    expect(w.text()).toContain('Tu portal de paciente')
-    expect(w.text()).toContain('nombre.apellido@organizacion.paciente')
-    expect(w.findAll('a').map(a => a.attributes('data-to'))).not.toContain('/olvide-contrasena')
-    expect(w.text()).toContain('Pedile una nueva a tu organización')
-    expect(w.text()).not.toContain('Probá gratis')
+    expect(w.findAll('a').map(a => a.attributes('data-to'))).toContain('/paciente')
+    expect(w.text()).not.toContain('nombre.apellido@organizacion.paciente')
   })
 
   it('al equipo le sigue ofreciendo «olvidé mi contraseña»', async () => {

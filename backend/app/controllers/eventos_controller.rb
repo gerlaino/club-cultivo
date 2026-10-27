@@ -1,7 +1,7 @@
 class EventosController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
-  before_action :set_evento, only: [:show, :update, :destroy]
+  before_action :set_evento, only: [:show, :update, :destroy, :asistentes]
 
   def index
     eventos = current_user.club.eventos.ordenados
@@ -10,6 +10,14 @@ class EventosController < ApplicationController
 
   def show
     render json: { data: serialize(@evento) }
+  end
+
+  # GET /eventos/:id/asistentes — quiénes marcaron «Asistiré» en el portal (27-oct-2026).
+  def asistentes
+    lista = @evento.asistencias.includes(:paciente).order(:created_at).map do |a|
+      { paciente_id: a.paciente_id, nombre: a.paciente&.nombre_completo, desde: a.created_at }
+    end
+    render json: { data: lista }
   end
 
   def create
@@ -58,6 +66,7 @@ class EventosController < ApplicationController
       titulo:       e.titulo,
       descripcion:  e.descripcion,
       fecha_inicio: e.fecha_inicio,
+      asistentes:   e.asistencias.count,
       fecha_fin:    e.fecha_fin,
       lugar:        e.lugar,
       activo:       e.activo,

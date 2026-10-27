@@ -15,8 +15,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin
-} from 'lucide-vue-next'
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin, MessageCircle } from 'lucide-vue-next'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import SocioMedicos from '../components/pacientes/SocioMedicos.vue'
 import { reprocannCategoria, reprocannDias, reprocannPlazo } from '../composables/useReprocann.js'
@@ -28,6 +27,10 @@ import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
 import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vue'
 import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
 import SocioTabPortal          from '../components/pacientes/SocioTabPortal.vue'
+import LinkPortalNuevo         from '../components/pacientes/LinkPortalNuevo.vue'
+import ChatConPaciente         from '../components/chat/ChatConPaciente.vue'
+import RenovacionPortalCard    from '../components/pacientes/RenovacionPortalCard.vue'
+import { useChatPacientesStore } from '../stores/chatPacientes'
 import SocioTabDirecciones     from '../components/pacientes/SocioTabDirecciones.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ProximoPasoReprocann      from '../components/pacientes/ProximoPasoReprocann.vue'
@@ -80,6 +83,8 @@ const puedeMandarBienvenida = computed(() =>
   puedeAprobar.value && club.data?.features?.mailer === true && !!s.value?.email
 )
 
+const linkPortal = ref(null)
+
 async function aprobarAlta() {
   aprobando.value = true
   try {
@@ -90,6 +95,9 @@ async function aprobarAlta() {
     toast.success('Paciente aprobado — ya puede recibir dispensaciones')
     // El alta se aprobó igual; si el mail no salió es un aviso aparte, no un error del alta.
     if (data?.aviso) toast.warning(data.aviso)
+    // El link de su portal, para mandárselo ya (27-oct-2026).
+    if (data?.acceso?.link) linkPortal.value = { ...data.acceso.link, nombre: s.value.nombre_completo }
+    else if (data?.acceso?.error) toast.warning(`Quedó aprobado, pero no se pudo generar el link del portal: ${data.acceso.error}`)
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo aprobar el alta')
   } finally {
@@ -285,6 +293,8 @@ const ALL_TABS = [
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck,   primary: true },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill,          primary: true },
   { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'supervisor', 'dispensador'], primary: true },
+  // El chat del portal con este paciente (27-oct-2026): sólo con el portal contratado (ver TABS).
+  { key: 'chat',             label: 'Chat',              icon: MessageCircle, roles: ['admin', 'supervisor'], primary: true },
   // A dónde se le mandan los paquetes: varias, con nombre y una por defecto (Germán, 17-sep).
   { key: 'direcciones',      label: 'Direcciones',       icon: MapPin,        roles: ['admin', 'supervisor', 'medico', 'dispensador'] },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
@@ -307,7 +317,7 @@ const TABS = computed(() => {
   return ALL_TABS.filter(t => {
     if (t.roles && !t.roles.includes(role)) return false
     // Sin el módulo no hay portal del que hablar: la tab no existe, no aparece vacía.
-    if (t.key === 'portal') return s.value?.acceso?.modulo === true
+    if (t.key === 'portal' || t.key === 'chat') return s.value?.acceso?.modulo === true
     return true
   })
 })
@@ -325,6 +335,11 @@ if (typeof route.query.tab === 'string' && TABS.value.some(t => t.key === route.
 }
 
 // P1: tabs primarias (alta frecuencia) visibles; el resto va a un menú "Más".
+// Los mensajes del portal sin leer de ESTE paciente: el contador de la solapa «Chat».
+const chatPacientes = useChatPacientesStore()
+const chatSinLeer = computed(() => chatPacientes.bandeja.find(c => c.paciente.id === socioId)?.sin_leer || 0)
+watch(() => tieneTab('chat'), (si) => { if (si) { chatPacientes.escuchar(); chatPacientes.cargar() } }, { immediate: true })
+
 const TABS_PRIMARY = computed(() => TABS.value.filter(t => t.primary))
 const TABS_MORE    = computed(() => TABS.value.filter(t => !t.primary))
 const masOpen      = ref(false)
@@ -449,6 +464,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         >
           <component :is="tab.icon" :size="14" :stroke-width="1.75" />
           {{ tab.label }}
+          <span v-if="tab.key === 'chat' && chatSinLeer" class="sd__tab-badge" data-testid="chat-sin-leer">{{ chatSinLeer }}</span>
+          <span v-if="tab.key === 'reprocann' && s.renovacion_portal" class="sd__tab-badge" title="Renovación para revisar">1</span>
         </button>
 
         <div v-if="TABS_MORE.length" class="sd__tab-mas" @mouseleave="masOpen = false">
@@ -528,6 +545,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 
       <!-- ── Tab: REPROCANN ── -->
       <div v-if="tieneTab('reprocann')" v-show="activeTab === 'reprocann'" class="sd__tab-content">
+        <!-- La renovación que subió el paciente desde su portal y espera revisión (27-oct-2026). -->
+        <RenovacionPortalCard v-if="s.renovacion_portal" :socio-id="socioId" :renovacion="s.renovacion_portal"
+                              :numero-actual="s.reprocann_numero || ''" :puede-revisar="canEdit"
+                              @revisada="store.fetchOne(socioId)" />
         <div class="sd__card" :class="reprocannStatus?.key === 'danger' ? 'sd__card--danger' : reprocannStatus?.key === 'warning' ? 'sd__card--warning' : ''">
           <div class="sd__card-header">
             <div class="sd__card-icon sd__card-icon--green"><ShieldCheck :size="15" /></div>
@@ -780,6 +801,13 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <SocioTabDirecciones :socio-id="socioId" />
       </div>
 
+      <!-- ── Tab: Chat del portal ── -->
+      <div v-if="tieneTab('chat') && activeTab === 'chat'" class="sd__tab-content">
+        <div class="sd__chat">
+          <ChatConPaciente :paciente-id="socioId" :nombre="s.nombre_completo" />
+        </div>
+      </div>
+
       <!-- ── Tab: Acceso al portal ── -->
       <div v-if="tabVisible('portal') && activeTab === 'portal'" class="sd__tab-content">
         <SocioTabPortal :socio-id="socioId" :nombre="s.nombre_completo" :acceso="s.acceso"
@@ -787,6 +815,9 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       </div>
 
     </template>
+
+  <!-- El link del portal al aprobar el alta (cualquier solapa puede estar abierta). -->
+  <LinkPortalNuevo :datos="linkPortal" @cerrar="linkPortal = null" />
 
   <SocioEditarModal v-if="canEdit" v-model:open="editarOpen" :socio-id="socioId" :solapa="editarSolapa" @saved="store.fetchOne(socioId)" />
 
@@ -1080,4 +1111,5 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 }
 
 .sd__edit-warn { margin: 0 20px 8px; font-size: var(--fs-12); color: var(--c-rust-600); }
+.sd__chat { height: min(70vh, 720px); min-height: 460px; border: 1px solid var(--c-slate-200); border-radius: 12px; overflow: hidden; }
 </style>

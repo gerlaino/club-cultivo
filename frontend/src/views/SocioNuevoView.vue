@@ -11,7 +11,7 @@ import { useClubStore } from '../stores/club'
 import { useToast } from '../composables/useToast.js'
 import { listPacientes } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
+import LinkPortalNuevo from '../components/pacientes/LinkPortalNuevo.vue'
 import SeccionPersona   from '../components/pacientes/formulario/SeccionPersona.vue'
 import SeccionDomicilio from '../components/pacientes/formulario/SeccionDomicilio.vue'
 import SeccionReprocann from '../components/pacientes/formulario/SeccionReprocann.vue'
@@ -180,13 +180,14 @@ async function crear() {
     toast.success(turno.value ? `${nombreCompleto.value} quedó dado de alta, con su turno.` : `${nombreCompleto.value} quedó dado de alta.`)
     if (aviso) toast.warning(aviso)
     const destino = { name: 'paciente-detail', params: { id: paciente.id } }
-    // La contraseña del portal se muestra ANTES de irse: no se puede volver a ver.
-    if (acceso?.password_inicial) {
-      credenciales.value = { ...acceso, nombre: nombreCompleto.value }
+    // El link del portal se muestra ANTES de irse, para mandárselo ya (27-oct-2026). Si se cierra
+    // sin mandarlo, desde la ficha se genera otro.
+    if (acceso?.link) {
+      credenciales.value = { ...acceso.link, nombre: nombreCompleto.value }
       irAlFinal.value = destino
       return
     }
-    if (acceso?.error) toast.warning(`El paciente se creó, pero su cuenta del portal no: ${acceso.error}`)
+    if (acceso?.error) toast.warning(`El paciente se creó, pero no se pudo generar el link de su portal: ${acceso.error}`)
     router.push(destino)
   } catch (e) {
     errorGeneral.value = e.response?.status === 402
@@ -205,7 +206,7 @@ function onEnter(ev) {
 
 <template>
   <div class="alta" :class="{ 'alta--shell': enShell }">
-    <CredencialesNuevas :datos="credenciales" @cerrar="cerrarCredenciales" />
+    <LinkPortalNuevo :datos="credenciales" @cerrar="cerrarCredenciales" />
 
     <header class="alta__head">
       <RouterLink to="/pacientes" class="alta__back"><i class="bi bi-arrow-left"></i> Pacientes</RouterLink>

@@ -43,6 +43,7 @@ import AuditorSidebar         from "./components/layout/AuditorSidebar.vue";
 import AuditorTopBar          from "./components/layout/AuditorTopBar.vue";
 import DeliverySidebar        from "./components/layout/DeliverySidebar.vue";
 import DeliveryTopBar         from "./components/layout/DeliveryTopBar.vue";
+import AvisoMensajePaciente   from "./components/chat/AvisoMensajePaciente.vue";
 
 const auth   = useAuthStore();
 const toast  = useToast();
@@ -52,6 +53,9 @@ const lotes  = useLotesStore();
 const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
+// Quién atiende el chat del portal: administración, con el portal contratado (27-oct-2026).
+const atiendeChat = computed(() =>
+  auth.isAuthenticated && ['admin', 'supervisor'].includes(auth.user?.role) && club.data?.features?.vista_paciente === true)
 
 const routeLoading  = ref(false)
 router.beforeEach(() => { routeLoading.value = true })
@@ -208,6 +212,8 @@ onMounted(async () => {
   <!-- Uso personal autoregistrado: confirmar el mail / fin de la prueba. -->
   <AvisoAutoregistro v-if="primeraRutaLista && auth.isAuthenticated && !auth.clubSuspendido && !$route.meta.fullscreen" />
   <ToastProvider />
+  <!-- El chat con los pacientes del portal: la alerta de mensaje nuevo y el contador del menú. -->
+  <AvisoMensajePaciente v-if="atiendeChat" />
   <ConfirmDialog />
   <OfflineIndicator />
   <div v-if="routeLoading" class="route-loading-bar"></div>

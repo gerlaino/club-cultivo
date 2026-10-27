@@ -21,7 +21,7 @@
 
       <nav class="pfo__nav" aria-label="Mi organización">
         <RouterLink to="/portal/organizacion" class="pfo__link">Mi organización</RouterLink>
-        <RouterLink to="/portal/geneticas" class="pfo__link">Variedades</RouterLink>
+        <RouterLink to="/portal/geneticas" class="pfo__link">Genéticas</RouterLink>
         <RouterLink to="/portal/noticias" class="pfo__link">Novedades</RouterLink>
         <RouterLink to="/portal/eventos" class="pfo__link">Eventos</RouterLink>
         <RouterLink to="/portal/galeria" class="pfo__link">Galería</RouterLink>

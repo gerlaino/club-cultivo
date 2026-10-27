@@ -131,7 +131,10 @@ créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo co
 - **Correo**: un mail por destinatario (nunca `To:` múltiple ni BCC: datos de salud), plantillas con
   `gsub` por lista blanca, nunca ERB. Tope 450/día.
 - **Portal del paciente**: dos llaves (add-on contratado + `vista_paciente_activa`); lo clínico se
-  serializa con lista blanca, nunca `as_json`. Sin señal no se dispensa (`lib/offlineApi.js`).
+  serializa con lista blanca, nunca `as_json`. Entra con DNI y una clave que elige él desde un link
+  (`PortalAcceso::*`, `AccesoPortal`); nadie de la organización la conoce. Escucha `PacienteChannel`,
+  nunca `ClubChannel`. Chat, renovación del REPROCANN, «Asistiré» y catálogo: ver
+  `docs/CHANGELOG.md` (gg). Sin señal no se dispensa (`lib/offlineApi.js`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 

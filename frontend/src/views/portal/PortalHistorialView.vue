@@ -1,8 +1,8 @@
 <template>
   <div class="phv">
     <header class="phv__hd">
-      <h1 class="phv__title">Mis retiros</h1>
-      <p class="phv__sub">Todo lo que retiraste, de lo más reciente a lo más viejo.</p>
+      <h1 class="phv__title">Mis dispensas</h1>
+      <p class="phv__sub">Todo lo que retiraste, con de dónde viene cada producto.</p>
     </header>
 
     <div v-if="cargando" class="phv__estado"><DsSpinner :size="36" /></div>
@@ -17,7 +17,7 @@
     </div>
 
     <ul v-else class="phv__lista">
-      <li v-for="d in dispensas" :key="d.id" class="phv__item">
+      <li v-for="d in dispensas" :key="d.id" class="phv__item" :class="{ 'phv__item--anulada': d.anulada }">
         <div class="phv__fecha">
           <span class="phv__dia">{{ dia(d.fecha) }}</span>
           <span class="phv__mes">{{ mes(d.fecha) }}</span>
@@ -30,13 +30,16 @@
             </span>
           </div>
           <div class="phv__meta">
-            <span>{{ d.gramos }} g en total</span>
+            <span>Nº {{ d.numero }}</span>
+            <span v-if="d.sede">· {{ d.sede }}</span>
+            <span v-if="lotes(d)">· lote {{ lotes(d) }}</span>
             <span v-if="d.total > 0">· {{ pesos(d.total) }}</span>
+            <span v-if="d.anulada" class="phv__anulada">· Anulada</span>
           </div>
         </div>
-        <a v-if="d.token" :href="`/d/${d.token}`" class="phv__ver" target="_blank" rel="noopener">
+        <RouterLink :to="{ name: 'portal-dispensa', params: { id: d.id } }" class="phv__ver">
           Ver detalle
-        </a>
+        </RouterLink>
       </li>
     </ul>
   </div>
@@ -45,9 +48,9 @@
 <script setup>
 // Lo primero que un paciente busca cuando entra: qué retiró y cuándo.
 //
-// El "ver detalle" abre el pasaporte que ya existe (`/d/:token`), con las fotos, la ficha de la
-// genética y cómo se cultivó. No se rehace acá: es la misma página que le llega por QR, y tener
-// dos versiones del mismo dato es lo que después se contradice.
+// «Ver detalle» abre la dispensa adentro del portal (27-oct-2026), con la trazabilidad de cada
+// frasco: era el pasaporte público (`/d/:token`), que pide el DNI aunque ya esté logueado. El
+// pasaporte sigue existiendo para el QR de la etiqueta, y el detalle lo enlaza.
 import { ref, onMounted } from 'vue'
 import { getPortalHistorial } from '@/lib/portalApi'
 import DsSpinner from '@/design-system/components/Spinner.vue'
@@ -60,6 +63,7 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const fecha = (f) => new Date(String(f) + 'T00:00:00')
 const dia   = (f) => (f ? fecha(f).getDate() : '')
 const mes   = (f) => (f ? MESES[fecha(f).getMonth()] : '')
+const lotes = (d) => [...new Set((d.items || []).map(i => i.lote).filter(Boolean))].join(', ')
 const pesos = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 onMounted(async () => {
@@ -105,6 +109,8 @@ onMounted(async () => {
 .phv__cant { font-weight: 400; color: var(--p-suave); }
 .phv__meta { font-size: .8rem; color: var(--p-suave); display: flex; gap: .3rem; flex-wrap: wrap; }
 
+.phv__item--anulada { opacity: .7; }
+.phv__anulada { color: var(--p-urgente); font-weight: 600; }
 .phv__ver { flex-shrink: 0; font-size: .85rem; font-weight: 600; color: var(--p-marca); text-decoration: none; }
 .phv__ver:hover { text-decoration: underline; }
 

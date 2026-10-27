@@ -31,6 +31,37 @@ unless Rails.env.test?
       req.ip if req.path.match?(%r{\A/api/password\z}) && (req.post? || req.put?)
     end
 
+    # Portal del paciente (27-oct-2026). Entrar con DNI: por IP y además por DNI, para que probar
+    # claves contra UN paciente desde muchas IPs también se frene. El de la IP deja pasar el segundo
+    # pedido de quien es paciente en dos organizaciones (manda lo mismo con la que eligió).
+    throttle('portal_sesion/ip', limit: 8, period: 1.minute) do |req|
+      req.ip if req.path == '/api/portal_acceso/sesion' && req.post?
+    end
+    throttle('portal_sesion/dni', limit: 10, period: 10.minutes) do |req|
+      next unless req.path == '/api/portal_acceso/sesion' && req.post?
+
+      # El pedido viene en JSON y rack-attack mira antes de que Rails lo parsee.
+      cuerpo = begin
+        JSON.parse(req.body.read)
+      rescue JSON::ParserError
+        {}
+      ensure
+        req.body.rewind
+      end
+      (req.params['dni'] || (cuerpo.is_a?(Hash) ? cuerpo['dni'] : nil)).to_s.gsub(/\D/, '').presence
+    end
+    # Activar un link pide el DNI: además del freno por IP, el link se cae solo a los 5 errores.
+    throttle('portal_activar/ip', limit: 10, period: 10.minutes) do |req|
+      req.ip if req.path.match?(%r{\A/api/portal_acceso/links/[^/]+/activar\z}) && req.post?
+    end
+    throttle('portal_link/ip', limit: 30, period: 1.minute) do |req|
+      req.ip if req.path.start_with?('/api/portal_acceso/links/') && req.get?
+    end
+    # «Me olvidé la clave» manda un mail: mismo criterio que el del equipo.
+    throttle('portal_recuperar/ip', limit: 5, period: 10.minutes) do |req|
+      req.ip if req.path == '/api/portal_acceso/recuperar' && req.post?
+    end
+
     # Autoregistro: cada alta crea una organización entera. 3 por hora por IP alcanza para una
     # persona que se equivocó; frena a quien quiere llenar la base de cuentas basura.
     throttle('registro/ip', limit: 3, period: 1.hour) do |req|

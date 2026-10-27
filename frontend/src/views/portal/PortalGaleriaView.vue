@@ -6,7 +6,7 @@
 
     <PortalVacio v-else-if="!fotos.length"
                  titulo="Todavía no hay fotos"
-                 texto="Las fotos salen de las variedades del catálogo. Cuando tu organización cargue alguna, aparecen acá."
+                 texto="Las fotos salen de las genéticas que publica la organización. Cuando tu organización cargue alguna, aparecen acá."
                  hacia-a="/portal/geneticas" hacia-txt="Ver el catálogo" />
 
     <template v-else>

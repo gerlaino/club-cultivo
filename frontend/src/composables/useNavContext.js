@@ -4,6 +4,7 @@
  * (topbar). El sidebar lleva a `to` de cada grupo; el topbar muestra los `tabs` del
  * grupo activo. Badges (manicura/tareas) compartidos como singleton.
  */
+import { useChatPacientesStore } from '../stores/chatPacientes'
 import { ref } from 'vue'
 import { listPesajesManicuraAdmin, getTareasDashboard } from '../lib/api.js'
 
@@ -55,6 +56,8 @@ export const NAV_GROUPS = [
     tabs: [
       { to: '/pacientes', label: 'Pacientes' },
       { to: '/historial', label: 'Dispensaciones' },
+      // El chat del portal (27-oct-2026), con cuántas conversaciones esperan respuesta.
+      { to: '/chat-pacientes', label: 'Chat', feature: 'vista_paciente', badge: 'chat' },
       // El informe REPROCANN vivía acá Y en Reportes: dos puertas al mismo asunto, con
       // contenidos distintos. Queda una sola, en Reportes, que es donde están los informes.
     ],
@@ -239,6 +242,7 @@ export function useNavContext() {
   function badgeFor(key) {
     if (key === 'aprob')  return aprobPendientes.value
     if (key === 'tareas') return tareasPendientes.value
+    if (key === 'chat')   return useChatPacientesStore().sinResponder
     return 0
   }
 

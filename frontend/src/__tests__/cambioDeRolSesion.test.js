@@ -10,6 +10,7 @@ vi.mock('../lib/cambios.js', () => ({
   alCambiar: (recurso, fn) => { handlers[recurso] = fn; return () => {} },
   alCambiarAgrupado: () => () => {},
   olvidarCambios: () => {},
+  usarCanal: () => {},
 }))
 vi.mock('../lib/cableConsumer.js', () => ({ cerrarCable: () => {} }))
 vi.mock('../utils/reloadTrace.js', () => ({ anotarReload: vi.fn() }))

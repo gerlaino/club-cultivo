@@ -30,14 +30,23 @@ class ReprocannRenovacionesController < ApplicationController
 
     case accion
     when 'aprobar'
+      # Aprobar es cargar el vencimiento nuevo: sin fecha, la ficha seguiría diciendo «vencido».
+      if params[:fecha_vencimiento_nueva].blank?
+        return render json: { errors: ['Cargá la fecha de vencimiento nueva.'] }, status: :unprocessable_entity
+      end
       @renovacion.aprobar!(
-        reprocann_numero_nuevo:  params[:reprocann_numero_nuevo],
+        reprocann_numero_nuevo:  params[:reprocann_numero_nuevo].presence,
         fecha_vencimiento_nueva: params[:fecha_vencimiento_nueva],
+        por: current_user,
       )
     when 'rechazar'
-      @renovacion.rechazar!(observaciones: params[:observaciones])
+      @renovacion.rechazar!(observaciones: params[:observaciones], por: current_user)
     else
       @renovacion.update!(renovacion_params)
+    end
+    if %w[aprobar rechazar].include?(accion)
+      @renovacion.avisar_al_paciente!
+      @renovacion.avisar_a_la_organizacion!
     end
 
     render json: { data: serialize(@renovacion) }
@@ -78,6 +87,9 @@ class ReprocannRenovacionesController < ApplicationController
       fecha_inicio:           r.fecha_inicio,
       fecha_aprobacion:       r.fecha_aprobacion,
       fecha_vencimiento_nueva: r.fecha_vencimiento_nueva,
+      origen:                 r.origen,
+      constancia_url:         r.constancia.attached? ? url_for(r.constancia) : nil,
+      constancia_nombre:      r.constancia.attached? ? r.constancia.filename.to_s : nil,
       reprocann_numero_nuevo: r.reprocann_numero_nuevo,
       observaciones:          r.observaciones,
       iniciada_por:           r.iniciada_por&.nombre_completo,

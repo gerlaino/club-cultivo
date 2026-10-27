@@ -334,6 +334,8 @@ Devise.setup do |config|
       # Cambiar la contraseña vence las sesiones con la huella vieja (`JwtDenylist`), incluida
       # la propia: por eso la respuesta trae un token nuevo y quien la cambió sigue adentro.
       ['PATCH', %r{^/api/profile/password$}],
+      # El portal del paciente: entrar con DNI y activar un link (`PortalAccesoController`).
+      ['POST', %r{^/api/portal_acceso/(sesion|links/[^/]+/activar)$}],
     ]
     jwt.revocation_requests = [
       ['DELETE', %r{^/users/sign_out$}]

@@ -74,6 +74,16 @@ Rails.application.routes.draw do
     post 'password', to: 'users/passwords#create'
     put  'password', to: 'users/passwords#update'
 
+    # La puerta del portal del paciente, sin sesión: DNI + clave, el link de invitación o de «me
+    # olvidé la clave», y pedir ese link (ver PortalAccesoController).
+    post 'portal_acceso/sesion',              to: 'portal_acceso#sesion'
+    get  'portal_acceso/links/:token',         to: 'portal_acceso#link'
+    post 'portal_acceso/links/:token/activar', to: 'portal_acceso#activar'
+    post 'portal_acceso/recuperar',           to: 'portal_acceso#recuperar'
+
+    # La bandeja del chat con los pacientes (ver MensajesPacientesController).
+    get 'mensajes_pacientes', to: 'mensajes_pacientes#index'
+
     get "/me",             to: "me#show"
     get "/stats",          to: "stats#show"
     get "/stats/ambiente_salas", to: "stats#ambiente_salas"
@@ -107,10 +117,25 @@ Rails.application.routes.draw do
       resource  :club,      only: [:show], controller: 'club'
       resources :geneticas, only: [:index, :show]
       resources :noticias,  only: [:index, :show]
-      resources :eventos,   only: [:index, :show]
+      resources :eventos,   only: [:index, :show] do
+        # «Asistiré» (27-oct-2026).
+        member do
+          post   :asistencia, action: :asistir
+          delete :asistencia, action: :no_asistir
+        end
+      end
       resources :galeria,   only: [:index], controller: 'galeria'
       # Lo suyo: qué retiró y cuándo. Es lo primero que va a buscar al entrar.
-      resources :historial, only: [:index], controller: 'historial'
+      resources :historial, only: [:index, :show], controller: 'historial'
+      # El chat con su organización (27-oct-2026). Siempre SU conversación: no lleva id.
+      get  'mensajes',        to: 'mensajes#index'
+      post 'mensajes',        to: 'mensajes#create'
+      post 'mensajes/leidos', to: 'mensajes#leidos'
+      # Sus papeles: el REPROCANN y la constancia de renovación que sube él (27-oct-2026).
+      # Lo que hay hoy sobre la mesa de cada sede (27-oct-2026).
+      get  'catalogo',           to: 'catalogo#show'
+      get  'papeles',            to: 'papeles#show'
+      post 'papeles/renovacion', to: 'papeles#renovacion'
       # Su cuenta corriente, sólo si la organización se la abrió. Hoy es lectura; más adelante
       # acredita saldo desde acá.
       resource  :cuenta_corriente, only: [:show], controller: 'cuenta_corriente'
@@ -298,10 +323,12 @@ Rails.application.routes.draw do
       # Admitir a alguien cargado desde el mostrador. Sólo admin y médico (ver Paciente).
       member do
         post :aprobar
-        # Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña
-        # nueva cuando la pierde. Mismo par que ya existe para el equipo.
-        post 'acceso',             action: :crear_acceso_portal
-        post 'acceso/restablecer', action: :restablecer_acceso_portal
+        # El link para entrar a su portal: la primera vez y cuando perdió la clave (27-oct-2026).
+        post 'acceso/invitar', action: :invitar_portal
+        # El chat del portal con este paciente, del lado de la organización (27-oct-2026).
+        get  'mensajes',          to: 'mensajes_pacientes#show'
+        post 'mensajes',          to: 'mensajes_pacientes#create'
+        post 'mensajes/resolver', to: 'mensajes_pacientes#resolver'
         # «Inicié el trámite» del REPROCANN: el médico o administración (6-oct-2026).
         post :iniciar_tramite_reprocann
         # El ciclo del REPROCANN (19-oct-2026): llegó aprobado, no indicado, rechazado, volver a entrevistar.
@@ -436,7 +463,9 @@ Rails.application.routes.draw do
       end
     end
     resources :noticias
-    resources :eventos
+    resources :eventos do
+      member { get :asistentes }
+    end
 
     resource :profile, only: [:show, :update], controller: "profile" do
       patch :password

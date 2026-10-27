@@ -1,68 +1,89 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
-const crearAcceso       = vi.fn(() => Promise.resolve({ data: { credenciales: { email: 'ana.diaz@org.paciente', password_inicial: 'frut-mesa-4728' } } }))
-const restablecerAcceso = vi.fn(() => Promise.resolve({ data: { credenciales: { email: 'ana.diaz@org.paciente', password_inicial: 'nuev-clav-9182' } } }))
+const invitar = vi.fn(() => Promise.resolve({ data: { link: {
+  url: 'https://cultivoespacial.com/portal/entrar/abc123', texto: 'Hola Ana! Te invitamos… https://cultivoespacial.com/portal/entrar/abc123',
+  expira_at: '2026-10-30T15:00:00Z', mail_enviado: false,
+} } }))
 const confirmar = vi.fn(() => Promise.resolve(true))
 
-vi.mock('../lib/api.js', () => ({
-  crearAccesoPaciente:       (...a) => crearAcceso(...a),
-  restablecerAccesoPaciente: (...a) => restablecerAcceso(...a),
-}))
+vi.mock('../lib/api.js', () => ({ invitarPortalPaciente: (...a) => invitar(...a) }))
 vi.mock('../composables/useToast.js', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../composables/useConfirm.js', () => ({ useConfirm: () => ({ confirm: confirmar }) }))
-vi.mock('../composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
+vi.mock('../composables/useToast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }))
 
 const SocioTabPortal = (await import('../components/pacientes/SocioTabPortal.vue')).default
 
+const base = { modulo: true, portal_abierto: true, activo: true, activado: false, link_vigente: null,
+               ultimo_ingreso: null, tiene_mail: false, puede_gestionar: true }
 const montar = (acceso) => mount(SocioTabPortal, {
-  props: { socioId: 7, nombre: 'Ana Díaz', acceso },
-  global: { stubs: { CredencialesNuevas: true } },
+  props: { socioId: 7, nombre: 'Ana Díaz', acceso: { ...base, ...acceso } },
+  global: { directives: { modal: {} } },
   attachTo: document.body,
 })
+const boton = (w) => w.find('[data-testid="portal-invitar"]')
 
-// AC: la cuenta del portal se ve y se gestiona desde la ficha. Antes la contraseña se mostraba
-// una sola vez al dar el alta y no había NINGÚN lugar donde consultar siquiera el usuario.
+// AC (27-oct-2026): desde la ficha se le manda al paciente el LINK para entrar a su portal (elige
+// su clave con su DNI). La ficha dice en qué está: sin invitar, invitado, activado o cerrado. Nadie
+// ve ni dicta una contraseña.
 describe('Acceso al portal, en la ficha del paciente', () => {
-  beforeEach(() => { crearAcceso.mockClear(); restablecerAcceso.mockClear(); confirmar.mockClear() })
+  beforeEach(() => { invitar.mockClear(); confirmar.mockClear(); document.body.innerHTML = '' })
 
-  it('muestra el usuario del que ya tiene cuenta', () => {
-    const w = montar({ modulo: true, tiene: true, email: 'ana.diaz@org.paciente', activo: true, puede_gestionar: true })
+  it('al que nunca invitaron le ofrece «Invitar al portal» y muestra el link para mandar', async () => {
+    const w = montar({})
+    expect(w.find('[data-testid="portal-estado"]').text()).toBe('Sin invitar')
+    expect(boton(w).text()).toContain('Invitar al portal')
 
-    expect(w.text()).toContain('ana.diaz@org.paciente')
-    expect(w.text()).toContain('Puede entrar')
+    await boton(w).trigger('click')
+    await flushPromises()
+
+    expect(invitar).toHaveBeenCalledWith(7)
+    expect(confirmar).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[data-testid="link-portal"]').textContent).toContain('/portal/entrar/abc123')
+    // Para WhatsApp, el mensaje entero (con el link) va en el texto del enlace.
+    const wa = document.body.querySelector('[data-testid="link-portal-whatsapp"]').getAttribute('href')
+    expect(decodeURIComponent(wa)).toContain('/portal/entrar/abc123')
   })
 
-  it('avisa cuando el paciente está desactivado: la cuenta existe pero no entra', () => {
-    const w = montar({ modulo: true, tiene: true, email: 'ana.diaz@org.paciente', activo: false, puede_gestionar: true })
-
-    expect(w.text()).toContain('No puede entrar')
-    expect(w.text()).toContain('desactivado')
+  it('no muestra ni pide ninguna contraseña', () => {
+    const w = montar({})
+    expect(w.text().toLowerCase()).not.toContain('contraseña')
   })
 
-  it('al que no tiene cuenta le muestra qué usuario le quedaría, y deja crearla', async () => {
-    const w = montar({ modulo: true, tiene: false, sugerido: 'ana.diaz@org.paciente', puede_gestionar: true })
+  it('con un link vigente sin usar, mandar otro pregunta antes: el anterior deja de servir', async () => {
+    const w = montar({ link_vigente: { motivo: 'invitacion', creado_at: '2026-10-27T15:00:00Z', expira_at: '2026-10-30T15:00:00Z' } })
+    expect(w.find('[data-testid="portal-estado"]').text()).toBe('Invitado, sin activar')
+    expect(boton(w).text()).toContain('Mandar un link nuevo')
 
-    expect(w.text()).toContain('ana.diaz@org.paciente')
-    await w.find('.stp__btn--primary').trigger('click')
-
-    expect(crearAcceso).toHaveBeenCalledWith(7)
-  })
-
-  it('restablecer pregunta antes: la clave vieja deja de servir en el acto', async () => {
-    const w = montar({ modulo: true, tiene: true, email: 'ana.diaz@org.paciente', activo: true, puede_gestionar: true })
-
-    await w.find('.stp__btn').trigger('click')
-    await Promise.resolve()
+    await boton(w).trigger('click')
+    await flushPromises()
 
     expect(confirmar).toHaveBeenCalled()
-    expect(restablecerAcceso).toHaveBeenCalledWith(7)
+    expect(invitar).toHaveBeenCalled()
   })
 
-  it('a quien no puede gestionarla no le ofrece un botón que rebota', () => {
-    const w = montar({ modulo: true, tiene: false, sugerido: 'ana.diaz@org.paciente', puede_gestionar: false })
+  it('el que ya lo activó: dice cuándo entró y que la clave la recupera solo', () => {
+    const w = montar({ activado: true, ultimo_ingreso: '2026-10-27T13:14:00Z', tiene_mail: true })
+    expect(w.find('[data-testid="portal-estado"]').text()).toBe('Activó su portal')
+    expect(w.text()).toContain('Entró')
+    expect(w.text()).toContain('Me olvidé la clave')
+  })
 
-    expect(w.findAll('.stp__btn')).toHaveLength(0)
-    expect(w.text()).toContain('Sólo un administrador o el médico')
+  it('dado de baja, lo dice y no ofrece mandar un link que no abriría', () => {
+    const w = montar({ activo: false })
+    expect(w.find('[data-testid="portal-estado"]').text()).toBe('Dado de baja')
+    expect(boton(w).exists()).toBe(false)
+  })
+
+  it('con el portal cerrado, dice dónde abrirlo y no ofrece el link', () => {
+    const w = montar({ portal_abierto: false })
+    expect(w.text()).toContain('Configuración → Portal del paciente')
+    expect(boton(w).exists()).toBe(false)
+  })
+
+  it('a quien no puede gestionarlo no le ofrece un botón que rebota', () => {
+    const w = montar({ puede_gestionar: false })
+    expect(boton(w).exists()).toBe(false)
+    expect(w.text()).toContain('Sólo administración')
   })
 })

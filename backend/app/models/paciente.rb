@@ -32,6 +32,10 @@ class Paciente < ApplicationRecord
   has_many :patient_documents, dependent: :destroy
   has_one  :cuenta_corriente, dependent: :destroy
   has_many :reprocann_renovaciones, class_name: 'ReprocannRenovacion', dependent: :destroy
+  # Los links para entrar al portal (invitación y «me olvidé la clave»): `AccesoPortal`.
+  has_many :accesos_portal, class_name: 'AccesoPortal', dependent: :destroy
+  # El chat del portal con la organización (`ConversacionPaciente`): una por paciente.
+  has_one :conversacion_portal, class_name: 'ConversacionPaciente', dependent: :destroy
   has_many :mails_enviados, class_name: 'MailEnviado', dependent: :destroy
   has_many :check_ins, dependent: :destroy
   has_many :turnos, dependent: :destroy

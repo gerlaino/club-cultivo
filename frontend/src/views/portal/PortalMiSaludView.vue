@@ -1,6 +1,9 @@
 <template>
   <div class="pms">
-    <PortalCabecera titulo="Mi salud" bajada="Tus turnos y lo que te indicó tu médico." />
+    <PortalCabecera titulo="Mi salud" bajada="Tu REPROCANN, lo que te indicó tu médico y tus turnos." />
+
+    <!-- El REPROCANN no depende del módulo médico: se ve y se renueva siempre (27-oct-2026). -->
+    <PortalReprocannCard />
 
     <div v-if="cargando" class="pms__cargando"><DsSpinner :size="32" /></div>
 
@@ -100,6 +103,7 @@ import { ref, computed, onMounted } from 'vue'
 import { getPortalMiSalud } from '@/lib/portalApi'
 import PortalCabecera from '@/components/portal/PortalCabecera.vue'
 import PortalVacio from '@/components/portal/PortalVacio.vue'
+import PortalReprocannCard from '@/components/portal/PortalReprocannCard.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
 const datos    = ref(null)

@@ -212,6 +212,63 @@ namespace :e2e do
     end
   end
 
+  # El portal del paciente (27-oct-2026): la organización e2e con el portal contratado y abierto, y
+  # Paciente2 (DNI 90000002) sin cuenta ni links, para que la prueba haga el camino entero:
+  # invitarlo desde la ficha, abrir el link, elegir la clave y volver a entrar con el DNI.
+  desc 'Portal del paciente abierto y Paciente2 sin acceso todavía'
+  task portal: :environment do
+    club = ActsAsTenant.without_tenant { Club.unscoped.find_by!(slug: SLUG_E2E) }
+    club.update!(features: club.features.merge('vista_paciente' => true), vista_paciente_activa: true)
+
+    ActsAsTenant.with_tenant(club) do
+      pac = Paciente.find_by!(dni: '90000002')
+      pac.update_columns(aprobado_at: pac.aprobado_at || Time.current, es_paciente: true, deleted_at: nil)
+      AccesoPortal.where(paciente_id: pac.id).delete_all
+      # Sin conversación previa: el chat arranca vacío en cada corrida.
+      ConversacionPaciente.where(paciente_id: pac.id).destroy_all
+      if (user = pac.user)
+        pac.update_column(:user_id, nil)
+        user.destroy!
+      end
+
+      # Una dispensa suya de la flor de L-E2E-001, con la historia del lote, un análisis y una
+      # aplicación: lo que el detalle de «Mis dispensas» muestra como trazabilidad.
+      admin = User.find_by!(email: 'admin@e2e.test')
+      sede  = club.sedes.first
+      flor  = club.stocks.find_by!(sede_id: sede.id, forma_producto: 'flor_seca')
+      lote  = flor.lote
+      flor.update_columns(fecha_elaboracion: 9.days.ago.to_date)
+      unless lote.lote_eventos.where(tipo: 'cambio_estado').exists?
+        { 'enraizado' => 90, 'vegetativo' => 76, 'floracion' => 60 }.each do |estado, hace|
+          LoteEvento.create!(lote: lote, club: club, user: admin, tipo: 'cambio_estado', estado_nuevo: estado,
+                             registrado_en: hace.days.ago, sala_destino: (estado == 'floracion' ? lote.sala : nil))
+        end
+      end
+      AnalisisLaboratorio.find_or_create_by!(lote: lote, club_id: club.id, laboratorio: 'Laboratorio E2E') do |a|
+        a.user = admin
+        a.fecha_analisis = 12.days.ago.to_date
+        a.thc_pct = 18.5
+        a.cbd_pct = 0.4
+      end
+      d = Dispensacion.create!(paciente: pac, user: admin, stock: flor, sede: sede, cantidad: 5,
+                               medio_pago: 'efectivo', aporte_socio_ars: 5_000, fecha_dispensacion: Time.zone.today)
+      Dispensaciones::RegistrarCobro.call(dispensacion: d, club: club, usuario: admin, medio: 'efectivo', monto: 5_000)
+      # Lo de la organización que el portal muestra: la genética publicada, la flor sobre la mesa
+      # (el catálogo), un evento próximo para «Asistiré» y el REPROCANN por vencer (la renovación).
+      lote.genetica&.update!(visible_paciente: true)
+      flor.genetica&.update!(visible_paciente: true)
+      mostrador = sede.mostrador!
+      unless MostradorItem.where(mostrador_id: mostrador.id, stock_id: flor.id).where('cantidad > 0').exists?
+        Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'portal e2e', cambios: [{ stock_id: flor.id, cantidad: 100 }])
+      end
+      Evento.where(club_id: club.id, titulo: 'Taller e2e').destroy_all
+      evento = Evento.create!(club: club, titulo: 'Taller e2e', fecha_inicio: 10.days.from_now.change(hour: 15), lugar: 'Sede E2E', activo: true)
+      pac.update_columns(reprocann_numero: 'R-E2E', reprocann_vencimiento: 5.days.from_now.to_date, reprocann_estado: 'activo')
+      ReprocannRenovacion.where(paciente_id: pac.id).delete_all
+      puts "Portal e2e abierto · Paciente2 (#{pac.id}) sin cuenta · dispensa ##{d.id} · evento ##{evento.id}"
+    end
+  end
+
   desc 'Deja la organización e2e sin datos operativos'
   task limpiar: :environment do
     club = ActsAsTenant.without_tenant { Club.unscoped.find_by(slug: SLUG_E2E) }

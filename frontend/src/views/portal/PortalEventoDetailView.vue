@@ -27,12 +27,17 @@
 
       <div v-if="evento.descripcion" class="ped__cuerpo">{{ evento.descripcion }}</div>
 
-      <!-- Anotarse no se hace por el portal: el cupo y la lista los maneja la organización. En
-           vez de mandarlo a una pantalla de contacto se le da el link que marca o escribe. -->
-      <p class="ped__anotarse">
-        ¿Querés participar? Avisale a tu organización<template v-if="comoAvisar">
-          por <a :href="comoAvisar.href">{{ comoAvisar.txt }}</a></template>.
-      </p>
+      <!-- «Asistiré» (27-oct-2026): la organización ve quién va. Antes no se podía avisar desde
+           acá y se le pasaba el WhatsApp de la organización. -->
+      <div v-if="esProximo" class="ped__asistir">
+        <button type="button" class="ped__asistir-btn" :class="{ 'ped__asistir-btn--si': evento.asistire }"
+                :disabled="marcando" data-testid="asistire" @click="alternar">
+          {{ evento.asistire ? 'Asistiré ✓' : 'Asistiré' }}
+        </button>
+        <span class="ped__asistir-txt">
+          {{ evento.asistire ? 'Le avisamos a tu organización que vas. Si no podés, tocá de nuevo.' : 'Tocá para avisarle a tu organización que vas.' }}
+        </span>
+      </div>
     </template>
   </article>
 </template>
@@ -40,10 +45,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { usePortalClubStore } from '@/stores/portalClub'
 import { CalendarDays, MapPin } from 'lucide-vue-next'
-import { getPortalEvento } from '@/lib/portalApi'
+import { getPortalEvento, asistirEvento, noAsistirEvento } from '@/lib/portalApi'
 import PortalCabecera from '@/components/portal/PortalCabecera.vue'
 import PortalVacio from '@/components/portal/PortalVacio.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
@@ -52,16 +55,17 @@ const route = useRoute()
 const evento   = ref(null)
 const cargando = ref(true)
 
-// WhatsApp primero, después teléfono, después mail: es el orden en que la gente avisa. Si la
-// organización no cargó ninguno, la frase sale igual sin el enlace.
-const { club } = storeToRefs(usePortalClubStore())
-const comoAvisar = computed(() => {
-  const c = club.value || {}
-  if (c.whatsapp) return { txt: 'WhatsApp', href: `https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}` }
-  if (c.phone)    return { txt: c.phone,    href: `tel:${c.phone}` }
-  if (c.email)    return { txt: c.email,    href: `mailto:${c.email}` }
-  return null
-})
+const esProximo = computed(() => evento.value && new Date(evento.value.fecha_inicio) > new Date())
+const marcando = ref(false)
+async function alternar() {
+  marcando.value = true
+  try {
+    const e = await (evento.value.asistire ? noAsistirEvento(evento.value.id) : asistirEvento(evento.value.id))
+    evento.value = { ...evento.value, asistire: e.asistire }
+  } catch { /* queda como estaba */ } finally {
+    marcando.value = false
+  }
+}
 
 const fechaLarga = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
 const hora       = (f) => (f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
@@ -90,12 +94,14 @@ onMounted(async () => {
 
 .ped__cuerpo { white-space: pre-line; font-size: var(--fs-16); line-height: var(--lh-loose); }
 
-.ped__anotarse {
-  margin: var(--sp-8) 0 0; padding: var(--sp-4);
-  background: var(--p-marca-suave); border-radius: var(--p-radio);
-  font-size: var(--fs-14); color: var(--p-suave);
-}
-.ped__anotarse a { color: var(--p-marca); font-weight: 600; }
 
 @media (min-width: 640px) { .ped__fotos { grid-template-columns: 1fr 1fr; } }
+.ped__asistir { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin-top: 1.5rem; padding: 1rem; border-radius: var(--p-radio-sm); background: var(--p-hundido); }
+.ped__asistir-btn {
+  min-height: 46px; padding: 0 1.4rem; border-radius: 12px; border: 0; background: var(--p-marca); color: var(--p-papel);
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.ped__asistir-btn--si { background: var(--p-marca-suave); color: var(--p-marca); box-shadow: inset 0 0 0 1px var(--p-marca); }
+.ped__asistir-btn:disabled { opacity: .6; cursor: default; }
+.ped__asistir-txt { font-size: .88rem; color: var(--p-suave); flex: 1 1 200px; }
 </style>

@@ -4,7 +4,7 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :crear_acceso_portal, :restablecer_acceso_portal, :iniciar_tramite_reprocann,
+                                          :invitar_portal, :iniciar_tramite_reprocann,
                                           :reprocann_aprobado, :reprocann_no_indicado, :reprocann_rechazado,
                                           :volver_a_entrevistar]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
@@ -138,6 +138,8 @@ class PacientesController < ApplicationController
       json['situacion'] = situacion_de(@paciente)
       # El motivo de «No indicado» / «Rechazado» es de salud: lo ve quien ve el REPROCANN.
       json['reprocann_resultado_motivo'] = @paciente.reprocann_resultado_motivo if @paciente.reprocann_cerrado?
+      # La constancia de renovación que subió el paciente desde el portal y espera revisión.
+      json['renovacion_portal'] = renovacion_portal_json(@paciente)
     end
 
     # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
@@ -194,46 +196,18 @@ class PacientesController < ApplicationController
     paso_del_reprocann { @paciente.volver_a_entrevistar!(por: current_user) }
   end
 
-  # POST /pacientes/:id/acceso — crearle la cuenta del portal a alguien que no la tiene.
+  # POST /pacientes/:id/acceso/invitar — el link para que el paciente entre a su portal (27-oct-2026).
   #
-  # Hace falta porque el alta sólo la crea de ahora en más: todos los pacientes cargados antes de
-  # que existiera el portal no tienen ninguna, y sin esto no habría forma de dárselas más que
-  # borrarlos y volverlos a cargar.
-  def crear_acceso_portal
+  # Reemplaza a «Crear su acceso» y «Generar contraseña nueva», que mostraban una contraseña UNA
+  # vez para dictársela: ahora el paciente la elige él, desde el link, poniendo su DNI. Sirve igual
+  # para el que nunca entró y para el que perdió la clave; cada link nuevo anula el anterior.
+  def invitar_portal
     return unless autorizado_para_acceso?
 
-    resultado = Pacientes::Acceso.crear!(@paciente)
+    resultado = PortalAcceso::Invitar.call(@paciente, creado_por: current_user)
     return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
 
-    if resultado.password_inicial.blank?
-      return render json: { errors: ['Este paciente ya tiene cuenta. Usá "Restablecer contraseña".'] },
-                    status: :unprocessable_entity
-    end
-
-    enviado = Pacientes::Acceso.enviar_por_mail(@paciente, resultado.password_inicial, remitente: current_user)
-
-    render json: { data: acceso_json(@paciente.reload),
-                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial,
-                                   mail_enviado: enviado } },
-           status: :created
-  end
-
-  # POST /pacientes/:id/acceso/restablecer — contraseña nueva.
-  #
-  # La inicial se muestra UNA vez y no se guarda en claro en ningún lado, así que "me la olvidé"
-  # se resuelve generando otra. Es lo mismo que ya existe para el equipo.
-  def restablecer_acceso_portal
-    return unless autorizado_para_acceso?
-
-    resultado = Pacientes::Acceso.restablecer!(@paciente)
-    return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
-
-    enviado = Pacientes::Acceso.enviar_por_mail(@paciente, resultado.password_inicial,
-                                                remitente: current_user, nueva: true)
-
-    render json: { data: acceso_json(@paciente.reload),
-                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial,
-                                   mail_enviado: enviado } }
+    render json: { data: acceso_json(@paciente.reload), link: link_json(resultado) }, status: :created
   end
 
   def subir_reprocann
@@ -783,32 +757,38 @@ class PacientesController < ApplicationController
   # `activo` es el mismo interruptor que ya le impide dispensar: si el paciente está desactivado,
   # la cuenta existe pero no entra, y la ficha tiene que decirlo o parece que el portal se rompió.
   def acceso_json(paciente)
-    return { modulo: false } unless current_user.club.feature?(:vista_paciente)
+    club = current_user.club
+    return { modulo: false } unless club.feature?(:vista_paciente)
 
-    user = paciente.user
+    user    = paciente.user
+    vigente = paciente.accesos_portal.where(usado_at: nil, anulado_at: nil).where('expira_at > ?', Time.current)
+                      .order(created_at: :desc).first
     {
-      modulo:      true,
-      tiene:       user.present?,
-      email:       user&.email,
-      activo:      paciente.es_paciente?,
-      # Cómo le quedaría el usuario si se le crea: se muestra antes de crear la cuenta.
-      sugerido:    user ? nil : Pacientes::Acceso.previsualizar(paciente),
+      modulo:          true,
+      portal_abierto:  club.portal_paciente_disponible?,
+      activo:          paciente.es_paciente?,
+      # Entra con su DNI. «Activó» = eligió su clave desde un link (antes de esto no hay forma de
+      # que la sepa: la inicial no se le muestra a nadie).
+      activado:        paciente.accesos_portal.where.not(usado_at: nil).exists?,
+      ultimo_ingreso:  user&.visto_at,
+      link_vigente:    vigente && { motivo: vigente.motivo, expira_at: vigente.expira_at, creado_at: vigente.created_at },
+      tiene_mail:      paciente.email.present?,
       puede_gestionar: Paciente::ROLES_APRUEBAN.include?(current_user.role),
-      # ¿Se le puede mandar la contraseña por mail? Hacen falta las tres cosas, y si falta alguna
-      # la pantalla tiene que decir cuál ANTES de crear la cuenta — no después, cuando quien la
-      # creó ya cerró el cartel con la única copia de la contraseña.
-      mail_posible:    current_user.club.feature?('mailer') && current_user.club.smtp_configured? && paciente.email.present?,
-      mail_falta:      motivo_sin_mail(paciente),
     }
   end
 
-  # Qué le falta para poder mandarle la contraseña por mail. `nil` si se puede.
-  def motivo_sin_mail(paciente)
-    return 'Tu organización no tiene el módulo Correo electrónico.' unless current_user.club.feature?('mailer')
-    return 'Tu organización no tiene su casilla conectada (Configuración → Correo electrónico).' unless current_user.club.smtp_configured?
-    return 'El paciente no tiene mail cargado.' if paciente.email.blank?
+  def renovacion_portal_json(paciente)
+    r = paciente.reprocann_renovaciones.del_portal.where(estado: 'en_tramite').recientes.first
+    return nil unless r
 
-    nil
+    { id: r.id, subida_at: r.created_at,
+      constancia_url: r.constancia.attached? ? url_for(r.constancia) : nil,
+      constancia_nombre: r.constancia.attached? ? r.constancia.filename.to_s : nil,
+      es_imagen: r.constancia.attached? && r.constancia.content_type.to_s.start_with?('image/') }
+  end
+
+  def link_json(resultado)
+    { url: resultado.link, expira_at: resultado.expira_at, texto: resultado.texto, mail_enviado: resultado.mail_enviado }
   end
 
   # La cuenta la maneja quien admite pacientes. El mostrador crea altas pero no reparte accesos:
@@ -853,14 +833,17 @@ class PacientesController < ApplicationController
   # Devuelve las credenciales para que quien dio el alta se las pase en mano. Nunca hace fallar la
   # operación: el paciente quedó dado de alta igual, y sin cuenta se le crea después.
   def crear_acceso(paciente)
-    return unless current_user.club.feature?(:vista_paciente)
+    club = current_user.club
+    return unless club.feature?(:vista_paciente)
+    # Con el portal cerrado la cuenta se crea igual (para invitarlo cuando lo abran), pero no se
+    # manda un link que hoy no abriría nada.
+    unless club.portal_paciente_disponible?
+      resultado = Pacientes::Acceso.crear!(paciente)
+      return resultado.ok? ? nil : { error: resultado.error }
+    end
 
-    resultado = Pacientes::Acceso.crear!(paciente)
-    return { error: resultado.error } unless resultado.ok?
-    return if resultado.password_inicial.blank? # ya tenía cuenta
-
-    enviado = Pacientes::Acceso.enviar_por_mail(paciente, resultado.password_inicial, remitente: current_user)
-    { email: resultado.user.email, password_inicial: resultado.password_inicial, mail_enviado: enviado }
+    resultado = PortalAcceso::Invitar.call(paciente, creado_por: current_user)
+    resultado.ok? ? { link: link_json(resultado) } : { error: resultado.error }
   end
 
   # Manda la plantilla de bienvenida si quien está operando lo pidió. Devuelve un aviso para

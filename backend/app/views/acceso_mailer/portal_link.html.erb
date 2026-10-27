@@ -1,0 +1,24 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @paciente.nombre.to_s.split.first %>,</p>
+<% if @invita %>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  <strong><%= @club.name %></strong> te invita a tu portal de paciente: tu credencial, tus dispensas, tus papeles y un chat con la organización.
+</p>
+<% else %>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  Pediste una clave nueva para tu portal de paciente de <strong><%= @club.name %></strong>.
+</p>
+<% end %>
+<p style="margin:20px 0;">
+  <a href="<%= @link %>" style="display:inline-block; background:#1b5e20; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:bold; font-size:14px;"><%= @invita ? 'Activar mi portal' : 'Elegir clave nueva' %></a>
+</p>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:0 0 8px;">
+  Te va a pedir tu DNI y que elijas una clave. El link sirve una sola vez y vence el <%= @vence.strftime('%d/%m a las %H:%M') %>.
+</p>
+<% unless @invita %>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:0 0 8px;">
+  Si no lo pediste, ignorá este mail: sin abrir el link nadie puede cambiar tu clave.
+</p>
+<% end %>
+<p style="font-size:12px; color:#94a3b8; margin:16px 0 0; word-break:break-all;">
+  Si el botón no funciona, copiá esta dirección en el navegador:<br><%= @link %>
+</p>

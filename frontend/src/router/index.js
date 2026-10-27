@@ -88,9 +88,22 @@ const routes = [
   },
   // El primer nombre de esa página (5-oct, mismo día): por si alguien guardó el link.
   { path: "/bienvenida/casa", redirect: "/bienvenida/autocultivo" },
-  // «Soy paciente» de la página pública (23-oct-2026). Hasta que exista la entrada con DNI (etapa 1
-  // del portal), es el login de siempre con el texto para el paciente.
-  { path: "/paciente", redirect: { path: "/login", query: { paciente: "1" } } },
+  // La puerta del paciente (27-oct-2026): entra con su DNI y su clave. «Soy paciente» de la página
+  // pública y el cierre de sesión del paciente llevan acá.
+  {
+    path: "/paciente",
+    name: "portal-entrar",
+    component: () => import("../views/portal/PortalEntrarView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  // El link de invitación (o de «me olvidé la clave») que le llega al paciente. Va ANTES que el
+  // portal: es público, y `/portal` pide sesión.
+  {
+    path: "/portal/entrar/:token",
+    name: "portal-activar",
+    component: () => import("../views/portal/PortalActivarView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
   {
     path: "/bienvenida/organizaciones",
     name: "landing-organizaciones",
@@ -842,6 +855,12 @@ const routes = [
       // Lo clínico: turnos e indicación médica. El módulo médico existía y el portal no lo leía.
       { path: 'mi-salud',       name: 'portal-mi-salud',  component: () => import('../views/portal/PortalMiSaludView.vue') },
       { path: 'historial',      name: 'portal-historial', component: () => import('../views/portal/PortalHistorialView.vue') },
+      // Una dispensa, con la trazabilidad de cada frasco y el enlace a su genética (27-oct-2026).
+      { path: 'dispensas/:id',  name: 'portal-dispensa',  component: () => import('../views/portal/PortalDispensaView.vue') },
+      // El chat con la organización (27-oct-2026).
+      { path: 'mensajes',       name: 'portal-mensajes',  component: () => import('../views/portal/PortalMensajesView.vue') },
+      // Lo que hay hoy en el mostrador (27-oct-2026).
+      { path: 'catalogo',       name: 'portal-catalogo',  component: () => import('../views/portal/PortalCatalogoView.vue') },
       // Lo que publica la organización, todo junto: era el inicio y son cinco entradas de la barra
       // colapsadas en una. Un portal de salud tiene pocas secciones.
       // "club" no va en texto visible (convención del proyecto: se dice "organización"), y la
@@ -938,6 +957,13 @@ const routes = [
       if (auth.user?.role === 'dispensador' || auth.user?.role === 'admin') next()
       else next('/')
     },
+  },
+  // El chat con los pacientes del portal (27-oct-2026): la bandeja de administración.
+  {
+    path: '/chat-pacientes',
+    name: 'chat-pacientes',
+    component: () => import('../views/ChatPacientesView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/dispensaciones/:id',
@@ -1212,6 +1238,8 @@ const routes = [
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
       { path: 'admin/aprobar', component: () => import('../views/mobile/MAdminAprobacionView.vue') },
+      // El chat con los pacientes en el teléfono: la misma bandeja (lista y, al tocar, el chat).
+      { path: 'chat',          component: () => import('../views/ChatPacientesView.vue') },
 
       // ── Detalle mobile propio ──
       { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
@@ -1320,7 +1348,7 @@ const ROLE_ALLOWED_PREFIX = {
   supervisor: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/guia-nutrientes', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
-               '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m',
+               '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m', '/chat-pacientes',
                ...ETIQUETAS, ...COMUNES],
 
   // Post-cosecha: pesa los lotes que le asignan. `/mnc` es SU sección y además donde aterriza
@@ -1476,7 +1504,8 @@ router.beforeEach(async (to) => {
     /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path.startsWith('/bienvenida/') ||
     to.path === '/contacto' || to.path === '/login' ||
     to.path === '/olvide-contrasena' || to.path === '/restablecer' ||
-    to.path.startsWith('/registro') || to.path === '/terminos' || to.path === '/privacidad';
+    to.path.startsWith('/registro') || to.path === '/terminos' || to.path === '/privacidad' ||
+    to.path === '/paciente' || to.path.startsWith('/portal/entrar/');
 
   if (noEsperaBootstrap) {
     auth.ensureBootstrapped();
@@ -1496,8 +1525,12 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    // El portal es del paciente: sin sesión, a SU puerta (DNI y clave), no al login del equipo.
+    if (to.path === '/portal' || to.path.startsWith('/portal/')) return { name: 'portal-entrar' };
     return { name: "login", query: { redirect: to.fullPath } };
   }
+  // El paciente con sesión que vuelve a su puerta, directo a su portal.
+  if (to.path === '/paciente' && auth.user?.role === 'paciente') return '/portal';
   if (to.meta.guestOnly && auth.isAuthenticated) {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";

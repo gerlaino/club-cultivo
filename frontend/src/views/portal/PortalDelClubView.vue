@@ -88,7 +88,7 @@
         <LeafHerbarium :size="40" class="ph__nada-ico" />
         <h2 class="ph__nada-t">Todavía no hay nada publicado</h2>
         <p class="ph__nada-b">
-          Cuando {{ club?.name || 'tu organización' }} cargue novedades, eventos o variedades, los
+          Cuando {{ club?.name || 'tu organización' }} cargue novedades, eventos o genéticas, los
           vas a ver acá. Mientras tanto:
         </p>
         <div class="ph__nada-acts">
