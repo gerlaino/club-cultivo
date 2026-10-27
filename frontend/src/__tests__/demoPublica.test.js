@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount, shallowMount, flushPromises } from '@vue/test-utils'
 
 // AC (Germán, 26-oct-2026): las simulaciones de cómo se usa (las grabaciones de la app) están en UN
-// solo lugar, la vista «Demo» de cada puerta; la portada y cada página llevan ahí con «Ver la demo».
+// solo lugar, la vista «Demo» de cada puerta; cada página lleva ahí con «Ver la demo» (la portada no).
 // La planta que crece por fase no es una grabación: se queda en la página de autocultivo.
 window.scrollTo = () => {}
 vi.mock('../lib/api.js', () => ({ getRegistroInfo: () => Promise.resolve({ data: { dias_prueba: 30, precios: null } }) }))
@@ -40,9 +40,11 @@ describe('Las grabaciones viven sólo en la demo', () => {
     expect(links(w).filter((l) => l === '/bienvenida/autocultivo/demo')).toHaveLength(1)
   })
 
-  it('la portada lleva a la demo de cada lado', async () => {
+  // Germán (27-oct): «Ver la demo» queda dentro de organizaciones y de autocultivo, no en la portada.
+  it('la portada no lleva a la demo: se llega desde la página de cada lado', async () => {
     const w = await montarPagina('LandingView')
-    expect(links(w)).toEqual(expect.arrayContaining(['/bienvenida/organizaciones/demo', '/bienvenida/autocultivo/demo']))
+    expect(links(w).some((l) => l.endsWith('/demo'))).toBe(false)
+    expect(links(w)).toEqual(expect.arrayContaining(['/bienvenida/organizaciones', '/bienvenida/autocultivo']))
   })
 })
 
