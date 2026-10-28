@@ -1676,6 +1676,29 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **EL CATÁLOGO ES «RESERVAR»** (Germán, 28-oct-2026). `/portal/reservar` (el viejo `/portal/catalogo`
+  redirige) muestra la mesa de cada sede y de ahí se pide. Reglas:
+  - **el paciente elige la sede y retira HOY o MAÑANA, nunca más allá** (`Reserva.fechas_portal`, viaja
+    en `GET /portal/reservas`); el pedido es de UNA sede;
+  - **sólo lo que ve** (`Portal::Catalogo`, la misma regla para mostrar y para pedir: la mesa de esa
+    sede y las genéticas «La ve el paciente»), **contra lo LIBRE de la mesa** (sin lo ya reservado; el
+    catálogo dice «Hay/Quedan pocos/No hay hoy» con ese mismo número) y **nunca le dice cuánto hay**;
+  - el pedido nace **`solicitada`** (`origen: 'portal'`, sin `user_id`) y **no aparta nada**: aparta
+    recién cuando **admin o supervisor** lo confirma (`Reserva::ROLES_CONFIRMAN`, `PATCH
+    /reservas/:id/confirmar`, que vuelve a mirar la mesa con el candado); el rechazo **pide motivo**,
+    que es lo que lee el paciente (`motivo_rechazo`). El dispensador no ve los pedidos sin confirmar;
+  - **una reserva por día** (Germán, 28-oct: «podés reservar para hoy o para mañana, más fácil»): una
+    para hoy y otra para mañana, nunca dos el mismo día; cuenta la que espera y la confirmada, la haya
+    pedido él o se la haya cargado la organización (`Reserva.del_dia`, `Reserva.dias_portal` viaja con
+    `libre` por día). El paciente cancela la suya mientras nadie la confirmó y el día vuelve a quedar
+    libre; una sin confirmar cuyo día pasó **vence sola** (`VencimientoReservasJob`);
+  - **sin el portal habilitado no existe**: el paciente ni entra (login) y el que ya estaba adentro
+    recibe 403 en todo `/portal/*`; en administración «Pedidos del portal» se ve sólo con el módulo
+    contratado (`features.vista_paciente`, la misma llave que el Chat);
+  - el precio es el del stock con SU descuento (`Reserva.precio_para`), el mismo en el catálogo, el
+    pedido y la reserva de la organización. Se paga al retirar (Mercado Pago: más adelante);
+  - avisos: a admin y supervisor (`reserva_solicitada`: campanita + push) y al paciente por su canal
+    y push (`reserva_respondida`) al confirmar, rechazar o vencer.
 - **LA INVITACIÓN AL PORTAL VA POR MAIL, NO POR WHATSAPP** (Germán, 27-oct-2026). Tres caminos y una
   regla: (1) **abrir el portal lo habilita para todo el padrón** (activos y admitidos): se les crea la
   cuenta en un job (`HabilitarPortalJob` → `PortalAcceso::HabilitarTodos`, idempotente) y no se manda

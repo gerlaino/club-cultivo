@@ -134,6 +134,10 @@ Rails.application.routes.draw do
       # Sus papeles: el REPROCANN y la constancia de renovación que sube él (27-oct-2026).
       # Lo que hay hoy sobre la mesa de cada sede (27-oct-2026).
       get  'catalogo',           to: 'catalogo#show'
+      # «Reservar» (28-oct-2026): pedir de la mesa, para hoy o mañana; lo confirma administración.
+      resources :reservas, only: [:index, :create] do
+        member { patch :cancelar }
+      end
       get  'papeles',            to: 'papeles#show'
       post 'papeles/renovacion', to: 'papeles#renovacion'
       # Su cuenta corriente, sólo si la organización se la abrió. Hoy es lectura; más adelante
@@ -457,6 +461,9 @@ Rails.application.routes.draw do
         patch :entregar
         patch :cancelar
         patch :anular_sena
+        # El pedido del portal (28-oct-2026): admin o supervisor lo confirman o lo rechazan.
+        patch :confirmar
+        patch :rechazar
       end
     end
 

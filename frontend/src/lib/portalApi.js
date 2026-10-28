@@ -41,6 +41,11 @@ export const marcarPortalMensajesLeidos = ()      => api.post('/portal/mensajes/
 export const getPortalPapeles = () => api.get('/portal/papeles').then(datos)
 // Lo que hay hoy sobre la mesa de cada sede (27-oct-2026).
 export const getPortalCatalogo = () => api.get('/portal/catalogo').then(datos)
+// «Reservar» (28-oct-2026). `getPortalReservas` devuelve `{ data, fechas_retiro: [{ fecha, etiqueta, libre }] }`.
+export const getPortalReservas   = ()        => api.get('/portal/reservas').then(r => r.data)
+// `{ sede_id, fecha, items: [{ stock_id, cantidad }], notas }`
+export const pedirPortalReserva  = (pedido)  => api.post('/portal/reservas', pedido).then(datos)
+export const cancelarPortalReserva = (id)    => api.patch(`/portal/reservas/${id}/cancelar`).then(datos)
 export const subirRenovacionReprocann = (archivo) => {
   const fd = new FormData()
   fd.append('constancia', archivo)

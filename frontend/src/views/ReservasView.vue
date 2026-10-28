@@ -7,6 +7,7 @@
       </div>
       <div class="rsv__filters">
         <select v-model="estado" class="rsv__select" @change="cargar">
+          <option v-if="veePedidos" value="solicitada">Pedidos del portal{{ nSolicitadas ? ` (${nSolicitadas})` : '' }}</option>
           <option value="pendiente">Pendientes</option>
           <option value="entregada">Entregadas</option>
           <option value="cancelada">Canceladas</option>
@@ -45,7 +46,12 @@
             </td>
           </tr>
         <tr v-for="r in g.reservas" :key="r.id" :class="{ 'rsv__row--vencida': esVencidaHoy(r) }">
-          <td>{{ r.paciente?.nombre || '—' }}</td>
+          <td>
+            {{ r.paciente?.nombre || '—' }}
+            <div v-if="r.origen === 'portal'" class="rsv__origen">Lo pidió desde el portal</div>
+            <div v-if="r.estado === 'solicitada' && r.notas" class="rsv__origen">{{ r.notas }}</div>
+            <div v-if="r.estado === 'rechazada' && r.motivo_rechazo" class="rsv__origen">«{{ r.motivo_rechazo }}»</div>
+          </td>
           <!-- Una fila por línea: con varios productos, cada uno con su cantidad al lado. -->
           <td>
             <div v-for="ln in lineasDe(r)" :key="ln.id ?? ln.stock_id" class="rsv__linea">
@@ -60,6 +66,11 @@
           <td>{{ r.aporte_restante_ars != null ? fmt(r.aporte_restante_ars) : '—' }}</td>
           <td><span class="rsv__pill" :class="`rsv__pill--${r.estado}`">{{ ESTADO_LABEL[r.estado] || r.estado }}</span></td>
           <td class="rsv__actions">
+            <!-- El pedido del portal (28-oct-2026): no aparta nada hasta que se confirma. -->
+            <template v-if="r.estado === 'solicitada' && canGestionarReservas">
+              <button class="rsv__btn rsv__btn--primary" :disabled="busy === r.id" @click="confirmarPedido(r)">Confirmar</button>
+              <button class="rsv__btn rsv__btn--ghost" :disabled="busy === r.id" @click="rechazarPedido(r)">Rechazar</button>
+            </template>
             <template v-if="r.estado === 'pendiente'">
               <button class="rsv__btn rsv__btn--primary" :disabled="busy === r.id" @click="abrirEntrega(r)">Entregar</button>
               <!-- Gestión de la reserva: solo admin/supervisor. -->
@@ -104,10 +115,12 @@ import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensaci
 import ModalEditarReserva from '../components/pacientes/ModalEditarReserva.vue'
 import { lineasDe } from '../lib/reservaLineas.js'
 import { formaLabel } from '../lib/formatters.js'
-import { listReservas, cancelarReserva, anularSenaReserva, deleteReserva } from '../lib/api.js'
+import { listReservas, cancelarReserva, anularSenaReserva, deleteReserva, confirmarReserva, rechazarReserva } from '../lib/api.js'
+import { useRoute } from 'vue-router'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useAuthStore } from '../stores/auth'
+import { useClubStore } from '../stores/club'
 import { hoyISO } from '../utils/dates.js'
 
 const toast = useToast()
@@ -117,12 +130,15 @@ const auth = useAuthStore()
 // El dispensador VE las reservas y las pasa a dispensa (Entregar), pero no las gestiona
 // (editar/cancelar/eliminar) — eso es de admin/supervisor.
 const canGestionarReservas = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+// Los pedidos del portal sólo existen con el portal contratado (la misma llave que el Chat).
+const club = useClubStore()
+const veePedidos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && club.data?.features?.vista_paciente === true)
 
 const ESTADO_LABEL = {
-  pendiente: 'Pendiente', entregada: 'Entregada', cancelada: 'Cancelada', vencida: 'Vencida',
+  solicitada: 'Por confirmar', pendiente: 'Pendiente', entregada: 'Entregada', cancelada: 'Cancelada', vencida: 'Vencida', rechazada: 'Rechazada',
 }
 // «No hay reservas pendientes», en plural: el estado en singular no concuerda con «reservas».
-const VACIO_PLURAL = { pendiente: 'pendientes', entregada: 'entregadas', cancelada: 'canceladas', vencida: 'vencidas' }
+const VACIO_PLURAL = { solicitada: 'pedidas desde el portal', pendiente: 'pendientes', entregada: 'entregadas', cancelada: 'canceladas', vencida: 'vencidas', rechazada: 'rechazadas' }
 
 const reservas = ref([])
 
@@ -145,7 +161,11 @@ const gruposPorSede = computed(() => {
 const agruparPorSede = computed(() => gruposPorSede.value.length > 1)
 const loading  = ref(true)
 const busy     = ref(null)
-const estado   = ref('pendiente')
+// El push de un pedido nuevo abre `/reservas?estado=solicitada`.
+const route    = useRoute()
+const pedido   = route?.query?.estado
+const estado   = ref(['solicitada', 'pendiente', 'entregada', 'cancelada', 'vencida'].includes(pedido) && (pedido !== 'solicitada' || veePedidos.value) ? pedido : 'pendiente')
+const nSolicitadas = ref(0)
 
 const hoy = hoyISO()
 
@@ -160,6 +180,11 @@ async function cargar() {
   try {
     const { data } = await listReservas(estado.value ? { estado: estado.value } : {})
     reservas.value = data.reservas || []
+    if (veePedidos.value) {
+      nSolicitadas.value = estado.value === 'solicitada'
+        ? reservas.value.length
+        : ((await listReservas({ estado: 'solicitada' })).data.reservas || []).length
+    }
   } catch {
     reservas.value = []
   } finally {
@@ -176,6 +201,37 @@ function abrirEntrega(r) { reservaSel.value = r; showEntrega.value = true }
 const showEdit    = ref(false)
 const reservaEdit = ref(null)
 function abrirEdicion(r) { reservaEdit.value = r; showEdit.value = true }
+
+// ── Pedidos del portal ──
+async function confirmarPedido(r) {
+  busy.value = r.id
+  try {
+    await confirmarReserva(r.id)
+    toast.success('Pedido confirmado: quedó apartado')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo confirmar')
+  } finally { busy.value = null }
+}
+
+async function rechazarPedido(r) {
+  const res = await confirm({
+    title: 'Rechazar el pedido',
+    message: `El motivo le llega a ${r.paciente?.nombre} en su portal.`,
+    confirmText: 'Rechazar', variant: 'danger',
+    campo: { label: 'Motivo', placeholder: 'Ej.: hoy no llegamos a prepararlo, pasá mañana' },
+  })
+  if (!res) return
+  if (!res.valor) { toast.error('Escribí el motivo: es lo que le llega al paciente.'); return }
+  busy.value = r.id
+  try {
+    await rechazarReserva(r.id, res.valor)
+    toast.success('Pedido rechazado')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo rechazar')
+  } finally { busy.value = null }
+}
 
 async function eliminar(r) {
   const ok = await confirm({
@@ -233,6 +289,7 @@ useRecargaEnCambios(['reservas', 'stocks'], cargar)
 </script>
 
 <style scoped>
+.rsv__origen { font-size: .75rem; color: var(--c-slate-500); margin-top: 2px; }
 .rsv { padding: var(--sp-6, 1.5rem); max-width: 1100px; margin: 0 auto; }
 .rsv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .rsv__title { font-size: 1.5rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; }
@@ -255,11 +312,13 @@ useRecargaEnCambios(['reservas', 'stocks'], cargar)
 .rsv__lote { color: var(--c-slate-400); }
 .rsv__fecha--hoy { font-weight: 800; color: #b45309; }
 
-.rsv__pill { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.rsv__pill { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
 .rsv__pill--pendiente { background: #fef9c3; color: #854d0e; }
 .rsv__pill--entregada { background: #dcfce7; color: #14532d; }
 .rsv__pill--cancelada { background: var(--c-slate-100); color: var(--c-slate-600); }
 .rsv__pill--vencida   { background: #fee2e2; color: #991b1b; }
+.rsv__pill--solicitada { background: var(--c-sky-100); color: var(--c-sky-600); }
+.rsv__pill--rechazada  { background: var(--c-slate-100); color: var(--c-slate-600); }
 
 .rsv__actions { text-align: right; white-space: nowrap; }
 .rsv__btn { border: none; border-radius: 7px; padding: .35rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; margin-left: .35rem; }

@@ -57,6 +57,14 @@ module Notificaciones
       { clave: 'respuesta_organizacion', grupo: TE_PIDEN, label: 'Respuestas de tu organización',
         desc: 'Tu organización te contestó en el chat del portal.',
         roles: %w[paciente], feature: 'vista_paciente', personal: false, default: true },
+      # «Reservar» del portal (28-oct-2026): a quien confirma cuando un paciente pide, y al paciente
+      # cuando se lo confirman, rechazan o vence.
+      { clave: 'reserva_solicitada', grupo: TE_PIDEN, label: 'Pedidos de reserva del portal',
+        desc: 'Un paciente pidió desde su portal para retirar hoy o mañana.',
+        roles: Reserva::ROLES_CONFIRMAN, feature: 'vista_paciente', personal: false, default: true },
+      { clave: 'reserva_respondida', grupo: TE_PIDEN, label: 'Tus pedidos de reserva',
+        desc: 'Tu organización confirmó o no pudo confirmar lo que pediste.',
+        roles: %w[paciente], feature: 'vista_paciente', personal: false, default: true },
       # La renovación del REPROCANN que sube el paciente desde el portal (27-oct-2026).
       { clave: 'renovacion_subida', grupo: TE_PIDEN, label: 'Renovaciones de REPROCANN para revisar',
         desc: 'Un paciente subió la constancia de renovación desde su portal.',

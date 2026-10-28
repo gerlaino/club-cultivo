@@ -1,5 +1,37 @@
 # Changelog
 
+## Octubre 2026 (gj) — El catálogo del portal es «Reservar»: el paciente pide de la mesa para hoy o mañana y administración lo confirma (28-oct)
+
+- **Migración `PedidosDelPortalEnReservas`** (reversible, corre sola en el deploy): `reservas.user_id`
+  opcional, `origen` ('organizacion' | 'portal'), `solicitada_at`, `confirmada_at`, `confirmada_por_id`,
+  `rechazada_at`, `motivo_rechazo`. Estados nuevos: `solicitada` y `rechazada`.
+- **Portal**: `/portal/reservar` (el menú dice «Reservar»; `/portal/catalogo` redirige). Elige sede,
+  cantidades, «Lo retiro: Hoy / Mañana» (los días los manda el backend), una nota opcional y «Pedir la
+  reserva». Arriba, «Mis pedidos» con el estado («Esperando confirmación», «Confirmada», «No se pudo
+  confirmar» con el motivo, «Venció sin confirmar») y «Cancelar el pedido» mientras espera. **Una reserva
+  por día**: con hoy tomado ofrece sólo mañana (y al revés); con los dos, lo dice. Se entera
+  en vivo por `PacienteChannel`. `GET/POST /portal/reservas`, `PATCH /portal/reservas/:id/cancelar`
+  (`Portal::PedirReserva`, lista blanca).
+- **Administración**: en Reservas, «Pedidos del portal (n)» con Confirmar / Rechazar (motivo obligatorio,
+  `ConfirmDialog` con campo); en el teléfono, la solapa «Pedidos». Campanita y push `reserva_solicitada`
+  llevan a `/reservas?estado=solicitada`. El dispensador no los ve. Sin el portal contratado no aparece
+  nada de esto (en el portal ya no se entra: login y 403 en `/portal/*`).
+- **El catálogo** dice «Hay/Quedan pocos/No hay hoy» con lo LIBRE de la mesa (antes, con lo cargado: podía
+  decir «Hay» de algo ya reservado) y muestra el precio con el descuento del paciente. La regla de qué se
+  muestra vive en `Portal::Catalogo` (antes, en el controller).
+- `Reserva.precio_para` reemplaza la cuenta repetida del controller de reservas.
+- **Siembra e2e**: la limpieza borraba las reservas antes que sus líneas (FK); no saltaba porque ninguna
+  prueba dejaba reservas.
+- Specs: `portal_reservar_spec.rb` (34 casos: hoy/mañana/pasado/ayer, otra sede, sólo uno fuera de la
+  mesa, genética oculta, más de lo libre sin revelar cuánto, precio con descuento,
+  una por día (el mismo día no; hoy y mañana sí; la confirmada y la de la organización ocupan el día;
+  la rechazada lo libera), portal cerrado o sin contratar con la sesión abierta, pendiente de
+  aprobación, lo suyo y no lo de otro, cancelar, confirmar admin/supervisor y recién ahí
+  aparta, dispensador no, motivo obligatorio, la mesa cambió en el medio, canal del paciente, otra
+  organización, vencimiento, «No hay hoy»), `portalReservar.test.js` (15) y la e2e
+  `portalReservar.spec.js` (pide en el teléfono → administración confirma → al paciente le aparece
+  «Confirmada» sin recargar), vista en Playwright.
+
 ## Octubre 2026 (gi) — Admin y supervisor pesan el lote de una manicura y le mandan la jornada a confirmar (28-oct)
 
 - **Quién pesa, una sola regla** (`Lote#pesa_manicura?`): admin y supervisor pesan aunque el lote esté

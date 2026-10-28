@@ -306,6 +306,9 @@ def limpiar_operativo_e2e!(club)
   CuentaCorriente.unscoped.where(ids).update_all(saldo_disponible: 0, saldo_disponible_g: 0)
   Cobro.unscoped.where(ids).delete_all
   DispensacionItem.unscoped.where(dispensacion_id: disps).delete_all
+  # Las líneas cuelgan de la reserva (FK): van antes. Hasta `portalReservar` ninguna prueba dejaba
+  # reservas, y la limpieza reventaba en la segunda corrida.
+  ReservaItem.where(reserva_id: Reserva.unscoped.where(ids).select(:id)).delete_all
   Reserva.unscoped.where(ids).delete_all
   Dispensacion.unscoped.where(id: disps).delete_all
   # La mesa y su historial: los movimientos cuelgan del ítem, así que van antes.

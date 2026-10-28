@@ -1,6 +1,6 @@
 module Portal
   # El catálogo del portal: lo que hay HOY sobre la mesa de cada sede (27-oct-2026, Germán: «un
-  # catálogo de stock»).
+  # catálogo de stock»). Desde el 28-oct es también «Reservar»: de acá se pide (`Portal::ReservasController`).
   #
   #   GET /portal/catalogo   por sede: los productos de la mesa, con su precio y si hay
   #
@@ -13,13 +13,8 @@ module Portal
     POCOS_POR_DEFECTO = 5
 
     def show
-      mostradores = Mostrador.where(club_id: current_club.id).includes(:sede).to_a.select { |m| m.sede&.activa != false }
-      items = MostradorItem.where(mostrador_id: mostradores.map(&:id))
-                           .includes(stock: [:genetica, { lote: :genetica }]).to_a
-      por_mostrador = items.group_by(&:mostrador_id)
-
-      data = mostradores.filter_map do |m|
-        productos = Array(por_mostrador[m.id]).filter_map { |item| producto_json(item) }
+      data = Portal::Catalogo.por_mostrador(current_club).filter_map do |m, items|
+        productos = items.map { |item| producto_json(item, m.sede_id) }
         next if productos.empty?
 
         { sede_id: m.sede_id, sede: m.sede&.nombre,
@@ -30,29 +25,31 @@ module Portal
 
     private
 
-    def producto_json(item)
-      stock = item.stock
-      return nil unless stock
-
-      genetica = stock.genetica || stock.lote&.genetica
-      return nil if genetica && !genetica.visible_paciente?
-      return nil if item.cantidad.to_d <= 0 && !item.agotado?
-
+    def producto_json(item, sede_id)
+      stock    = item.stock
+      genetica = Portal::Catalogo.genetica(stock)
       {
         stock_id: stock.id,
         nombre:   genetica&.nombre || Portal::DetalleDispensa::FORMAS.fetch(stock.forma_producto, 'Producto'),
         forma:    Portal::DetalleDispensa::FORMAS.fetch(stock.forma_producto, 'Producto'),
         unidad:   stock.unidad.presence || 'g',
-        precio:   stock.precio_sugerido_ars&.to_f,
+        # El precio que va a pagar ÉL (con su descuento), el mismo que lleva el pedido.
+        precio:   stock.precio_sugerido_ars && Reserva.precio_para(stock, ficha).to_f,
         genetica: genetica && { id: genetica.id, nombre: genetica.nombre, tipo: genetica.tipo,
                                 thc: genetica.thc&.to_f, cbd: genetica.cbd&.to_f },
         foto_url: foto(genetica),
-        disponibilidad: disponibilidad(item, stock),
+        disponibilidad: disponibilidad(stock, sede_id),
       }
     end
 
-    def disponibilidad(item, stock)
-      cantidad = item.cantidad.to_d
+    def ficha
+      @ficha ||= current_club.pacientes.find_by(user_id: current_user.id)
+    end
+
+    # Lo LIBRE de la mesa (sin lo que ya está reservado): es contra lo que se valida un pedido, así
+    # que «Hay» no puede ofrecer lo que el pedido después rechaza.
+    def disponibilidad(stock, sede_id)
+      cantidad = stock.libre_en_mostrador(sede_id)
       return 'no_hay' if cantidad <= 0
 
       cantidad < POCOS.fetch(stock.unidad.to_s, POCOS_POR_DEFECTO) ? 'pocos' : 'hay'

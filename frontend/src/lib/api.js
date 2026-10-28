@@ -404,6 +404,9 @@ export const entregarReserva = (id, payload = {})    => api.patch(`/reservas/${i
 export const cancelarReserva = (id, motivo = null)   => api.patch(`/reservas/${id}/cancelar`, { motivo });
 export const anularSenaReserva = (id)                => api.patch(`/reservas/${id}/anular_sena`);
 export const updateReserva   = (id, payload)         => api.patch(`/reservas/${id}`, { reserva: payload });
+// El pedido del portal (28-oct-2026): admin o supervisor lo confirman o lo rechazan con motivo.
+export const confirmarReserva = (id)                 => api.patch(`/reservas/${id}/confirmar`);
+export const rechazarReserva  = (id, motivo)         => api.patch(`/reservas/${id}/rechazar`, { motivo });
 export const deleteReserva   = (id)                  => api.delete(`/reservas/${id}`);
 
 // ── Delivery ──────────────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ class AlertaInterna < ApplicationRecord
     manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo merma_mostrador cierre_mostrador_pendiente reposicion_mostrador
     delivery_entregado delivery_fallido
-    reserva_por_entregar reserva_vencida
+    reserva_por_entregar reserva_vencida reserva_solicitada
     plan_por_vencer plan_vencido
     otro
   ].freeze
@@ -59,7 +59,7 @@ class AlertaInterna < ApplicationRecord
     'manicura_eliminada' => 'lote', 'manicura_reabierta' => 'lote',
     'manicura_aprobacion_pendiente' => 'manicura',
     'stock_bajo' => 'stock', 'stock_vencimiento' => 'stock',
-    'reserva_por_entregar' => 'reserva', 'reserva_vencida' => 'reserva',
+    'reserva_por_entregar' => 'reserva', 'reserva_vencida' => 'reserva', 'reserva_solicitada' => 'reserva',
     'reprocann_vencido' => 'paciente', 'reprocann_por_vencer' => 'paciente', 'reprocann_tramite_iniciado' => 'paciente', 'reprocann_no_indicado' => 'paciente', 'reprocann_rechazado' => 'paciente',
     'documento_vencido' => 'paciente', 'saldo_cc_bajo' => 'paciente', 'saldo_gramos_bajo' => 'paciente',
     'indicacion_vencida' => 'paciente', 'indicacion_por_vencer' => 'paciente',

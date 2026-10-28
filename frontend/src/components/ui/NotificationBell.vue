@@ -26,7 +26,7 @@ const INTERNA_ICON  = {
   saldo_cc_bajo: '💳', saldo_gramos_bajo: '⚖️', documento_vencido: '📄',
   reprocann_vencido: '📄', reprocann_por_vencer: '⏰', manicura_aprobacion_pendiente: '✂️',
   manicura_aprobada: '✅', manicura_rechazada: '↩️', manicura_eliminada: '🗑️', manicura_reabierta: '✏️',
-  stock_bajo: '📦',
+  stock_bajo: '📦', reserva_solicitada: '🛍️',
 }
 const SEV_CLASS = { error: 'nb__dot--error', warning: 'nb__dot--warning', info: 'nb__dot--info' }
 
@@ -39,7 +39,8 @@ const ENTIDAD_ROUTE = {
   paciente: (id) => id ? { name: 'paciente-detail', params: { id } } : null,
   tarea:    ()   => ({ path: '/tareas' }),
   stock:    ()   => ({ path: '/admin/stock' }),
-  reserva:  ()   => ({ path: '/reservas' }),
+  // Un pedido del portal abre directo la lista de pedidos por confirmar.
+  reserva:  (_id, a) => a?.tipo === 'reserva_solicitada' ? { path: '/reservas', query: { estado: 'solicitada' } } : { path: '/reservas' },
   manicura: ()   => ({ path: '/admin/pesajes-manicura' }),
   delivery: ()   => ({ path: '/delivery/despachos' }),
 }
@@ -47,7 +48,7 @@ function rutaDeAlerta(a) {
   const e = a.entidad
   if (!e || !e.tipo) return null
   const fn = ENTIDAD_ROUTE[e.tipo]
-  return fn ? fn(e.id) : null
+  return fn ? fn(e.id, a) : null
 }
 function cerrarPanel() {
   if (triggerRef.value) Dropdown.getOrCreateInstance(triggerRef.value).hide()

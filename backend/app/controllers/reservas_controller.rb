@@ -7,10 +7,10 @@ class ReservasController < ApplicationController
   before_action :require_reservas_role!
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar, :anular_sena]
+  before_action :set_reserva,      only: [:show, :update, :destroy, :entregar, :cancelar, :anular_sena, :confirmar, :rechazar]
   # El dashboard cachea sus métricas 10 min; al tocar una reserva lo invalidamos para
   # que la sección "Reservas para preparar" se actualice al instante.
-  after_action :bust_dashboard_cache, only: [:create, :update, :destroy, :entregar, :cancelar, :anular_sena]
+  after_action :bust_dashboard_cache, only: [:create, :update, :destroy, :entregar, :cancelar, :anular_sena, :confirmar]
 
   # GET /pacientes/:paciente_id/reservas  OR  GET /reservas[?estado=pendiente]
   def index
@@ -24,6 +24,8 @@ class ReservasController < ApplicationController
                     current_user.sedes_visibles_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
+    # Un pedido del portal sin confirmar no es todavía nada que preparar: el dispensador no lo ve.
+    scope = scope.where.not(estado: 'solicitada') unless Reserva::ROLES_CONFIRMAN.include?(current_user.role)
     scope = scope.includes(:user, { stock: [:genetica, :sede, { lote: :genetica }] }, { items: { stock: [:genetica, { lote: :genetica }] } }, paciente: :cuenta_corriente).recientes
     render json: { reservas: scope.map { |r| serialize_reserva(r) } }
   end
@@ -243,6 +245,22 @@ class ReservasController < ApplicationController
     render json: serialize_reserva(@reserva)
   end
 
+  # PATCH /reservas/:id/confirmar — el pedido del portal pasa a reserva y aparta (28-oct-2026).
+  def confirmar
+    @reserva.confirmar!(por: current_user)
+    render json: serialize_reserva(@reserva.reload)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  # PATCH /reservas/:id/rechazar — con el motivo, que es lo que lee el paciente.
+  def rechazar
+    @reserva.rechazar!(por: current_user, motivo: params[:motivo])
+    render json: serialize_reserva(@reserva.reload)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   # PATCH /reservas/:id/anular_sena
   # Anula la seña: revierte su asiento contable y, con él, el crédito de cuenta
   # corriente que había generado, dejando la reserva en sena_ars = 0. A diferencia
@@ -327,11 +345,7 @@ class ReservasController < ApplicationController
   end
 
   # Mismo cálculo que la dispensación: precio sugerido del stock con descuento del paciente.
-  def precio_linea(stock, paciente)
-    precio_base = stock.precio_sugerido_ars.to_d
-    descuento   = paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
-    (precio_base * (1 - descuento)).round(2)
-  end
+  def precio_linea(stock, paciente) = Reserva.precio_para(stock, paciente)
 
   # Edición de reserva pendiente. La seña SÍ se puede editar (monto y medio): al cambiarla
   # se re-registra su asiento contable y se ajusta el crédito de cuenta corriente.
@@ -435,6 +449,13 @@ class ReservasController < ApplicationController
         }
       },
       reservado_por: r.user && (r.user.first_name || r.user.email),
+      # El pedido del portal (28-oct-2026).
+      origen:         r.origen,
+      solicitada_at:  r.solicitada_at,
+      confirmada_at:  r.confirmada_at,
+      confirmada_por: r.confirmada_por && (r.confirmada_por.first_name || r.confirmada_por.email),
+      rechazada_at:   r.rechazada_at,
+      motivo_rechazo: r.motivo_rechazo,
     }
   end
 end

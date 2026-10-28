@@ -859,8 +859,9 @@ const routes = [
       { path: 'dispensas/:id',  name: 'portal-dispensa',  component: () => import('../views/portal/PortalDispensaView.vue') },
       // El chat con la organización (27-oct-2026).
       { path: 'mensajes',       name: 'portal-mensajes',  component: () => import('../views/portal/PortalMensajesView.vue') },
-      // Lo que hay hoy en el mostrador (27-oct-2026).
-      { path: 'catalogo',       name: 'portal-catalogo',  component: () => import('../views/portal/PortalCatalogoView.vue') },
+      // Lo que hay hoy en el mostrador, y de ahí se pide (28-oct-2026: el catálogo ES «Reservar»).
+      { path: 'reservar',       name: 'portal-reservar',  component: () => import('../views/portal/PortalCatalogoView.vue') },
+      { path: 'catalogo',       redirect: '/portal/reservar' },
       // Lo que publica la organización, todo junto: era el inicio y son cinco entradas de la barra
       // colapsadas en una. Un portal de salud tiene pocas secciones.
       // "club" no va en texto visible (convención del proyecto: se dice "organización"), y la

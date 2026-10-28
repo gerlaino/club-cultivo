@@ -308,12 +308,13 @@ describe('Mi organización — el boletín, que dejó de ser el inicio', () => {
 
 describe('La barra y el pie', () => {
   // Eran ocho entradas, cinco de ellas del boletín. Con ocho, ninguna se lee.
+  // 28-oct-2026: el catálogo es «Reservar» (Germán).
   it('la barra lleva lo del paciente y una sola entrada al boletín', async () => {
     const w = montar(PortalNavBar)
     await flushPromises()
 
     const links = w.findAll('.pnb__nav .pnb__link').map(a => a.text())
-    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis dispensas', 'Mensajes', 'Catálogo', 'Mi organización'])
+    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis dispensas', 'Mensajes', 'Reservar', 'Mi organización'])
   })
 
   it('la barra ofrece la cuenta sólo si la organización se la abrió', async () => {

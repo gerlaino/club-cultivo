@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_27_210000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_28_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2355,7 +2355,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_27_210000) do
     t.bigint "club_id", null: false
     t.bigint "paciente_id", null: false
     t.bigint "stock_id", null: false
-    t.bigint "user_id", null: false
+    t.bigint "user_id"
     t.bigint "dispensacion_id"
     t.decimal "cantidad", precision: 10, scale: 3, null: false
     t.string "estado", default: "pendiente", null: false
@@ -2375,8 +2375,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_27_210000) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.string "origen", default: "organizacion", null: false
+    t.datetime "solicitada_at"
+    t.datetime "confirmada_at"
+    t.bigint "confirmada_por_id"
+    t.datetime "rechazada_at"
+    t.text "motivo_rechazo"
     t.index ["club_id", "estado"], name: "index_reservas_on_club_id_and_estado"
     t.index ["club_id"], name: "index_reservas_on_club_id"
+    t.index ["confirmada_por_id"], name: "index_reservas_on_confirmada_por_id"
     t.index ["deleted_at"], name: "index_reservas_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_reservas_on_deleted_by_id"
     t.index ["dispensacion_id"], name: "index_reservas_on_dispensacion_id"
@@ -3226,6 +3233,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_27_210000) do
   add_foreign_key "reservas", "pacientes"
   add_foreign_key "reservas", "stocks"
   add_foreign_key "reservas", "users"
+  add_foreign_key "reservas", "users", column: "confirmada_por_id"
   add_foreign_key "reservas", "users", column: "deleted_by_id"
   add_foreign_key "riego_plantas", "clubs"
   add_foreign_key "riego_plantas", "plants"

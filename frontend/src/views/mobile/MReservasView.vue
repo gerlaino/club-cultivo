@@ -7,7 +7,36 @@
       <button class="mres__tab" :class="{ 'mres__tab--on': filtro === 'todas' }" @click="filtro = 'todas'">
         Todas
       </button>
+      <!-- Los pedidos del portal (28-oct-2026): los confirman admin o supervisor. -->
+      <button v-if="confirmaPedidos" class="mres__tab" :class="{ 'mres__tab--on': filtro === 'pedidos' }" @click="filtro = 'pedidos'">
+        Pedidos <span v-if="pedidos.length" class="mres__badge">{{ pedidos.length }}</span>
+      </button>
     </div>
+
+    <template v-if="filtro === 'pedidos'">
+      <div v-if="!pedidos.length" class="mres__empty">
+        <span class="mres__empty-ico">📦</span>
+        <p>No hay pedidos del portal para confirmar.</p>
+      </div>
+      <div v-else class="mres__list">
+        <div v-for="r in pedidos" :key="r.id" class="mres__card" data-testid="pedido-portal">
+          <div class="mres__card-head">
+            <span class="mres__paciente">{{ r.paciente?.nombre || '—' }}</span>
+            <span class="mres__fecha">Retira {{ r.fecha_entrega_estimada === hoyISO() ? 'hoy' : fechaCorta(r.fecha_entrega_estimada) }}</span>
+          </div>
+          <div v-for="ln in lineasDe(r)" :key="ln.id ?? ln.stock_id" class="mres__linea">
+            <div v-if="ln.genetica" class="mres__prod">{{ ln.genetica }}</div>
+            <div class="mres__meta">{{ ln.cantidad }}{{ ln.unidad || 'g' }} · {{ formaLabel(ln.forma_producto) }}</div>
+          </div>
+          <div v-if="r.notas" class="mres__meta">{{ r.notas }}</div>
+          <div class="mres__pie">
+            <button class="mres__btn mres__btn--ghost" :disabled="ocupado === r.id" @click="rechazarPedido(r)">Rechazar</button>
+            <button class="mres__btn" :disabled="ocupado === r.id" @click="confirmarPedido(r)">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template v-else>
 
     <!-- LA CAJA CERRADA SE AVISA ACÁ, NO AL APRETAR ENTREGAR.
          Entregar una reserva crea una dispensa, y sin caja abierta el backend la rechaza: lo
@@ -78,16 +107,21 @@
       :reserva="entregando"
       @saved="onEntregada"
     />
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { listReservas, getMostrador } from '../../lib/api.js'
+import { listReservas, getMostrador, confirmarReserva, rechazarReserva } from '../../lib/api.js'
+import { useToast } from '../../composables/useToast.js'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
 import { lineasDe } from '../../lib/reservaLineas.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { useClubStore } from '../../stores/club'
 import { useSedeStore } from '../../stores/sede.js'
 import { sedeDeMostrador } from '../../composables/useMostrador.js'
 import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
@@ -95,6 +129,15 @@ import { hoyISO } from '../../utils/dates.js'
 
 const auth      = useAuthStore()
 const sedeStore = useSedeStore()
+const toast     = useToast()
+const { confirm } = useConfirm()
+
+// Quién confirma los pedidos del portal: la misma lista que el backend (`Reserva::ROLES_CONFIRMAN`),
+// y sólo con el portal contratado (la misma llave que el Chat).
+const club = useClubStore()
+const confirmaPedidos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && club.data?.features?.vista_paciente === true)
+const pedidos = ref([])
+const ocupado = ref(null)
 
 const filtro     = ref('hoy')
 const loading    = ref(false)
@@ -168,7 +211,44 @@ async function cargar() {
     // El endpoint devuelve { reservas: [...] }. El `?? data` de antes dejaba pasar el objeto entero
     // cuando la forma no coincidía, y la vista reventaba al filtrar algo que no era un array.
     reservas.value = Array.isArray(data?.reservas) ? data.reservas : []
+    if (confirmaPedidos.value) {
+      const { data: p } = await listReservas({ estado: 'solicitada' })
+      pedidos.value = Array.isArray(p?.reservas) ? p.reservas : []
+    }
   } catch { reservas.value = [] } finally { loading.value = false }
+}
+
+// Un pedido nuevo, confirmado en la compu o cancelado por el paciente: la lista se entera sola.
+useRecargaEnCambios('reservas', cargar)
+
+async function confirmarPedido(r) {
+  ocupado.value = r.id
+  try {
+    await confirmarReserva(r.id)
+    toast.success('Pedido confirmado: quedó apartado')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo confirmar')
+  } finally { ocupado.value = null }
+}
+
+async function rechazarPedido(r) {
+  const res = await confirm({
+    title: 'Rechazar el pedido',
+    message: `El motivo le llega a ${r.paciente?.nombre} en su portal.`,
+    confirmText: 'Rechazar', variant: 'danger',
+    campo: { label: 'Motivo', placeholder: 'Ej.: hoy no llegamos a prepararlo, pasá mañana' },
+  })
+  if (!res) return
+  if (!res.valor) { toast.error('Escribí el motivo: es lo que le llega al paciente.'); return }
+  ocupado.value = r.id
+  try {
+    await rechazarReserva(r.id, res.valor)
+    toast.success('Pedido rechazado')
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo rechazar')
+  } finally { ocupado.value = null }
 }
 
 function esVencida(r) { return (r.fecha_entrega_estimada || '') < hoyISO() }
@@ -251,4 +331,5 @@ function fechaCorta(f) {
   background: var(--c-leaf-600, #16a34a); color: #fff; font-size: .85rem; font-weight: 600;
 }
 .mres__btn:disabled { opacity: .5; }
+.mres__btn--ghost { background: var(--c-slate-100); color: var(--c-slate-600); }
 </style>

@@ -74,7 +74,7 @@ const conCuenta = computed(() => [
 ])
 
 const DE_LA_ORG = [
-  { to: '/portal/catalogo',     txt: 'Catálogo' },
+  { to: '/portal/reservar',     txt: 'Reservar' },
   { to: '/portal/organizacion', txt: 'Mi organización' },
 ]
 

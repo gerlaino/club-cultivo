@@ -2,6 +2,8 @@
 #   1. Vence las reservas pendientes cuya fecha de entrega estimada pasó hace más de
 #      Reserva::DIAS_VENCIMIENTO días. Al marcarlas 'vencida' dejan de bloquear stock
 #      (Stock#gramos_reservados sólo suma pendientes).
+#   1b. Vence los pedidos del portal que nadie confirmó y cuyo día ya pasó (28-oct-2026): no
+#      apartaban nada; vencerlos le dice al paciente que no se los van a preparar.
 #   2. Avisa al admin de las reservas cuya entrega es HOY y siguen pendientes, para que
 #      se despachen/retiren.
 class VencimientoReservasJob < ApplicationJob
@@ -15,6 +17,7 @@ class VencimientoReservasJob < ApplicationJob
 
   def procesar_club(club)
     vencer_reservas(club)
+    vencer_pedidos_sin_confirmar(club)
     avisar_entregas_de_hoy(club)
   rescue StandardError => e
     Rails.logger.warn "VencimientoReservasJob: club #{club.id} falló: #{e.message}"
@@ -31,6 +34,13 @@ class VencimientoReservasJob < ApplicationJob
         destinada_a_role: 'admin',
         contexto:         { reserva_id: reserva.id, paciente_id: reserva.paciente_id, accion: 'reserva_vencida' }
       )
+    end
+  end
+
+  def vencer_pedidos_sin_confirmar(club)
+    club.reservas.solicitadas_vencidas.find_each do |reserva|
+      reserva.marcar_vencida!
+      reserva.avisar_al_paciente!
     end
   end
 
