@@ -1,5 +1,48 @@
 # Changelog
 
+## Octubre 2026 (gk) — El portal rediseñado: «Armá tu portal» para el admin, la ficha del paciente en secciones y el portal del paciente en el teléfono (28-oct)
+
+Germán (28-oct): «el portal no queda abierto cuando clickeo el toggle; tiene que ser mucho más fácil e
+intuitivo, pensá que no es alguien de sistemas» y «la ficha del paciente tiene mil solapas». Maquetas
+aprobadas en dos lienzos (lado del admin y lado del paciente).
+
+- **El interruptor del portal no guardaba**: cambiaba en pantalla y esperaba «Guardar cambios» al pie
+  de la solapa; el error del guardado se tragaba en silencio. Ahora se guarda al tocarlo, lo confirma y,
+  si falla, lo dice. Cerrarlo pide confirmación.
+- **Pantalla del portal (admin)** `/configuracion/portal`: arriba el estado con su interruptor; **«Armá tu
+  portal»** con los pasos (abrirlo, presentación, qué ven, invitar, probarlo como paciente) mientras
+  falte alguno; **«Para atender»** (pedidos de Reservar, mensajes sin contestar, renovaciones del
+  REPROCANN, con el atajo a cada uno); **quiénes entran** (entran / invitados sin entrar / sin invitar /
+  sin mail) con «Invitar a n por mail», «Recordarles» e «Imprimir el cartel con QR»; **qué pueden
+  hacer** con Reservar y Mensajes que se prenden y apagan. Abajo, «Lo que ven tus pacientes»:
+  Presentación (se guarda al salir de cada campo), Genéticas, Novedades, Eventos. Lo arma
+  `Portal::Panel` (`GET /api/portal_panel`, sólo admin).
+- **Migración `PartesDelPortalPorOrganizacion`** (reversible, corre sola): `clubs.portal_reservar_activo`
+  y `clubs.portal_mensajes_activo` (default `true`). `Club#portal_reservar?` / `#portal_mensajes?`;
+  apagados, el portal no los ofrece (`/portal/club` manda `reservar` y `mensajes`) y el backend no deja
+  pedir ni escribir (403); lo que ya tenía lo sigue viendo y cancela su pedido.
+- **Cartel con QR** `/configuracion/portal/cartel` (A4, para imprimir): lleva a `/paciente`.
+- **Primera vez sin invitación**: en `/paciente`, «Es mi primera vez» → DNI → le llega el link a su mail
+  (`portal_acceso#recuperar` ahora manda la invitación al que nunca eligió clave, y el de cambiar la
+  clave al que sí). Misma respuesta exista o no el DNI; un link sin usar de menos de 10 minutos no se
+  reemplaza (no se le anula el que le acaban de mandar ni se le llena el correo).
+- **Ficha del paciente**: las 15 solapas en **5 secciones** (Resumen · Salud · Dispensas y cuenta ·
+  Mensajes · Datos y contacto, + Historial de la ficha) con sus partes adentro. Abre en el **Resumen**
+  (`SocioResumen`: últimas dispensas, cuenta, REPROCANN, próximo turno, contacto, última nota). En la
+  cabecera, **Dispensar** y **Escribirle**; debajo, **«Para atender»** (pedido del portal — `pedidos_portal`
+  en `GET /pacientes/:id`, sólo a quien confirma —, renovación, mensajes sin leer). `?tab=` sigue
+  abriendo cualquier solapa. El dispensador sigue viendo sólo las dispensas.
+- **Portal del paciente en el teléfono**: barra de abajo (Inicio · Reservar · Dispensas · Mensajes;
+  `PortalTabBar`), el menú de arriba queda para lo demás. **Inicio**: la reserva en curso con su estado y
+  «Reservar para hoy/mañana». **Reservar**: primero cuándo y dónde, botones − / + , resumen fijo con un
+  solo botón; «Volver a pedir lo mismo» desde una dispensa precarga lo que hay hoy (`?repetir=<id>`;
+  `stock_id` viaja en el detalle). **Mis dispensas**: por mes, con lo retirado este mes en un número.
+- `DsSwitch` (design system): interruptor accesible (`role="switch"`).
+- Specs: `portal_panel_spec.rb` (15), `portal_acceso_spec.rb` (+6: primera vez, la invitación sirve, la
+  espera de 10 min, portal cerrado, dos organizaciones); vitest `portalPanelAdmin` (12), `fichaSecciones`
+  (9), `portalPaciente` (+7), `portalReservar` (+4), `portalDispensa` (+2). Vistas en Playwright
+  (admin, ficha, cartel, el paciente en el teléfono pide, «Volver a pedir», apagar Reservar).
+
 ## Octubre 2026 (gj) — El catálogo del portal es «Reservar»: el paciente pide de la mesa para hoy o mañana y administración lo confirma (28-oct)
 
 - **Migración `PedidosDelPortalEnReservas`** (reversible, corre sola en el deploy): `reservas.user_id`

@@ -91,6 +91,8 @@ module Portal
       lote     = lote_de(item)
       genetica = stock&.genetica || lote&.genetica
       {
+        # «Volver a pedir lo mismo» (28-oct-2026): Reservar busca este producto en la mesa de hoy.
+        stock_id: item.stock_id,
         nombre:   nombre_de(item),
         forma:    FORMAS.fetch(stock&.forma_producto, 'Producto'),
         cantidad: item.cantidad.to_f,

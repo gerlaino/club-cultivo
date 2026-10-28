@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useRoute } from 'vue-router'
 
@@ -15,7 +15,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin, MessageCircle } from 'lucide-vue-next'
+  CalendarDays, UserCheck, RotateCcw, X, Check, FileHeart, KeyRound, MapPin, MessageCircle } from 'lucide-vue-next'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import SocioMedicos from '../components/pacientes/SocioMedicos.vue'
 import { reprocannCategoria, reprocannDias, reprocannPlazo } from '../composables/useReprocann.js'
@@ -32,6 +32,7 @@ import ChatConPaciente         from '../components/chat/ChatConPaciente.vue'
 import RenovacionPortalCard    from '../components/pacientes/RenovacionPortalCard.vue'
 import { useChatPacientesStore } from '../stores/chatPacientes'
 import SocioTabDirecciones     from '../components/pacientes/SocioTabDirecciones.vue'
+import SocioResumen            from '../components/pacientes/SocioResumen.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ProximoPasoReprocann      from '../components/pacientes/ProximoPasoReprocann.vue'
 import { reprocannSit, pacienteSit, vinculoSit } from '../composables/useSituacionPaciente.js'
@@ -47,7 +48,7 @@ const auth   = useAuthStore()
 const socioId   = Number(route.params.id)
 const loading   = ref(true)
 const error     = ref(null)
-const activeTab = ref(auth.user?.role === 'dispensador' ? 'dispensaciones' : 'info')
+const activeTab = ref(auth.user?.role === 'dispensador' ? 'dispensaciones' : 'resumen')
 
 const club       = useClubStore()
 // canEdit = lo de SALUD (REPROCANN, historia clínica): admin y médico. Los datos personales, el
@@ -109,6 +110,7 @@ const toast   = useToast()
 const ccRefreshKey = ref(0)
 function onDispensacionCreada() {
   ccRefreshKey.value++
+  resumenRef.value?.recargar?.()
   // La dispensa ya quedó; si la recarga falla, la ficha sigue con lo que tenía.
   store.fetchOne(socioId).catch(() => {})
 }
@@ -289,12 +291,14 @@ const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc262
 function avatarColor(id) { return AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length] }
 
 const ALL_TABS = [
+  // Lo que se ve al abrir la ficha (28-oct-2026): un vistazo de todo, sin entrar a ninguna sección.
+  { key: 'resumen',          label: 'Resumen',          icon: User,          primary: true },
   { key: 'info',             label: 'Datos',            icon: User,          primary: true },
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck,   primary: true },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill,          primary: true },
   { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'supervisor', 'dispensador'], primary: true },
   // El chat del portal con este paciente (27-oct-2026): sólo con el portal contratado (ver TABS).
-  { key: 'chat',             label: 'Chat',              icon: MessageCircle, roles: ['admin', 'supervisor'], primary: true },
+  { key: 'chat',             label: 'Chat del portal',   icon: MessageCircle, roles: ['admin', 'supervisor'], primary: true },
   // A dónde se le mandan los paquetes: varias, con nombre y una por defecto (Germán, 17-sep).
   { key: 'direcciones',      label: 'Direcciones',       icon: MapPin,        roles: ['admin', 'supervisor', 'medico', 'dispensador'] },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
@@ -302,7 +306,7 @@ const ALL_TABS = [
   { key: 'indicaciones',     label: 'Indicaciones',      icon: FileHeart,     roles: ['admin', 'medico', 'supervisor'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
-  { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico'] },
+  { key: 'timeline',         label: 'Historial',         icon: Clock,         roles: ['admin', 'medico'] },
   { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
   // Su cuenta del portal. Sólo aparece si la organización tiene el módulo (ver TABS).
   { key: 'portal',           label: 'Acceso al portal',  icon: KeyRound,      roles: ['admin', 'medico'] },
@@ -340,11 +344,50 @@ const chatPacientes = useChatPacientesStore()
 const chatSinLeer = computed(() => chatPacientes.bandeja.find(c => c.paciente.id === socioId)?.sin_leer || 0)
 watch(() => tieneTab('chat'), (si) => { if (si) { chatPacientes.escuchar(); chatPacientes.cargar() } }, { immediate: true })
 
-const TABS_PRIMARY = computed(() => TABS.value.filter(t => t.primary))
-const TABS_MORE    = computed(() => TABS.value.filter(t => !t.primary))
-const masOpen      = ref(false)
-const activeEnMas  = computed(() => TABS_MORE.value.some(t => t.key === activeTab.value))
-function elegirTab(key) { activeTab.value = key; masOpen.value = false }
+// ── Secciones (Germán, 28-oct-2026: «siento que tiene mil solapas, difícil encontrar las cosas») ──
+// Las 15 solapas quedan agrupadas en 5 secciones por lo que el admin viene a buscar. Las solapas
+// siguen siendo las mismas (y `?tab=` sigue abriendo cualquiera): cambia cómo se llega a ellas.
+// Una sección existe si el rol tiene al menos una de sus solapas.
+const SECCIONES = [
+  { key: 'resumen',   label: 'Resumen',             tabs: ['resumen'] },
+  { key: 'salud',     label: 'Salud',               tabs: ['reprocann', 'indicaciones', 'turnos', 'historia', 'notas', 'documentos'] },
+  { key: 'dispensas', label: 'Dispensas y cuenta',  tabs: ['dispensaciones', 'cuenta_corriente'] },
+  { key: 'mensajes',  label: 'Mensajes',            tabs: ['chat', 'correo'] },
+  { key: 'datos',     label: 'Datos y contacto',    tabs: ['info', 'direcciones', 'portal'] },
+  { key: 'historial', label: 'Historial de la ficha', tabs: ['timeline'], chica: true },
+]
+const secciones = computed(() => SECCIONES
+  .map(sec => ({ ...sec, visibles: sec.tabs.map(k => TABS.value.find(t => t.key === k)).filter(Boolean) }))
+  .filter(sec => sec.visibles.length))
+const seccionActual = computed(() => secciones.value.find(sec => sec.tabs.includes(activeTab.value)) || secciones.value[0])
+// La última solapa que se abrió en cada sección: volver a «Salud» vuelve a donde estabas.
+const ultimaDe = ref({})
+watch(activeTab, (k) => { const sec = SECCIONES.find(x => x.tabs.includes(k)); if (sec) ultimaDe.value[sec.key] = k })
+function irSeccion(sec) { activeTab.value = ultimaDe.value[sec.key] && sec.tabs.includes(ultimaDe.value[sec.key]) ? ultimaDe.value[sec.key] : sec.visibles[0].key }
+function badgeSeccion(sec) {
+  if (sec.key === 'salud')    return s.value?.renovacion_portal ? 1 : 0
+  if (sec.key === 'mensajes') return chatSinLeer.value
+  return 0
+}
+
+// «Para atender»: lo que espera algo de administración con este paciente, con el atajo a resolverlo.
+const paraAtender = computed(() => {
+  const items = []
+  if (s.value?.pedidos_portal) items.push({ key: 'pedido', texto: s.value.pedidos_portal === 1 ? 'Pidió desde el portal: falta confirmar' : `${s.value.pedidos_portal} pedidos del portal para confirmar`, to: '/reservas?estado=solicitada' })
+  if (s.value?.renovacion_portal && tieneTab('reprocann')) items.push({ key: 'renov', texto: 'Mandó su REPROCANN renovado', tab: 'reprocann' })
+  if (chatSinLeer.value && tieneTab('chat')) items.push({ key: 'chat', texto: chatSinLeer.value === 1 ? '1 mensaje sin leer' : `${chatSinLeer.value} mensajes sin leer`, tab: 'chat' })
+  return items
+})
+
+// Las dos cosas que más se hacen con un paciente, siempre a mano en la cabecera.
+const dispRef = ref(null)
+const puedeDispensar = computed(() => tieneTab('dispensaciones') && ['admin', 'dispensador', 'supervisor', 'super_admin'].includes(auth.user?.role) && !pendienteAprobacion.value)
+function dispensar() {
+  activeTab.value = 'dispensaciones'
+  nextTick(() => dispRef.value?.openCreate?.('dispensa'))
+}
+const tabEscribir = computed(() => tieneTab('chat') ? 'chat' : tieneTab('correo') ? 'correo' : null)
+const resumenRef = ref(null)
 
 // Solo montar el contenido de un tab si el rol actual tiene acceso a él
 const tabVisible = (key) => TABS.value.some(t => t.key === key)
@@ -426,6 +469,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           <button v-if="canEditDatos" class="sd__btn-edit" @click="abrirEditar()">
             <Pencil :size="14" :stroke-width="1.75" /> Editar
           </button>
+          <button v-if="tabEscribir" class="sd__btn-edit" data-testid="ficha-escribir" @click="activeTab = tabEscribir">
+            <MessageCircle :size="14" :stroke-width="1.75" /> Escribirle
+          </button>
+          <button v-if="puedeDispensar" class="sd__btn-dispensar" data-testid="ficha-dispensar" @click="dispensar">
+            <Pill :size="15" :stroke-width="2" /> Dispensar
+          </button>
         </div>
       </div>
 
@@ -454,43 +503,41 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         </div>
       </div>
 
-      <!-- Tabs: primarias inline + resto en "Más" -->
-      <div class="sd__tabs">
-        <button
-          v-for="tab in TABS_PRIMARY" :key="tab.key"
-          class="sd__tab"
-          :class="{ 'sd__tab--active': activeTab === tab.key }"
-          @click="activeTab = tab.key"
-        >
-          <component :is="tab.icon" :size="14" :stroke-width="1.75" />
+      <!-- Lo que espera algo de administración con este paciente (28-oct-2026). -->
+      <div v-if="paraAtender.length" class="sd__atender" data-testid="ficha-para-atender">
+        <strong class="sd__atender-t">Para atender</strong>
+        <template v-for="a in paraAtender" :key="a.key">
+          <RouterLink v-if="a.to" :to="a.to" class="sd__atender-item">{{ a.texto }}</RouterLink>
+          <button v-else type="button" class="sd__atender-item" @click="activeTab = a.tab">{{ a.texto }}</button>
+        </template>
+      </div>
+
+      <div class="sd__cuerpo" :class="{ 'sd__cuerpo--sin-nav': secciones.length < 2 }">
+      <!-- Secciones: 5 en vez de 15 solapas -->
+      <nav v-if="secciones.length > 1" class="sd__secciones" aria-label="Secciones de la ficha" data-testid="ficha-secciones">
+        <button v-for="sec in secciones" :key="sec.key" type="button" class="sd__sec"
+                :class="{ 'sd__sec--on': seccionActual?.key === sec.key, 'sd__sec--chica': sec.chica }"
+                :aria-current="seccionActual?.key === sec.key ? 'page' : undefined" @click="irSeccion(sec)">
+          {{ sec.label }}
+          <span v-if="badgeSeccion(sec)" class="sd__tab-badge">{{ badgeSeccion(sec) }}</span>
+        </button>
+      </nav>
+
+      <div class="sd__contenido">
+      <!-- Dentro de la sección, sus partes (sólo si tiene más de una) -->
+      <div v-if="seccionActual && seccionActual.visibles.length > 1" class="sd__subtabs" role="tablist">
+        <button v-for="tab in seccionActual.visibles" :key="tab.key" type="button" role="tab" class="sd__subtab"
+                :class="{ 'sd__subtab--on': activeTab === tab.key }" :aria-selected="activeTab === tab.key" @click="activeTab = tab.key">
           {{ tab.label }}
           <span v-if="tab.key === 'chat' && chatSinLeer" class="sd__tab-badge" data-testid="chat-sin-leer">{{ chatSinLeer }}</span>
           <span v-if="tab.key === 'reprocann' && s.renovacion_portal" class="sd__tab-badge" title="Renovación para revisar">1</span>
+          <span v-if="tab.key === 'notas' && store.notas.length" class="sd__tab-badge sd__tab-badge--gris">{{ store.notas.length }}</span>
         </button>
+      </div>
 
-        <div v-if="TABS_MORE.length" class="sd__tab-mas" @mouseleave="masOpen = false">
-          <button
-            class="sd__tab"
-            :class="{ 'sd__tab--active': activeEnMas }"
-            @click="masOpen = !masOpen"
-          >
-            <MoreHorizontal :size="14" :stroke-width="1.75" />
-            {{ activeEnMas ? (TABS_MORE.find(t => t.key === activeTab)?.label) : 'Más' }}
-            <ChevronDown :size="12" :stroke-width="2" />
-          </button>
-          <div v-if="masOpen" class="sd__tab-mas-menu">
-            <button
-              v-for="tab in TABS_MORE" :key="tab.key"
-              class="sd__tab-mas-item"
-              :class="{ 'sd__tab-mas-item--active': activeTab === tab.key }"
-              @click="elegirTab(tab.key)"
-            >
-              <component :is="tab.icon" :size="14" :stroke-width="1.75" />
-              {{ tab.label }}
-              <span v-if="tab.key === 'notas' && store.notas.length" class="sd__tab-badge">{{ store.notas.length }}</span>
-            </button>
-          </div>
-        </div>
+      <!-- ── Resumen ── -->
+      <div v-if="tieneTab('resumen') && activeTab === 'resumen'" class="sd__tab-content">
+        <SocioResumen ref="resumenRef" :s="s" :tabs="TABS.map(t => t.key)" @ir="(k) => { if (k === 'turnos' && !tieneTab('turnos')) return; activeTab = k }" />
       </div>
 
       <!-- ── Tab: Datos ── -->
@@ -621,6 +668,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       <div v-if="tieneTab('dispensaciones')" v-show="activeTab === 'dispensaciones'" class="sd__tab-content">
         <div class="sd__card">
           <Dispensaciones
+            ref="dispRef"
             :socio-id="socioId"
             :paciente-nombre="s ? `${s.nombre} ${s.apellido}`.trim() : ''"
             :saldo-cc="s?.saldo_cc ?? null"
@@ -813,6 +861,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
         <SocioTabPortal :socio-id="socioId" :nombre="s.nombre_completo" :acceso="s.acceso"
                         @actualizado="store.fetchOne(socioId)" />
       </div>
+      </div><!-- /sd__contenido -->
+      </div><!-- /sd__cuerpo -->
 
     </template>
 
@@ -874,6 +924,37 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__btn-tramite:hover:not(:disabled) { background: var(--c-leaf-50); }
 .sd__btn-tramite:disabled { opacity: .5; cursor: not-allowed; }
 
+/* Secciones (28-oct-2026) */
+.sd__cuerpo { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.5rem; align-items: start; margin-top: .25rem; }
+.sd__cuerpo--sin-nav { grid-template-columns: minmax(0, 1fr); }
+.sd__secciones { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 1rem; }
+.sd__sec { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 44px; padding: 0 .85rem;
+  border: none; border-radius: 10px; background: none; color: var(--c-slate-700); font: inherit; font-size: .95rem; font-weight: 500; text-align: left; cursor: pointer; }
+.sd__sec:hover { background: var(--c-slate-100); }
+.sd__sec--on { background: var(--c-leaf-100); color: var(--c-leaf-900); font-weight: 700; }
+.sd__sec--chica { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--c-slate-200); border-radius: 0; font-size: .85rem; color: var(--c-slate-500); }
+.sd__sec--chica.sd__sec--on { border-radius: 10px; }
+.sd__contenido { min-width: 0; }
+.sd__subtabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+.sd__subtab { display: inline-flex; align-items: center; gap: .35rem; min-height: 36px; padding: 0 .9rem; border-radius: 999px;
+  border: 1px solid var(--c-slate-300); background: var(--c-surface, #fff); color: var(--c-slate-700); font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; }
+.sd__subtab:hover { border-color: var(--c-leaf-500); }
+.sd__subtab--on { background: var(--c-leaf-800); border-color: var(--c-leaf-800); color: #fff; }
+.sd__tab-badge--gris { background: var(--c-slate-200) !important; color: var(--c-slate-700) !important; }
+.sd__atender { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1.4rem; padding: .8rem 1.1rem; margin-bottom: 1.25rem;
+  background: var(--c-amber-100); border: 1px solid #f3dcae; border-radius: 12px; }
+.sd__atender-t { font-size: .9rem; color: #7a4a0b; }
+.sd__atender-item { padding: 0; border: none; background: none; font: inherit; font-size: .9rem; color: #7a4a0b; text-decoration: underline; cursor: pointer; min-height: 32px; }
+.sd__btn-dispensar { display: inline-flex; align-items: center; gap: .4rem; min-height: 40px; padding: 0 1.1rem; border: none; border-radius: 10px;
+  background: var(--c-leaf-800); color: #fff; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; }
+.sd__btn-dispensar:hover { background: var(--c-leaf-900); }
+@media (max-width: 860px) {
+  .sd__cuerpo { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .sd__secciones { position: static; flex-direction: row; overflow-x: auto; gap: .35rem; padding-bottom: .25rem; scrollbar-width: none; }
+  .sd__sec { flex: 0 0 auto; white-space: nowrap; border: 1px solid var(--c-slate-200); }
+  .sd__sec--chica { margin-top: 0; padding-top: 0; border-radius: 10px; }
+}
+
 /* Alertas */
 .sd__alerta { display: flex; align-items: flex-start; gap: .75rem; padding: .875rem 1.1rem; border-radius: 12px; font-size: .875rem; margin-bottom: 1.25rem; }
 .sd__alerta--danger { background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; }
@@ -897,16 +978,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__alerta-check { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600; color: #78350f; cursor: pointer; white-space: nowrap; }
 .sd__alerta-check input { cursor: pointer; accent-color: #b45309; }
 
-/* Tabs */
-.sd__tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.5rem; flex-wrap: wrap; }
-.sd__tab { display: flex; align-items: center; gap: .4rem; padding: .65rem 1rem; border-radius: 8px 8px 0 0; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; background: none; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer; transition: all .15s; }
-.sd__tab-mas { position: relative; }
-.sd__tab-mas-menu { position: absolute; top: 100%; right: 0; z-index: 20; min-width: 190px; background: #fff; border: 1px solid var(--c-slate-200); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.12); padding: .3rem; margin-top: .2rem; }
-.sd__tab-mas-item { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .55rem .7rem; border: none; background: none; border-radius: 7px; font-size: .82rem; font-weight: 600; color: var(--c-slate-600); cursor: pointer; text-align: left; }
-.sd__tab-mas-item:hover { background: var(--c-slate-100); }
-.sd__tab-mas-item--active { background: #f0fdf4; color: #15803d; }
-.sd__tab:hover { color: var(--c-slate-900); background: var(--c-slate-50); }
-.sd__tab--active { color: #1b5e20; border-bottom-color: #1b5e20; }
+/* Contadores de las secciones y sus partes */
 .sd__tab-badge { background: #e8f5e9; color: #1b5e20; font-size: .65rem; font-weight: 700; padding: .1em .5em; border-radius: 999px; }
 
 /* Cards */

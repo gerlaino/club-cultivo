@@ -12,6 +12,13 @@ module Portal
   class ReservasController < BaseController
     DIAS = 30
 
+    # Pedir es de las organizaciones que atienden Reservar; cancelar uno que ya pidió, siempre.
+    before_action only: :create do
+      next if current_club.portal_reservar?
+
+      render json: { error: 'Tu organización no toma reservas desde el portal por ahora.' }, status: :forbidden
+    end
+
     def index
       return render json: { data: [], fechas_retiro: [] } if ficha.nil?
 

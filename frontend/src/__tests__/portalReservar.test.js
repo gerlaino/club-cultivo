@@ -8,7 +8,7 @@ import { createPinia, setActivePinia } from 'pinia'
 // confirma; sin el portal contratado, administración no ve nada de esto.
 
 const portal = {
-  getPortalCatalogo: vi.fn(), getPortalReservas: vi.fn(),
+  getPortalCatalogo: vi.fn(), getPortalReservas: vi.fn(), getPortalDispensa: vi.fn(),
   pedirPortalReserva: vi.fn(() => Promise.resolve({})), cancelarPortalReserva: vi.fn(() => Promise.resolve({})),
 }
 vi.mock('@/lib/portalApi', () => portal)
@@ -25,7 +25,9 @@ vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => ({ confirm }) }))
 vi.mock('../composables/useConfirm.js', () => ({ useConfirm: () => ({ confirm }) }))
 vi.mock('@/composables/useRecargaEnCambios', () => ({ useRecargaEnCambios: () => {} }))
 vi.mock('../composables/useRecargaEnCambios.js', () => ({ useRecargaEnCambios: () => {} }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), RouterLink: { template: '<a><slot /></a>' } }))
+const ruta = { query: {} }
+const routerReplace = vi.fn()
+vi.mock('vue-router', () => ({ useRoute: () => ruta, useRouter: () => ({ replace: routerReplace }), RouterLink: { template: '<a><slot /></a>' } }))
 
 const SEDES = [
   { sede_id: 1, sede: 'Centro', productos: [
@@ -38,7 +40,7 @@ const SEDES = [
 ]
 const dias = (hoy = true, manana = true) => [{ fecha: '2026-10-28', etiqueta: 'Hoy', libre: hoy }, { fecha: '2026-10-29', etiqueta: 'Mañana', libre: manana }]
 
-beforeEach(() => { vi.clearAllMocks(); setActivePinia(createPinia()) })
+beforeEach(() => { vi.clearAllMocks(); setActivePinia(createPinia()); ruta.query = {} })
 
 describe('Reservar (portal del paciente)', () => {
   async function montar({ fechas = dias(), pedidos = [] } = {}) {
@@ -109,6 +111,44 @@ describe('Reservar (portal del paciente)', () => {
     await w.find('[data-testid="cantidad"]').setValue('500')
     await w.find('[data-testid="pedir"]').trigger('click'); await flushPromises()
     expect(w.find('[role="alert"]').text()).toContain('Hoy no hay tanto')
+  })
+
+  it('los botones + y − cambian la cantidad de a uno', async () => {
+    const w = await montar()
+    await w.find('button[aria-label="Más Northern Lights"]').trigger('click')
+    await w.find('button[aria-label="Más Northern Lights"]').trigger('click')
+    await w.find('button[aria-label="Menos Northern Lights"]').trigger('click')
+    await w.find('[data-testid="pedir"]').trigger('click'); await flushPromises()
+    expect(portal.pedirPortalReserva).toHaveBeenCalledWith(expect.objectContaining({ items: [{ stock_id: 10, cantidad: 1 }] }))
+  })
+
+  it('«Volver a pedir lo mismo»: precarga lo de la dispensa en la sede donde está hoy', async () => {
+    ruta.query = { repetir: '42' }
+    portal.getPortalDispensa.mockResolvedValue({ items: [{ stock_id: 20, nombre: 'OG Kush', cantidad: 7, unidad: 'g' }] })
+    const w = await montar()
+
+    expect(portal.getPortalDispensa).toHaveBeenCalledWith('42')
+    expect(w.find('[data-testid="repetir-aviso"]').text()).toContain('Cargamos lo mismo')
+    await w.find('[data-testid="pedir"]').trigger('click'); await flushPromises()
+    expect(portal.pedirPortalReserva).toHaveBeenCalledWith(expect.objectContaining({ sede_id: 2, items: [{ stock_id: 20, cantidad: 7 }] }))
+  })
+
+  it('«Volver a pedir»: si hoy no está, lo dice y no carga nada', async () => {
+    ruta.query = { repetir: '42' }
+    portal.getPortalDispensa.mockResolvedValue({ items: [{ stock_id: 11, nombre: 'Gelato', cantidad: 5, unidad: 'g' }] })
+    const w = await montar()
+
+    expect(w.find('[data-testid="repetir-aviso"]').text()).toContain('hoy no está')
+    expect(w.find('[data-testid="pedir"]').exists()).toBe(false)
+  })
+
+  it('si la organización no atiende Reservar, muestra lo que hay pero no deja pedir', async () => {
+    const { usePortalClubStore } = await import('../stores/portalClub')
+    usePortalClubStore().club = { reservar: false }
+    const w = await montar()
+    expect(w.find('[data-testid="reservar-apagado"]').exists()).toBe(true)
+    expect(w.findAll('[data-testid="cantidad"]')).toHaveLength(0)
+    expect(w.text()).toContain('Northern Lights')
   })
 
   it('cancela el pedido que espera, con confirmación', async () => {

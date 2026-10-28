@@ -73,6 +73,8 @@ const FORMA_EMOJI = {
 }
 
 function openCreate(modo = 'dispensa') { modoModal.value = modo; showModal.value = true }
+// La ficha abre la dispensa desde su cabecera («Dispensar», 28-oct-2026).
+defineExpose({ openCreate, canDispensar })
 
 async function onDispensacionGuardada() {
   await loadDispensaciones()

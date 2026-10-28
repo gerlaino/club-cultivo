@@ -34,7 +34,7 @@
                   {{ verClave ? 'Ocultar' : 'Ver' }}
                 </button>
               </div>
-              <button type="button" class="hb-link pe__olvide" @click="irARecuperar">Me olvidé la clave</button>
+              <button type="button" class="hb-link pe__olvide" @click="irARecuperar('olvide')">Me olvidé la clave</button>
             </div>
 
             <Transition name="err"><div v-if="error" class="hb-error" role="alert">{{ error }}</div></Transition>
@@ -45,7 +45,14 @@
             </button>
           </form>
 
-          <p class="hb-pie">¿Es la primera vez? Entrá con el link que te mandó tu organización.</p>
+          <!-- La primera vez entra solo (28-oct-2026, el QR del mostrador): pone su DNI y le llega
+               el link a su mail. Es la misma puerta que «Me olvidé la clave». -->
+          <div class="pe__primera">
+            <p class="pe__primera-t">¿Es tu primera vez?</p>
+            <button type="button" class="hb-btn pe__primera-btn" data-testid="primera-vez" @click="irARecuperar('primera')">
+              Es mi primera vez
+            </button>
+          </div>
         </template>
 
         <!-- ── Paciente en más de una organización: elige después de validar ── -->
@@ -64,12 +71,16 @@
           <button type="button" class="hb-link pe__volver" @click="volverAEntrar">Usar otro DNI</button>
         </template>
 
-        <!-- ── Me olvidé la clave ── -->
+        <!-- ── Primera vez / Me olvidé la clave: DNI → link al mail ── -->
         <template v-else>
           <p class="hb-ceja">Portal del paciente</p>
-          <h1 class="hb-titulo">Elegí una clave nueva</h1>
+          <h1 class="hb-titulo">{{ modoLink === 'primera' ? 'Tu primera vez' : 'Elegí una clave nueva' }}</h1>
           <template v-if="!recuperacionEnviada">
-            <p class="hb-bajada">Poné tu DNI. Si tenés un mail cargado en tu organización, te mandamos un link para elegirla.</p>
+            <p class="hb-bajada">
+              {{ modoLink === 'primera'
+                ? 'Poné tu DNI y te mandamos a tu mail un link para elegir tu clave. Tiene que ser el mail que tiene cargado tu organización.'
+                : 'Poné tu DNI. Si tenés un mail cargado en tu organización, te mandamos un link para elegirla.' }}
+            </p>
             <form class="hb-form" novalidate @submit.prevent="recuperar">
               <div class="hb-campo">
                 <label class="hb-label" for="pe-dni-rec">DNI</label>
@@ -111,6 +122,7 @@ const cargando = ref(false)
 const error = ref(null)
 const organizaciones = ref([])
 const recuperacionEnviada = ref(null)
+const modoLink = ref('olvide')        // primera · olvide (el mismo pedido; cambia cómo se le habla)
 
 function mensajeDe(e, porDefecto) {
   if (!e?.response) return 'No hay conexión con el servidor. Probá de nuevo en un momento.'
@@ -135,7 +147,8 @@ async function entrar(organizacionId = null) {
   }
 }
 
-function irARecuperar() {
+function irARecuperar(modo) {
+  modoLink.value = modo
   error.value = null
   recuperacionEnviada.value = null
   paso.value = 'recuperar'
@@ -174,6 +187,10 @@ const inicial = (nombre) => (nombre || '?').trim().charAt(0).toUpperCase()
 }
 .pe__ojo:hover { color: var(--hb-tinta); }
 .pe__olvide { align-self: flex-end; margin-top: 2px; font-size: .82rem; background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.pe__primera { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--hb-regla); width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pe__primera-t { margin: 0; font-weight: 600; color: var(--hb-tinta); }
+.pe__primera-btn { width: 100%; background: transparent; color: var(--hb-verde); border: 1.5px solid var(--hb-verde); }
+.pe__primera-btn:hover:not(:disabled) { background: var(--hb-salvia-suave); }
 .pe__volver { margin-top: 14px; align-self: center; background: none; border: 0; cursor: pointer; font-size: .9rem; }
 
 .pe__orgs { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }

@@ -100,7 +100,10 @@
             <div v-if="d.envio?.costo" class="pdv__fila pdv__fila--suave"><span>Envío</span><span>{{ pesos(d.envio.costo) }}</span></div>
             <div class="pdv__fila pdv__fila--total"><span>Total</span><b>{{ pesos(d.total) }}</b></div>
           </section>
-          <section class="pdv__card">
+          <!-- «Volver a pedir lo mismo» (28-oct-2026): Reservar lo precarga con lo que hay hoy. -->
+          <RouterLink v-if="!d.anulada && club?.reservar !== false" :to="{ path: '/portal/reservar', query: { repetir: d.id } }"
+                      class="pdv__btn pdv__btn--lleno pdv__repetir" data-testid="volver-a-pedir">Volver a pedir lo mismo</RouterLink>
+          <section v-if="club?.mensajes !== false" class="pdv__card">
             <h3 class="pdv__h3">¿Tenés una consulta?</h3>
             <p class="pdv__nota">Escribile a la organización por esta dispensa.</p>
             <RouterLink :to="{ path: '/portal/mensajes', query: { dispensa: d.id } }" class="pdv__btn pdv__btn--lleno">Consultar</RouterLink>
@@ -118,10 +121,13 @@
 // sólo lo suyo, sin costo ni otros pacientes.
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { getPortalDispensa } from '@/lib/portalApi'
+import { usePortalClubStore } from '@/stores/portalClub'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
 const route = useRoute()
+const { club } = storeToRefs(usePortalClubStore())
 const d = ref(null)
 const cargando = ref(true)
 const error = ref(null)
@@ -168,6 +174,7 @@ onMounted(async () => {
   font-weight: 600; font-size: .88rem; text-decoration: none;
 }
 .pdv__btn--lleno { background: var(--p-marca); border-color: var(--p-marca); color: var(--p-papel); width: 100%; }
+.pdv__repetir { min-height: 52px; box-sizing: border-box; background: var(--p-marca-fuerte); border-color: var(--p-marca-fuerte); font-size: 1rem; }
 
 .pdv__grid { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
 .pdv__col { flex: 3 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }

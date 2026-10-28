@@ -5,13 +5,18 @@
     <div class="wpv__header">
       <div>
         <h1 class="wpv__title">Portal del paciente</h1>
-        <p class="wpv__subtitle">Qué ve tu gente cuando entra: genéticas, novedades y eventos</p>
+        <p class="wpv__subtitle">Lo que ven y pueden hacer tus pacientes desde su teléfono, y lo que espera que contestes.</p>
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="wpv__tabs">
-      <button v-for="tab in tabs" :key="tab.key" class="wpv__tab"
+    <!-- Si está listo, qué espera respuesta y quiénes entran (28-oct-2026). -->
+    <PortalPanelAdmin ref="panelRef" @editar="irA" />
+
+    <!-- Lo que ven: cada cosa en su pestaña -->
+    <section ref="contenidoRef" class="wpv__contenido" aria-labelledby="wpv-contenido-t">
+      <h2 id="wpv-contenido-t" class="wpv__contenido-t">Lo que ven tus pacientes</h2>
+    <div class="wpv__tabs" role="tablist">
+      <button v-for="tab in tabs" :key="tab.key" class="wpv__tab" role="tab" :aria-selected="activeTab === tab.key"
               :class="{ 'wpv__tab--active': activeTab === tab.key }" @click="activeTab = tab.key">
         <i :class="`bi ${tab.icon}`"></i>
         {{ tab.label }}
@@ -169,68 +174,44 @@
       </div>
     </div>
 
-    <!-- TAB: CONFIGURACIÓN -->
-    <div v-if="activeTab === 'config'" class="wpv__section">
+    <!-- TAB: PRESENTACIÓN -->
+    <div v-if="activeTab === 'presentacion'" class="wpv__section">
       <div class="wpv__section-header">
-        <h2 class="wpv__section-title">Configuración del portal</h2>
-        <p class="wpv__section-sub">Abrilo o cerralo, y contá quiénes son y cómo contactarlos.</p>
+        <div>
+          <h2 class="wpv__section-title">Presentá la organización</h2>
+          <p class="wpv__section-sub">Lo ven en el inicio de su portal. Se guarda solo al salir de cada campo.</p>
+        </div>
+        <span class="wpv__autosave" aria-live="polite">
+          <template v-if="savingConfig">Guardando…</template>
+          <template v-else-if="configSaved"><i class="bi bi-check-circle-fill"></i> Guardado</template>
+        </span>
       </div>
       <div class="wpv__config-grid">
         <div class="wpv__config-field wpv__config-field--full">
-          <label class="wpv__label">Estado del portal</label>
-          <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.vista_paciente_activa }">
-            <div class="wpv__web-status-info">
-              <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.vista_paciente_activa }"></div>
-              <div>
-                <div class="wpv__web-status-label">
-                  {{ configForm.vista_paciente_activa ? 'Portal abierto' : 'Portal cerrado' }}
-                </div>
-                <div class="wpv__web-status-sub">
-                  {{ configForm.vista_paciente_activa
-                     ? 'Tus pacientes entran con su cuenta y ven su credencial, sus turnos y lo que publiques acá.'
-                     : 'Tus pacientes NO pueden entrar. Al intentarlo les avisa que su organización lo tiene cerrado.' }}
-                </div>
-              </div>
-            </div>
-            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': configForm.vista_paciente_activa }"
-                    @click="configForm.vista_paciente_activa = !configForm.vista_paciente_activa">
-              <span class="wpv__toggle-thumb"></span>
-            </button>
-          </div>
-        </div>
-        <div class="wpv__config-field wpv__config-field--full">
-          <label class="wpv__label">Descripción de la organización</label>
-          <textarea v-model="configForm.descripcion_web" class="wpv__textarea" rows="4"
-                    placeholder="Contá quiénes son y qué hacen..."></textarea>
+          <label class="wpv__label" for="wpv-desc">Quiénes son</label>
+          <textarea id="wpv-desc" v-model="configForm.descripcion_web" class="wpv__textarea" rows="4"
+                    placeholder="Contá quiénes son y qué hacen..." @blur="guardarConfig"></textarea>
         </div>
         <div class="wpv__config-field">
-          <label class="wpv__label">WhatsApp</label>
-          <input v-model="configForm.whatsapp" class="wpv__input" placeholder="+54 9 11 xxxx-xxxx" />
+          <label class="wpv__label" for="wpv-wa">WhatsApp</label>
+          <input id="wpv-wa" v-model="configForm.whatsapp" class="wpv__input" placeholder="+54 9 11 xxxx-xxxx" @blur="guardarConfig" />
         </div>
         <div class="wpv__config-field">
-          <label class="wpv__label">Instagram</label>
-          <input v-model="configForm.instagram_url" class="wpv__input" placeholder="https://instagram.com/..." />
+          <label class="wpv__label" for="wpv-ig">Instagram</label>
+          <input id="wpv-ig" v-model="configForm.instagram_url" class="wpv__input" placeholder="https://instagram.com/..." @blur="guardarConfig" />
         </div>
         <div class="wpv__config-field">
-          <label class="wpv__label">Facebook</label>
-          <input v-model="configForm.facebook_url" class="wpv__input" placeholder="https://facebook.com/..." />
+          <label class="wpv__label" for="wpv-fb">Facebook</label>
+          <input id="wpv-fb" v-model="configForm.facebook_url" class="wpv__input" placeholder="https://facebook.com/..." @blur="guardarConfig" />
         </div>
         <div class="wpv__config-field">
-          <label class="wpv__label">Horarios de atención</label>
-          <textarea v-model="configForm.horarios_atencion" class="wpv__textarea" rows="3"
-                    placeholder="Lunes a viernes 10-18hs..."></textarea>
+          <label class="wpv__label" for="wpv-hs">Horarios de atención</label>
+          <textarea id="wpv-hs" v-model="configForm.horarios_atencion" class="wpv__textarea" rows="3"
+                    placeholder="Lunes a viernes 10-18hs..." @blur="guardarConfig"></textarea>
         </div>
-      </div>
-      <div class="wpv__config-footer">
-        <button class="wpv__save-btn" @click="guardarConfig" :disabled="savingConfig">
-          <span v-if="savingConfig">Guardando...</span>
-          <span v-else><i class="bi bi-check-lg"></i> Guardar cambios</span>
-        </button>
-        <transition name="fade">
-          <span v-if="configSaved" class="wpv__saved-msg"><i class="bi bi-check-circle-fill"></i> Cambios guardados</span>
-        </transition>
       </div>
     </div>
+    </section>
 
     <!-- MODAL NOTICIA -->
     <Teleport to="body">
@@ -414,7 +395,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { logger } from '../../utils/logger.js'
 import { useClubStore } from '../../stores/club'
 import { storeToRefs } from 'pinia'
@@ -432,23 +413,33 @@ async function verAsistentes(e) {
 import { useConfirm } from '../../composables/useConfirm.js'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import PortalPanelAdmin from '../../components/portal/PortalPanelAdmin.vue'
+import { useToast } from '../../composables/useToast.js'
 
 const { confirm } = useConfirm()
+const toast = useToast()
 const clubStore = useClubStore()
 const { data: club } = storeToRefs(clubStore)
-const activeTab = ref('config')
-// La configuración va PRIMERO: si el portal está cerrado, publicar variedades no sirve de nada.
-// Estaba última y se llamaba "Configuración" a secas, dentro de una sección que ya se llama
-// Configuración — el admin no encontraba dónde se abría el portal.
+// Abrir y cerrar el portal, y qué partes ofrece, viven en el panel de arriba y se guardan al tocarlos
+// (28-oct-2026: el interruptor de acá esperaba un «Guardar cambios» al pie y el portal «no quedaba
+// abierto»). Abajo, lo que ven: cada cosa en su pestaña.
 //
 // "Novedades" y no "Noticias": es como se llama en el portal que ve el paciente. Dos nombres para
 // la misma cosa es lo que ya costó caro en otras pantallas.
 const tabs = [
-  { key: 'config',    label: 'Configuración del portal', icon: 'bi-gear'           },
-  { key: 'geneticas', label: 'Genéticas',                icon: 'bi-diagram-3'      },
-  { key: 'noticias',  label: 'Novedades',                icon: 'bi-newspaper'      },
-  { key: 'eventos',   label: 'Eventos',                  icon: 'bi-calendar-event' },
+  { key: 'presentacion', label: 'Presentación', icon: 'bi-shop'           },
+  { key: 'geneticas',    label: 'Genéticas',    icon: 'bi-diagram-3'      },
+  { key: 'noticias',     label: 'Novedades',    icon: 'bi-newspaper'      },
+  { key: 'eventos',      label: 'Eventos',      icon: 'bi-calendar-event' },
 ]
+const activeTab    = ref('presentacion')
+const panelRef     = ref(null)
+const contenidoRef = ref(null)
+// Los botones del panel («Completar», «Elegir», «Publicar») llevan a su pestaña.
+function irA(tab) {
+  activeTab.value = tab
+  nextTick(() => contenidoRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
+}
 
 const geneticas        = ref([])
 const loadingGeneticas = ref(true)
@@ -472,7 +463,7 @@ const eventoImgFile    = ref(null)
 const eventoImgInput   = ref(null)
 const formEvento       = ref({ id: null, titulo: '', descripcion: '', fecha_inicio: '', fecha_fin: '', lugar: '', activo: true })
 
-const configForm   = ref({ descripcion_web: '', whatsapp: '', instagram_url: '', facebook_url: '', horarios_atencion: '', vista_paciente_activa: false })
+const configForm   = ref({ descripcion_web: '', whatsapp: '', instagram_url: '', facebook_url: '', horarios_atencion: '' })
 const savingConfig = ref(false)
 const configSaved  = ref(false)
 
@@ -547,8 +538,11 @@ async function toggleVisiblePaciente(g) {
   try {
     const { data } = await api.patch(`/geneticas/${g.id}`, { genetica: { visible_paciente: !g.visible_paciente } })
     g.visible_paciente = data.visible_paciente
-  } catch (e) { logger.error(e) }
-  finally { savingId.value = null }
+    panelRef.value?.recargar?.()
+  } catch (e) {
+    logger.error(e)
+    toast.error('No se pudo cambiar. Probá de nuevo.')
+  } finally { savingId.value = null }
 }
 
 function abrirModalNoticia(n = null) {
@@ -574,8 +568,12 @@ async function guardarNoticia() {
       await api.post('/noticias', fd, { headers })
     }
     await cargarNoticias()
+    panelRef.value?.recargar?.()
     modalNoticia.value = false
-  } catch (e) { logger.error(e) }
+  } catch (e) {
+    logger.error(e)
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar la novedad')
+  }
   finally { savingNoticia.value = false }
 }
 async function eliminarNoticia(n) {
@@ -583,6 +581,7 @@ async function eliminarNoticia(n) {
   if (!ok) return
   await api.delete(`/noticias/${n.id}`)
   await cargarNoticias()
+  panelRef.value?.recargar?.()
 }
 
 function abrirModalEvento(e = null) {
@@ -611,8 +610,12 @@ async function guardarEvento() {
       await api.post('/eventos', fd, { headers })
     }
     await cargarEventos()
+    panelRef.value?.recargar?.()
     modalEvento.value = false
-  } catch (e) { logger.error(e) }
+  } catch (e) {
+    logger.error(e)
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar el evento')
+  }
   finally { savingEvento.value = false }
 }
 async function eliminarEvento(e) {
@@ -620,20 +623,27 @@ async function eliminarEvento(e) {
   if (!ok) return
   await api.delete(`/eventos/${e.id}`)
   await cargarEventos()
+  panelRef.value?.recargar?.()
 }
 
+// Se guarda al salir de cada campo, sólo si algo cambió. Si falla, se dice: antes el error se
+// tragaba en silencio y la pantalla quedaba como si se hubiera guardado.
+let guardado = ''
 async function guardarConfig() {
+  const actual = JSON.stringify(configForm.value)
+  if (actual === guardado) return
   savingConfig.value = true
   try {
     await api.put('/preferences', { club: { ...configForm.value } })
-    // Actualizar el store local para que refleje los cambios
-    if (club.value) {
-      Object.assign(club.value, configForm.value)
-    }
+    guardado = actual
+    if (club.value) Object.assign(club.value, configForm.value)
     configSaved.value = true
     setTimeout(() => { configSaved.value = false }, 3000)
-  } catch (e) { logger.error(e) }
-  finally { savingConfig.value = false }
+    panelRef.value?.recargar?.()
+  } catch (e) {
+    logger.error(e)
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar. Probá de nuevo.')
+  } finally { savingConfig.value = false }
 }
 
 async function cargarGeneticas() {
@@ -672,8 +682,8 @@ onMounted(async () => {
       instagram_url:     data.instagram_url      || '',
       facebook_url:      data.facebook_url       || '',
       horarios_atencion: data.horarios_atencion  || '',
-      vista_paciente_activa:        data.vista_paciente_activa         || false,
     }
+    guardado = JSON.stringify(configForm.value)
   } catch (e) { logger.error(e) }
 })
 </script>
@@ -694,7 +704,10 @@ onMounted(async () => {
 .wpv__preview-btn:hover { opacity: .88; color: #e8f5e9; }
 .wpv__preview-btn--disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 
-.wpv__tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--c-slate-200); margin-bottom: 2rem; }
+.wpv__contenido { margin-top: 2.5rem; scroll-margin-top: 1rem; }
+.wpv__contenido-t { font-size: 1.15rem; font-weight: 700; color: var(--c-ink-900); margin: 0 0 1rem; }
+.wpv__autosave { font-size: 13px; color: var(--c-leaf-700); white-space: nowrap; }
+.wpv__tabs { flex-wrap: wrap; display: flex; gap: 4px; border-bottom: 1px solid var(--c-slate-200); margin-bottom: 2rem; }
 .wpv__tab {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 18px; border: none; background: none;

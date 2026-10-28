@@ -172,6 +172,11 @@ class PacientesController < ApplicationController
     } : nil
 
     json['acceso'] = acceso_json(@paciente)
+    # Lo que pidió desde el portal y espera que administración lo confirme (28-oct-2026): la ficha
+    # lo pone en «Para atender». Sólo a quien confirma (admin y supervisor).
+    if Reserva::ROLES_CONFIRMAN.include?(current_user.role)
+      json['pedidos_portal'] = @paciente.club.reservas.solicitadas.where(paciente_id: @paciente.id).count
+    end
 
     render json: { data: json }
   end

@@ -252,6 +252,7 @@ class PreferencesController < ApplicationController
       :fecha_resolucion_reprocann, :tipo_organizacion,
       :descripcion_web, :whatsapp, :instagram_url,
       :facebook_url, :horarios_atencion, :vista_paciente_activa,
+      :portal_reservar_activo, :portal_mensajes_activo,
       :benchmark_opt_in,
       # El SMTP NO va acá: se carga sólo por `conectar_email`, que prueba la casilla y valida
       # el servidor. Por el PUT general entraba cualquier host sin chequear.
@@ -284,6 +285,8 @@ class PreferencesController < ApplicationController
       facebook_url:                 club.facebook_url,
       horarios_atencion:            club.horarios_atencion,
       vista_paciente_activa:                   club.vista_paciente_activa,
+      portal_reservar_activo:                  club.portal_reservar_activo,
+      portal_mensajes_activo:                  club.portal_mensajes_activo,
       benchmark_opt_in:             club.benchmark_opt_in,
       features:                     club.features_expandidas,
       # Uso personal: el frontend cambia el envoltorio entero (menú, PWA, vocabulario) y la

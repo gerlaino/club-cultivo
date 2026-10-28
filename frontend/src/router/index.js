@@ -605,6 +605,18 @@ const routes = [
   // es lo que hace que el menú lateral resalte Configuración estando adentro: `detectGroup` va por
   // prefijo de ruta, y con la pestaña sacada esta pantalla caía en Dashboard.
   { path: "/alertas-configuracion", redirect: "/configuracion/alertas" },
+  // El cartel con QR del portal para el mostrador (28-oct-2026): se imprime, sin el menú alrededor.
+  {
+    path: "/configuracion/portal/cartel",
+    name: "config-portal-cartel",
+    component: () => import("../views/admin/PortalCartelView.vue"),
+    meta: { requiresAuth: true, fullscreen: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore();
+      if (auth.user?.role === "admin") next();
+      else next("/");
+    },
+  },
   {
     path: "/configuracion",
     component: () => import("../views/ConfiguracionView.vue"),

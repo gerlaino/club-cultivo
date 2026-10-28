@@ -91,18 +91,30 @@ class PortalAccesoController < ApplicationController
 
   # POST /api/portal_acceso/recuperar
   #
+  # «Me olvidé la clave» y «Es mi primera vez» son la misma puerta (Germán, 28-oct-2026: que el
+  # paciente entre solo con el QR del mostrador, sin esperar que alguien lo invite): el que ya
+  # eligió su clave recibe un link para cambiarla; el que nunca entró, la invitación.
+  #
   # Siempre contesta lo mismo: decir «ese DNI no está» le diría a cualquiera quién es paciente.
+  # Un link sin usar que se mandó hace menos de ESPERA_ENTRE_LINKS no se reemplaza: si no, cualquiera que
+  # tipee un DNI ajeno anula el link que la organización le acaba de mandar, y le llena el correo.
+  ESPERA_ENTRE_LINKS = 10.minutes
+
   def recuperar
     PortalAcceso::Cuentas.fichas(params[:dni]).each do |ficha|
-      next if ficha.email.blank? || ficha.user.nil?
+      next if ficha.email.blank?
 
-      ActsAsTenant.with_tenant(ficha.club) { PortalAcceso::Invitar.call(ficha, motivo: 'recuperacion') }
+      ActsAsTenant.with_tenant(ficha.club) do
+        next if ficha.accesos_portal.where(usado_at: nil, anulado_at: nil).where('created_at > ?', ESPERA_ENTRE_LINKS.ago).exists?
+
+        PortalAcceso::Invitar.call(ficha, motivo: ficha.portal_activado? ? 'recuperacion' : 'invitacion')
+      end
     end
 
     render json: {
       mensaje: 'Si tu DNI está en una organización con portal y tenés un mail cargado, te mandamos un link ' \
-               'para elegir una clave nueva. Vale por 6 horas. Si no te llega, pedile a tu organización ' \
-               'que te mande un link nuevo.',
+               'a ese mail para elegir tu clave. Si no te llega en unos minutos, pedile el link a tu ' \
+               'organización en el mostrador.',
     }
   end
 

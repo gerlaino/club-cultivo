@@ -25,6 +25,9 @@ module Portal
         instagram_url:     club.instagram_url,
         facebook_url:      club.facebook_url,
         whatsapp:          club.whatsapp,
+        # Qué partes del portal atiende la organización: la pantalla no ofrece las apagadas.
+        reservar:          club.portal_reservar?,
+        mensajes:          club.portal_mensajes?,
         logo_url: club.logo.attached? ? url_for(club.logo) : nil
       }
     end

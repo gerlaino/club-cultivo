@@ -10,6 +10,9 @@ require 'rails_helper'
 #     DNI y ahí elige la clave. Un link nuevo anula al anterior; 5 DNI equivocados lo tiran.
 #   - «Me olvidé la clave» con el DNI: si tiene mail, le llega un link. La respuesta es la misma
 #     exista o no el DNI.
+#   - «Es mi primera vez» (28-oct-2026, el QR del mostrador) es la misma puerta: el que nunca eligió
+#     su clave recibe la invitación, aunque nadie de la organización lo haya invitado. Un link de
+#     hace menos de 10 minutos no se reemplaza (no se le anula el que le acaban de mandar).
 #   - No entra: el dado de baja, el que no fue aprobado, el de una organización con el portal
 #     cerrado o sin contratar.
 RSpec.describe 'La entrada al portal del paciente', type: :request do
@@ -40,6 +43,7 @@ RSpec.describe 'La entrada al portal del paciente', type: :request do
     ActsAsTenant.with_tenant(paciente.club) do
       user = Pacientes::Acceso.crear!(paciente).user
       user.update!(password: clave, password_confirmation: clave)
+      AccesoPortal.emitir!(paciente).acceso.usar!
       paciente.reload
     end
   end
@@ -321,7 +325,7 @@ RSpec.describe 'La entrada al portal del paciente', type: :request do
       ActsAsTenant.with_tenant(club) { AccesoPortal.emitir!(paciente) }
 
       expect { recuperar('30111222') }.not_to have_enqueued_mail
-      expect(AccesoPortal.unscoped.where(paciente_id: paciente.id, anulado_at: nil).count).to eq(1)
+      expect(AccesoPortal.unscoped.where(paciente_id: paciente.id, usado_at: nil, anulado_at: nil).count).to eq(1)
     end
 
     it 'el link que manda sirve para elegir la clave nueva' do
@@ -339,6 +343,60 @@ RSpec.describe 'La entrada al portal del paciente', type: :request do
       entrar('30111222', 'clave-recuperada')
 
       expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+
+    it 'primera vez: sin cuenta todavía, con mail cargado, le llega la invitación' do
+      paciente = ficha!
+
+      expect { recuperar('30111222') }.to have_enqueued_mail(AccesoMailer, :portal_link)
+      expect(AccesoPortal.unscoped.where(paciente_id: paciente.id).last.motivo).to eq('invitacion')
+    end
+
+    it 'primera vez: la invitación que le llega sirve para elegir su clave y entrar' do
+      paciente = ficha!
+      token = nil
+      allow(AccesoMailer).to receive(:portal_link).and_wrap_original do |m, **kw|
+        token = kw[:token]
+        m.call(**kw)
+      end
+
+      recuperar('30111222')
+      post "/api/portal_acceso/links/#{token}/activar",
+           params: { dni: '30111222', password: 'mi-primera-clave', password_confirmation: 'mi-primera-clave' }, as: :json
+      reset!
+      entrar('30111222', 'mi-primera-clave')
+
+      expect(quien_soy).to eq(sin_tenant { paciente.reload.user.email })
+    end
+
+    it 'un link de hace menos de 10 minutos no se reemplaza: no se le anula el que le mandaron' do
+      paciente = ficha!
+      ActsAsTenant.with_tenant(club) { AccesoPortal.emitir!(paciente) }
+
+      expect { recuperar('30111222') }.not_to have_enqueued_mail
+      expect(AccesoPortal.unscoped.where(paciente_id: paciente.id, anulado_at: nil).count).to eq(1)
+    end
+
+    it 'pasados los 10 minutos sí se manda uno nuevo' do
+      paciente = ficha!
+      ActsAsTenant.with_tenant(club) { AccesoPortal.emitir!(paciente) }
+
+      travel 11.minutes do
+        expect { recuperar('30111222') }.to have_enqueued_mail(AccesoMailer, :portal_link)
+      end
+    end
+
+    it 'primera vez en una organización con el portal cerrado: no se manda nada' do
+      ficha!(en: club!('Cerrada', abierto: false))
+
+      expect { recuperar('30111222') }.not_to have_enqueued_mail
+    end
+
+    it 'paciente en dos organizaciones con portal: le llega un link de cada una' do
+      ficha!
+      ficha!(en: club!('Mitocondria'))
+
+      expect { recuperar('30111222') }.to have_enqueued_mail(AccesoMailer, :portal_link).twice
     end
   end
 end

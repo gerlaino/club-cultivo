@@ -6,7 +6,8 @@
       <RouterView />
     </main>
     <PortalFooter />
-    <PortalChatBoton />
+    <PortalChatBoton v-if="club?.mensajes !== false" class="pt__chat" />
+    <PortalTabBar />
   </div>
 </template>
 
@@ -19,12 +20,15 @@
 //      meses, el admin lo edita, viaja en el endpoint — y no lo leía ninguna pantalla de la app.
 //      Acá sí: es la diferencia entre "una app donde está mi club" y "el portal de mi club".
 //   3. Monta la franja de avisos, que se dibuja sola sólo si hay algo que decir.
+//   4. En el teléfono, la barra de abajo con lo que el paciente viene a hacer (28-oct-2026); el
+//      botón flotante del chat queda para la compu, donde no hay barra.
 import { computed, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import PortalNavBar from '@/components/portal/PortalNavBar.vue'
 import PortalFooter from '@/components/portal/PortalFooter.vue'
 import PortalAvisos from '@/components/portal/PortalAvisos.vue'
 import PortalChatBoton from '@/components/portal/PortalChatBoton.vue'
+import PortalTabBar from '@/components/portal/PortalTabBar.vue'
 import { usePortalChatStore } from '@/stores/portalChat'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { storeToRefs } from 'pinia'
@@ -76,4 +80,9 @@ function mezclarConBlanco(hex, cuanto) { return aHex(partes(hex).map(v => v + (2
 }
 
 .pt__main { flex: 1; }
+/* Lugar para la barra de abajo: el pie y el último botón no quedan tapados. */
+@media (max-width: 859px) {
+  .pt { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .pt__chat { display: none; }
+}
 </style>

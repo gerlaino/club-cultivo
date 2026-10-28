@@ -9,6 +9,13 @@ module Portal
   class MensajesController < BaseController
     LIMITE = 200
 
+    # Escribir es de las organizaciones que atienden Mensajes; leer lo que ya se habló, siempre.
+    before_action only: :create do
+      next if current_club.portal_mensajes?
+
+      render json: { error: 'Tu organización no atiende mensajes desde el portal por ahora.' }, status: :forbidden
+    end
+
     def index
       return render json: { data: [], conversacion: MensajePacienteSerializer.conversacion(nil), sin_leer: 0 } if ficha.nil?
 

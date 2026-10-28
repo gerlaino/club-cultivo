@@ -13,6 +13,23 @@
         terminó de cargar tu ficha.
       </p>
 
+      <!-- ── A2 · Lo que tiene en curso y reservar (28-oct-2026) ─────────────
+           La reserva que espera o ya está confirmada, y el botón para pedir el día que le queda. -->
+      <RouterLink v-for="r in enCurso" :key="r.id" to="/portal/reservar" class="pmi__reserva" data-testid="inicio-reserva">
+        <span class="pmi__ficha-l">Tu reserva</span>
+        <span class="pmi__reserva-t">{{ cuando(r.fecha) }}<template v-if="r.sede"> · {{ r.sede }}</template></span>
+        <span class="pmi__ficha-b">{{ resumenReserva(r) }}</span>
+        <span class="pmi__estado" :class="`pmi__estado--${r.estado}`">{{ r.estado === 'solicitada' ? 'Esperando confirmación' : 'Confirmada: pasá a retirarla' }}</span>
+      </RouterLink>
+
+      <RouterLink v-if="ofrecerReservar" to="/portal/reservar" class="pmi__cta" data-testid="inicio-reservar">
+        <span>
+          <span class="pmi__cta-t">Reservar para {{ diaLibre.etiqueta.toLowerCase() }}</span>
+          <span class="pmi__cta-s">{{ otroDiaTomado ? `${otroDiaTomado.etiqueta} ya tenés una` : 'Elegí de lo que hay en la sede' }}</span>
+        </span>
+        <ChevronRight :size="22" :stroke-width="2" aria-hidden="true" />
+      </RouterLink>
+
       <!-- ── B · Lo mío ─────────────────────────────────────────────────── -->
       <section class="pmi__sec">
         <h2 class="pmi__sec-t">Lo mío</h2>
@@ -107,16 +124,19 @@ import { fechaLocal } from '../../utils/dates.js'
 // boletín está VACÍO en cualquier organización que no publique —que son casi todas, casi todas las
 // semanas—. Su estado no está vacío nunca.
 //
-// Así que el orden es: quién soy y si puedo retirar (la credencial) · lo mío que viene (turno,
-// indicación, cuenta, retiros) · lo que publica el club, en dos renglones y con "ver todo".
+// Así que el orden es: quién soy y si puedo retirar (la credencial) · lo que tengo reservado y el
+// botón para reservar (28-oct-2026) · lo mío que viene (turno, indicación, cuenta, retiros) · lo que
+// publica el club, en dos renglones y con "ver todo".
 //
 // El boletín no se perdió: es `/portal/organizacion`, la misma pantalla, con su entrada en la barra.
 import { ref, computed, onMounted } from 'vue'
 import { CalendarClock, ClipboardList, Wallet, PackageCheck, ChevronRight } from 'lucide-vue-next'
 import {
   getPortalMiEstado, getPortalMiSalud, getPortalCuentaCorriente,
-  getPortalHistorial, getPortalNoticias, getPortalEventos,
+  getPortalHistorial, getPortalNoticias, getPortalEventos, getPortalReservas,
 } from '@/lib/portalApi'
+import { storeToRefs } from 'pinia'
+import { usePortalClubStore } from '@/stores/portalClub'
 import PortalCredencial from '@/components/portal/PortalCredencial.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
@@ -128,6 +148,23 @@ const cc         = ref(null)
 const retiros    = ref([])
 const noticias   = ref([])
 const eventos    = ref([])
+const reservas   = ref([])
+const dias       = ref([])
+const { club }   = storeToRefs(usePortalClubStore())
+
+// Lo que tiene en curso: esperando confirmación o confirmada, de hoy en adelante.
+const enCurso = computed(() => reservas.value
+  .filter(r => ['solicitada', 'pendiente'].includes(r.estado) && dias.value.some(d => d.fecha === r.fecha))
+  .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))))
+// Los días los manda el backend (hoy y mañana, una reserva por día): se ofrece el primero libre.
+const diaLibre      = computed(() => dias.value.find(d => d.libre) || null)
+const otroDiaTomado = computed(() => dias.value.find(d => !d.libre) || null)
+const ofrecerReservar = computed(() => club.value?.reservar !== false && !!diaLibre.value)
+const cuando = (fecha) => dias.value.find(d => d.fecha === fecha)?.etiqueta || fechaCorta(fecha)
+function resumenReserva(r) {
+  const items = (r.items || []).map(i => `${i.nombre} ${Number(i.cantidad).toLocaleString('es-AR')} ${i.unidad}`)
+  return [items.join(' + '), r.total_estimado ? pesos(r.total_estimado) : null].filter(Boolean).join(' · ')
+}
 
 const ultimoRetiro = computed(() => retiros.value[0] || null)
 const destacado    = computed(() => noticias.value[0] || null)
@@ -160,9 +197,9 @@ const pesos = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currenc
 onMounted(async () => {
   // Seis llamadas y ninguna hace caer a las otras: sin módulo médico no hay turno, y el resto de
   // la pantalla tiene que salir igual.
-  const [est, sal, cta, his, not, eve] = await Promise.allSettled([
+  const [est, sal, cta, his, not, eve, res] = await Promise.allSettled([
     getPortalMiEstado(), getPortalMiSalud(), getPortalCuentaCorriente(),
-    getPortalHistorial(), getPortalNoticias(), getPortalEventos(),
+    getPortalHistorial(), getPortalNoticias(), getPortalEventos(), getPortalReservas(),
   ])
 
   if (est.status === 'fulfilled') credencial.value = est.value?.credencial || null
@@ -174,6 +211,10 @@ onMounted(async () => {
   if (his.status === 'fulfilled') retiros.value  = his.value || []
   if (not.status === 'fulfilled') noticias.value = not.value || []
   if (eve.status === 'fulfilled') eventos.value  = eve.value || []
+  if (res.status === 'fulfilled') {
+    reservas.value = res.value?.data || []
+    dias.value     = res.value?.fechas_retiro || []
+  }
 
   cargando.value = false
 })
@@ -227,6 +268,25 @@ onMounted(async () => {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pmi__chev { color: var(--p-tenue); flex: 0 0 auto; }
+
+/* La reserva en curso y el botón de reservar: lo que más se hace desde el teléfono. */
+.pmi__reserva {
+  display: flex; flex-direction: column; gap: 2px; margin-top: var(--sp-4); padding: var(--sp-4);
+  background: var(--p-papel); border: 1px solid var(--p-linea); border-radius: var(--p-radio-sm);
+  text-decoration: none; color: inherit;
+}
+.pmi__reserva-t { font-weight: 700; font-size: var(--fs-16); }
+.pmi__estado { align-self: flex-start; margin-top: var(--sp-2); padding: 3px 10px; border-radius: 999px; font-size: var(--fs-12); font-weight: 700; }
+.pmi__estado--solicitada { background: var(--p-atencion-bg); color: color-mix(in srgb, var(--p-atencion) 55%, var(--p-tinta)); }
+.pmi__estado--pendiente  { background: var(--p-marca-suave); color: var(--p-marca-fuerte); }
+.pmi__cta {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  margin-top: var(--sp-4); min-height: 68px; padding: var(--sp-3) var(--sp-5);
+  background: var(--p-marca-fuerte); color: var(--p-papel); border-radius: var(--p-radio-sm); text-decoration: none;
+}
+.pmi__cta:hover { background: var(--p-marca); }
+.pmi__cta-t { display: block; font-weight: 700; font-size: var(--fs-16); }
+.pmi__cta-s { display: block; font-size: var(--fs-13); opacity: .85; }
 
 /* Mi organización: texto, sin foto. La foto está en la sección; acá compite con la credencial. */
 .pmi__nota {

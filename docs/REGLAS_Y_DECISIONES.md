@@ -1676,6 +1676,20 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **EL PORTAL SE ARMA EN UNA PANTALLA Y LOS INTERRUPTORES GUARDAN AL TOCARLOS** (Germán, 28-oct-2026: «no
+  es alguien de sistemas»). `/configuracion/portal` dice si está listo (pasos deducidos de lo cargado,
+  no guardados), qué espera respuesta y quiénes entran, con la acción al lado (`Portal::Panel`). Un
+  interruptor que espera un «Guardar» al pie parece roto: se guarda al tocarlo y el error se dice.
+  Reservar y Mensajes **piden que alguien conteste**: la organización que no los va a atender los
+  apaga (`portal_reservar_activo`, `portal_mensajes_activo`) y no aparecen; credencial, REPROCANN y
+  dispensas no se apagan. El paciente puede **entrar solo la primera vez** (DNI → link a su mail,
+  la misma puerta que «Me olvidé la clave»), por eso el cartel con QR del mostrador: nadie tiene que
+  acordarse de invitarlo. Para «ver lo que ve el paciente» se usa un paciente de verdad (el admin se
+  carga a sí mismo): una previsualización que no es la pantalla real miente.
+- **LA FICHA DEL PACIENTE VA POR SECCIONES** (Germán, 28-oct-2026: «tiene mil solapas»): Resumen · Salud ·
+  Dispensas y cuenta · Mensajes · Datos y contacto (+ el historial, chico). Una solapa nueva entra en
+  una sección, no se suma a la fila. Dispensar y Escribirle siempre en la cabecera; lo que espera algo
+  de administración, en «Para atender».
 - **EL CATÁLOGO ES «RESERVAR»** (Germán, 28-oct-2026). `/portal/reservar` (el viejo `/portal/catalogo`
   redirige) muestra la mesa de cada sede y de ahí se pide. Reglas:
   - **el paciente elige la sede y retira HOY o MAÑANA, nunca más allá** (`Reserva.fechas_portal`, viaja

@@ -80,6 +80,8 @@ Rails.application.routes.draw do
     get  'portal_acceso/links/:token',         to: 'portal_acceso#link'
     post 'portal_acceso/links/:token/activar', to: 'portal_acceso#activar'
     post 'portal_acceso/recuperar',           to: 'portal_acceso#recuperar'
+    # La pantalla del portal del lado del admin (28-oct-2026).
+    get  'portal_panel',                      to: 'portal_panel#show'
 
     # La bandeja del chat con los pacientes (ver MensajesPacientesController).
     get 'mensajes_pacientes', to: 'mensajes_pacientes#index'

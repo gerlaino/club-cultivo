@@ -586,6 +586,11 @@ class Club < ApplicationRecord
     feature?(:vista_paciente) && vista_paciente_activa?
   end
 
+  # Las partes del portal que piden que alguien conteste (Germán, 28-oct-2026, «Armá tu portal»):
+  # la organización que no las va a atender las apaga y no aparecen. Lo demás no se apaga.
+  def portal_reservar? = portal_paciente_disponible? && portal_reservar_activo?
+  def portal_mensajes? = portal_paciente_disponible? && portal_mensajes_activo?
+
   def habilitar_portal_para_todos
     HabilitarPortalJob.perform_later(id)
   end

@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   getPortalEventos: vi.fn(),
   getPortalGeneticas: vi.fn(),
   getPortalClub: vi.fn(),
+  getPortalReservas: vi.fn(),
 }))
 vi.mock('@/lib/portalApi', () => api)
 vi.mock('../lib/portalApi', () => api)
@@ -37,6 +38,7 @@ import { usePortalClubStore } from '../stores/portalClub'
 import PortalNavBar from '../components/portal/PortalNavBar.vue'
 import PortalFooter from '../components/portal/PortalFooter.vue'
 import PortalAvisos from '../components/portal/PortalAvisos.vue'
+import PortalTabBar from '../components/portal/PortalTabBar.vue'
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -66,6 +68,7 @@ beforeEach(() => {
   api.getPortalEventos.mockResolvedValue([])
   api.getPortalGeneticas.mockResolvedValue([])
   api.getPortalClub.mockResolvedValue({ name: 'Club Verde' })
+  api.getPortalReservas.mockResolvedValue({ data: [], fechas_retiro: [] })
 })
 
 // La ficha de la organización la pide el shell UNA vez y la comparten la barra y el pie. En un
@@ -182,6 +185,42 @@ describe('El inicio del portal', () => {
   })
 
   // A quien paga siempre al contado, una sección con saldo cero le hace creer que debe algo.
+  // 28-oct-2026: lo que tiene reservado y el botón para reservar el día que le queda.
+  it('muestra la reserva que espera confirmación y ofrece reservar el otro día', async () => {
+    api.getPortalReservas.mockResolvedValue({
+      data: [{ id: 3, estado: 'solicitada', fecha: '2026-10-29', sede: 'Centro', total_estimado: 12000,
+               items: [{ nombre: 'Northern Lights', cantidad: 10, unidad: 'g' }] }],
+      fechas_retiro: [{ fecha: '2026-10-28', etiqueta: 'Hoy', libre: true }, { fecha: '2026-10-29', etiqueta: 'Mañana', libre: false }],
+    })
+    const w = montar(PortalHomeView)
+    await flushPromises()
+
+    expect(w.find('[data-testid="inicio-reserva"]').text()).toContain('Mañana · Centro')
+    expect(w.find('[data-testid="inicio-reserva"]').text()).toContain('Esperando confirmación')
+    expect(w.find('[data-testid="inicio-reservar"]').text()).toContain('Reservar para hoy')
+    expect(w.find('[data-testid="inicio-reservar"]').text()).toContain('Mañana ya tenés una')
+  })
+
+  it('con los dos días tomados no ofrece reservar', async () => {
+    api.getPortalReservas.mockResolvedValue({
+      data: [],
+      fechas_retiro: [{ fecha: '2026-10-28', etiqueta: 'Hoy', libre: false }, { fecha: '2026-10-29', etiqueta: 'Mañana', libre: false }],
+    })
+    const w = montar(PortalHomeView)
+    await flushPromises()
+
+    expect(w.find('[data-testid="inicio-reservar"]').exists()).toBe(false)
+  })
+
+  it('si la organización no atiende Reservar, el inicio no lo ofrece', async () => {
+    conClub({ name: 'Club Verde', reservar: false })
+    api.getPortalReservas.mockResolvedValue({ data: [], fechas_retiro: [{ fecha: '2026-10-28', etiqueta: 'Hoy', libre: true }] })
+    const w = montar(PortalHomeView)
+    await flushPromises()
+
+    expect(w.find('[data-testid="inicio-reservar"]').exists()).toBe(false)
+  })
+
   it('no ofrece la cuenta si la organización no se la abrió', async () => {
     const w = montar(PortalHomeView)
     await flushPromises()
@@ -308,13 +347,41 @@ describe('Mi organización — el boletín, que dejó de ser el inicio', () => {
 
 describe('La barra y el pie', () => {
   // Eran ocho entradas, cinco de ellas del boletín. Con ocho, ninguna se lee.
-  // 28-oct-2026: el catálogo es «Reservar» (Germán).
+  // 28-oct-2026: el catálogo es «Reservar» (Germán), y va segundo: es lo que más se hace.
   it('la barra lleva lo del paciente y una sola entrada al boletín', async () => {
     const w = montar(PortalNavBar)
     await flushPromises()
 
     const links = w.findAll('.pnb__nav .pnb__link').map(a => a.text())
-    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis dispensas', 'Mensajes', 'Reservar', 'Mi organización'])
+    expect(links).toEqual(['Inicio', 'Reservar', 'Mis dispensas', 'Mensajes', 'Mi salud', 'Mi organización'])
+  })
+
+  // «Armá tu portal» (28-oct-2026): lo que la organización no atiende no aparece.
+  it('sin Reservar ni Mensajes prendidos, la barra no los ofrece', async () => {
+    conClub({ name: 'Club Verde', reservar: false, mensajes: false })
+    const w = montar(PortalNavBar)
+    await flushPromises()
+
+    const links = w.findAll('.pnb__nav .pnb__link').map(a => a.text())
+    expect(links).not.toContain('Reservar')
+    expect(links).not.toContain('Mensajes')
+  })
+
+  // El rediseño del teléfono: abajo, las cuatro cosas que viene a hacer.
+  it('la barra de abajo del teléfono: Inicio, Reservar, Dispensas y Mensajes', async () => {
+    conClub({ name: 'Club Verde', reservar: true, mensajes: true })
+    const w = montar(PortalTabBar)
+    await flushPromises()
+
+    expect(w.findAll('.ptb__tab').map(a => a.text())).toEqual(['Inicio', 'Reservar', 'Dispensas', 'Mensajes'])
+  })
+
+  it('la barra de abajo sin Reservar ni Mensajes deja Inicio y Dispensas', async () => {
+    conClub({ name: 'Club Verde', reservar: false, mensajes: false })
+    const w = montar(PortalTabBar)
+    await flushPromises()
+
+    expect(w.findAll('.ptb__tab').map(a => a.text())).toEqual(['Inicio', 'Dispensas'])
   })
 
   it('la barra ofrece la cuenta sólo si la organización se la abrió', async () => {

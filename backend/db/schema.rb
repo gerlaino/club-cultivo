@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_28_150000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_28_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -612,6 +612,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_28_150000) do
     t.datetime "archivada_at"
     t.integer "packs_pacientes_extra", default: 0, null: false
     t.integer "sedes_extra", default: 0, null: false
+    t.boolean "portal_reservar_activo", default: true, null: false
+    t.boolean "portal_mensajes_activo", default: true, null: false
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_clubs_on_deleted_by_id"

@@ -22,7 +22,7 @@
 
     <!-- Teléfono -->
     <nav v-if="abierto" class="pnb__movil" aria-label="Secciones">
-      <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}<span v-if="l.chat && sinLeer" class="pnb__badge">{{ sinLeer }}</span></RouterLink>
+      <RouterLink v-for="l in delMenu" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <div class="pnb__msep"></div>
       <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <RouterLink to="/portal/cuenta" class="pnb__mlink" @click="abierto = false">Mis datos</RouterLink>
@@ -32,6 +32,9 @@
 </template>
 
 <script setup>
+// En el teléfono, lo de todos los días va en la barra de abajo (`PortalTabBar`) y este menú queda
+// para lo demás. En la compu, todo arriba.
+//
 // La barra separa dos cosas que no son lo mismo: lo que es DEL PACIENTE y lo que PUBLICA la
 // organización. Sin esa línea en el medio, "Eventos" y "Mis retiros" parecen la misma clase de
 // cosa.
@@ -61,20 +64,21 @@ const abierto = ref(false)
 const tieneCC = ref(false)
 
 // Lo suyo primero, y la organización al final: es el mismo orden que el inicio.
-const MIAS = [
-  { to: '/portal',           txt: 'Inicio' },
-  { to: '/portal/mi-salud',  txt: 'Mi salud' },
-  { to: '/portal/historial', txt: 'Mis dispensas' },
-  { to: '/portal/mensajes',  txt: 'Mensajes', chat: true },
-]
-
+// Reservar y Mensajes, sólo si la organización los atiende (28-oct-2026, «Armá tu portal»).
 const conCuenta = computed(() => [
-  ...MIAS,
+  { to: '/portal',           txt: 'Inicio' },
+  ...(club.value?.reservar === false ? [] : [{ to: '/portal/reservar', txt: 'Reservar' }]),
+  { to: '/portal/historial', txt: 'Mis dispensas' },
+  ...(club.value?.mensajes === false ? [] : [{ to: '/portal/mensajes', txt: 'Mensajes', chat: true }]),
+  { to: '/portal/mi-salud',  txt: 'Mi salud' },
   ...(tieneCC.value ? [{ to: '/portal/cuenta-corriente', txt: 'Mi cuenta' }] : []),
 ])
 
+// En el teléfono, lo de la barra de abajo no se repite en el menú: queda lo demás.
+const EN_LA_BARRA = ['/portal', '/portal/reservar', '/portal/historial', '/portal/mensajes']
+const delMenu = computed(() => conCuenta.value.filter(l => !EN_LA_BARRA.includes(l.to)))
+
 const DE_LA_ORG = [
-  { to: '/portal/reservar',     txt: 'Reservar' },
   { to: '/portal/organizacion', txt: 'Mi organización' },
 ]
 

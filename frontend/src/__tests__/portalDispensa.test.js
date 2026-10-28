@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { createPinia, setActivePinia } from 'pinia'
 
 // EL DETALLE DE UNA DISPENSA EN EL PORTAL (27-oct-2026).
 //
@@ -51,10 +52,23 @@ async function abrir() {
   return w
 }
 
-beforeEach(() => api.getPortalDispensa.mockClear())
+beforeEach(() => { api.getPortalDispensa.mockClear(); setActivePinia(createPinia()) })
 enableAutoUnmount(afterEach)
 
 describe('El detalle de una dispensa', () => {
+  // 28-oct-2026: «Volver a pedir lo mismo» lleva a Reservar con la dispensa para precargarla.
+  it('ofrece volver a pedir lo mismo, que lleva a Reservar con esta dispensa', async () => {
+    api.getPortalDispensa.mockResolvedValue(DISPENSA)
+    const w = await abrir()
+    expect(w.find('[data-testid="volver-a-pedir"]').attributes('href')).toBe('/portal/reservar?repetir=842')
+  })
+
+  it('una dispensa anulada no se vuelve a pedir', async () => {
+    api.getPortalDispensa.mockResolvedValue({ ...DISPENSA, anulada: true })
+    const w = await abrir()
+    expect(w.find('[data-testid="volver-a-pedir"]').exists()).toBe(false)
+  })
+
   it('pide la dispensa de la URL y muestra número, fecha y cómo se pagó', async () => {
     api.getPortalDispensa.mockResolvedValue(DISPENSA)
     const w = await abrir()
