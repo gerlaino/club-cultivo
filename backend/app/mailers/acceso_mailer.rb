@@ -38,13 +38,26 @@ class AccesoMailer < ApplicationMailer
     @link     = "#{App.base_url}/portal/entrar/#{token}"
     @vence    = acceso.expira_at.in_time_zone('America/Argentina/Buenos_Aires')
     adjuntar_logo(@club)
-    asunto = @invita ? "#{@club.name} te invita a tu portal de paciente" : 'Elegí una clave nueva para tu portal'
+    # El nombre de la organización va SIEMPRE en el asunto: quien es paciente en dos recibe un mail de
+    # cada una y tiene que saber cuál abre (Germán, 28-oct-2026).
+    asunto = @invita ? "#{@club.name} te invita a tu portal de paciente" : "Elegí una clave nueva para tu portal de #{@club.name}"
     opts = { to: @paciente.email, subject: asunto }
     if @club.email_propio?
       opts[:from] = @club.email_from
       opts[:delivery_method_options] = @club.email_delivery_options
     end
     mail(**opts)
+  end
+
+  # Paciente en varias organizaciones que pidió el link por la puerta general: un botón por cada
+  # una, y elige en el mail (ver `PortalAcceso::InvitarVarias`). Por la casilla de la PLATAFORMA:
+  # por la de una organización, esa se enteraría de las otras. Sin datos de salud.
+  def portal_varias(email:, nombre:, items:)
+    @nombre = nombre
+    @items  = items.map do |i|
+      i.merge(vence: i[:expira_at].in_time_zone('America/Argentina/Buenos_Aires'))
+    end
+    mail(to: email, subject: 'Tu portal de paciente: elegí la organización')
   end
 
   # Aviso de que la contraseña cambió. Como el perfil ya no pide la actual para cambiarla, esto es

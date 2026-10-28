@@ -11,8 +11,9 @@
           <span v-else class="pa__logo pa__logo--ini" aria-hidden="true">{{ inicial }}</span>
           <p class="hb-ceja">{{ link.organizacion.nombre }}</p>
           <h1 class="hb-titulo">Hola, {{ link.nombre }}</h1>
-          <p class="hb-bajada">
-            {{ esInvitacion ? 'Activá tu portal de paciente: confirmá tu DNI y elegí tu clave.' : 'Confirmá tu DNI y elegí una clave nueva.' }}
+          <p class="hb-bajada" data-testid="activar-organizacion">
+            <template v-if="esInvitacion">Activá tu portal de paciente de <strong>{{ link.organizacion.nombre }}</strong>: confirmá tu DNI y elegí tu clave.</template>
+            <template v-else>Elegí una clave nueva para tu portal de <strong>{{ link.organizacion.nombre }}</strong>. Confirmá tu DNI.</template>
           </p>
 
           <form class="hb-form" novalidate @submit.prevent="activar">
@@ -42,7 +43,7 @@
               <span v-else>{{ esInvitacion ? 'Activar y entrar' : 'Guardar la clave y entrar' }}</span>
             </button>
           </form>
-          <p class="hb-pie">De ahora en más entrás con tu DNI y esta clave.</p>
+          <p class="hb-pie">De ahora en más entrás a {{ link.organizacion.nombre }} con tu DNI y esta clave.</p>
         </template>
 
         <!-- El link no sirve (venció, ya se usó, hay uno más nuevo o no existe) -->
@@ -50,7 +51,7 @@
           <p class="hb-ceja">{{ organizacion?.nombre || 'Portal del paciente' }}</p>
           <h1 class="hb-titulo">Este link no sirve</h1>
           <p class="hb-bajada">{{ error }}</p>
-          <RouterLink to="/paciente" class="hb-btn pa__ir">Entrar con mi DNI</RouterLink>
+          <RouterLink :to="organizacion?.slug ? `/paciente/${organizacion.slug}` : '/paciente'" class="hb-btn pa__ir">Entrar con mi DNI</RouterLink>
         </template>
       </div>
     </div>

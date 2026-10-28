@@ -10,12 +10,29 @@
 
     <div class="pe__col">
       <div class="hb-ficha">
-        <RouterLink to="/bienvenida" class="hb-ficha__logo" aria-label="Volver a la página de inicio">
+        <RouterLink v-if="!slug" to="/bienvenida" class="hb-ficha__logo" aria-label="Volver a la página de inicio">
           <img src="/logo-ce-redondo.png" alt="Cultivo Espacial" />
         </RouterLink>
 
+        <!-- La puerta de UNA organización: dice de cuál es antes de pedir nada. -->
+        <div v-if="slug && puerta" class="pe__puerta" data-testid="puerta-organizacion">
+          <img v-if="puerta.logo_url" :src="puerta.logo_url" alt="" class="pe__puerta-logo" />
+          <span v-else class="pe__puerta-logo pe__org-logo--ini" :style="{ background: puerta.theme_primary || undefined }" aria-hidden="true">{{ inicial(puerta.nombre) }}</span>
+          <p class="pe__puerta-nombre">{{ puerta.nombre }}</p>
+        </div>
+
+        <div v-if="slug && cargandoPuerta" class="pe__cargando"><DsSpinner :size="28" /></div>
+
+        <!-- La organización no existe o tiene el portal cerrado -->
+        <template v-else-if="slug && !puerta">
+          <p class="hb-ceja">Portal del paciente</p>
+          <h1 class="hb-titulo">Este portal no está abierto</h1>
+          <p class="hb-bajada" data-testid="puerta-cerrada">{{ errorPuerta }}</p>
+          <RouterLink to="/paciente" class="hb-btn pe__ir">Entrar con mi DNI</RouterLink>
+        </template>
+
         <!-- ── Entrar ── -->
-        <template v-if="paso === 'entrar'">
+        <template v-else-if="paso === 'entrar'">
           <p class="hb-ceja">Portal del paciente</p>
           <h1 class="hb-titulo">Entrá con tu DNI</h1>
 
@@ -77,9 +94,7 @@
           <h1 class="hb-titulo">{{ modoLink === 'primera' ? 'Tu primera vez' : 'Elegí una clave nueva' }}</h1>
           <template v-if="!recuperacionEnviada">
             <p class="hb-bajada">
-              {{ modoLink === 'primera'
-                ? 'Poné tu DNI y te mandamos a tu mail un link para elegir tu clave. Tiene que ser el mail que tiene cargado tu organización.'
-                : 'Poné tu DNI. Si tenés un mail cargado en tu organización, te mandamos un link para elegirla.' }}
+              {{ bajadaLink }}
             </p>
             <form class="hb-form" novalidate @submit.prevent="recuperar">
               <div class="hb-campo">
@@ -102,17 +117,49 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { recuperarPortal } from '../../lib/api'
+import { puertaPortal, recuperarPortal } from '../../lib/api'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
 import '../../assets/herbario.css'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 cargarFuentesHerbario()
+
+// La puerta de UNA organización (`/paciente/<slug>`, el cartel del mostrador). Por ahí el link
+// que se manda y la cuenta en la que entra son sólo de ella (28-oct-2026, Germán: «abrí el portal
+// de Club Modelo y entré a Mitocondria»). Sin slug es la puerta general.
+const slug = String(route.params.organizacion || '') || null
+const puerta = ref(null)
+const cargandoPuerta = ref(!!slug)
+const errorPuerta = ref(null)
+
+onMounted(async () => {
+  if (!slug) return
+  try {
+    const { data } = await puertaPortal(slug)
+    puerta.value = data
+  } catch (e) {
+    errorPuerta.value = e?.response?.status === 404
+      ? 'Esta organización no tiene el portal del paciente abierto. Consultalo en el mostrador.'
+      : 'No pudimos abrir el portal. Revisá tu conexión y volvé a probar.'
+  } finally {
+    cargandoPuerta.value = false
+  }
+})
+
+const bajadaLink = computed(() => {
+  const de = puerta.value ? ` en ${puerta.value.nombre}` : ' en tu organización'
+  if (modoLink.value === 'primera') {
+    return `Poné tu DNI y te mandamos a tu mail un link para elegir tu clave. Tiene que ser el mail que tenés cargado${de}.` +
+      (puerta.value ? '' : ' Si sos paciente en más de una, en el mail elegís a cuál entrás.')
+  }
+  return `Poné tu DNI. Si tenés un mail cargado${de}, te mandamos un link para elegirla.`
+})
 
 const paso = ref('entrar')            // entrar · elegir · recuperar
 const dni = ref('')
@@ -135,7 +182,7 @@ async function entrar(organizacionId = null) {
   cargando.value = true
   error.value = null
   try {
-    const r = await auth.loginPaciente(dni.value, clave.value, organizacionId)
+    const r = await auth.loginPaciente(dni.value, clave.value, organizacionId, slug)
     if (r?.elegir) {
       organizaciones.value = r.elegir
       paso.value = 'elegir'
@@ -165,7 +212,7 @@ async function recuperar() {
   cargando.value = true
   error.value = null
   try {
-    const { data } = await recuperarPortal(dni.value)
+    const { data } = await recuperarPortal(dni.value, slug)
     recuperacionEnviada.value = data.mensaje
   } catch (e) {
     error.value = mensajeDe(e, 'No pudimos mandar el link. Probá de nuevo.')
@@ -192,6 +239,12 @@ const inicial = (nombre) => (nombre || '?').trim().charAt(0).toUpperCase()
 .pe__primera-btn { width: 100%; background: transparent; color: var(--hb-verde); border: 1.5px solid var(--hb-verde); }
 .pe__primera-btn:hover:not(:disabled) { background: var(--hb-salvia-suave); }
 .pe__volver { margin-top: 14px; align-self: center; background: none; border: 0; cursor: pointer; font-size: .9rem; }
+
+.pe__puerta { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px; }
+.pe__puerta-logo { width: 72px; height: 72px; border-radius: 20px; object-fit: cover; display: grid; place-items: center; font-size: 28px; }
+.pe__puerta-nombre { margin: 0; font-family: var(--hb-serif); font-size: 1.35rem; font-weight: 700; color: var(--hb-tinta); text-align: center; }
+.pe__cargando { display: grid; place-items: center; min-height: 220px; }
+.pe__ir { text-decoration: none; text-align: center; margin-top: 8px; }
 
 .pe__orgs { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
 .pe__org {

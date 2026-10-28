@@ -163,12 +163,15 @@ export const restablecerContrasena     = (token, password, password_confirmation
 export const me               = () => api.get("/me");
 // La puerta del portal del paciente (sin sesión): DNI + clave, el link de invitación o de «me
 // olvidé la clave», y pedir ese link. Entrar y activar dejan la sesión abierta (cookie).
-export const entrarPortal   = (dni, password, organizacion_id = null) =>
-  api.post('/portal_acceso/sesion', { dni, password, organizacion_id }, { timeout: 45000 })
+// `organizacion` es el slug de la puerta de UNA organización (`/paciente/<slug>`): por ahí todo
+// queda en ella. `organizacion_id` es la que eligió en la puerta general («¿A cuál entrás?»).
+export const entrarPortal   = (dni, password, organizacion_id = null, organizacion = null) =>
+  api.post('/portal_acceso/sesion', { dni, password, organizacion_id, organizacion }, { timeout: 45000 })
+export const puertaPortal   = (slug) => api.get(`/portal_acceso/organizaciones/${encodeURIComponent(slug)}`)
 export const linkPortal     = (token) => api.get(`/portal_acceso/links/${encodeURIComponent(token)}`)
 export const activarPortal  = (token, dni, password, password_confirmation) =>
   api.post(`/portal_acceso/links/${encodeURIComponent(token)}/activar`, { dni, password, password_confirmation }, { timeout: 45000 })
-export const recuperarPortal = (dni) => api.post('/portal_acceso/recuperar', { dni })
+export const recuperarPortal = (dni, organizacion = null) => api.post('/portal_acceso/recuperar', { dni, organizacion })
 
 // -------- Salas --------
 export const listSalas   = () => api.get("/salas");

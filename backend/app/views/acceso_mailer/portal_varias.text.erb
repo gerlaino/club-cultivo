@@ -1,0 +1,10 @@
+Hola <%= @nombre %>,
+
+Pediste entrar a tu portal de paciente y sos paciente en <%= @items.size %> organizaciones. Abrí el link de la organización a la que querés entrar:
+<% @items.each do |i| %>
+<%= i[:club].name %> (<%= i[:invita] ? 'activar' : 'clave nueva' %>, vence el <%= i[:vence].strftime('%d/%m a las %H:%M') %>):
+<%= i[:link] %>
+<% end %>
+Cada organización tiene su propia clave. Te va a pedir tu DNI; cada link sirve una sola vez.
+
+Si no lo pediste, ignorá este mail: sin abrir un link nadie puede cambiar tu clave.

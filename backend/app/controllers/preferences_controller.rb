@@ -263,6 +263,7 @@ class PreferencesController < ApplicationController
   def serialize(club)
     {
       id:                           club.id,
+      slug:                         club.slug,
       name:                         club.name,
       legal_name:                   club.legal_name,
       email:                        club.email,

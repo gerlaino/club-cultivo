@@ -4,6 +4,11 @@
 #   GET  /api/portal_acceso/links/:token          qué link es (para la pantalla de activar)
 #   POST /api/portal_acceso/links/:token/activar  DNI + clave nueva → entra
 #   POST /api/portal_acceso/recuperar             DNI → link por mail
+#   GET  /api/portal_acceso/organizaciones/:slug  la puerta de UNA organización (nombre y logo)
+#
+# Sesión y recuperar aceptan `organizacion` (el slug de la puerta `/paciente/<slug>`): por ahí todo
+# queda en esa organización. Sin él (la puerta general `/paciente`) es una por cada una en la que
+# es paciente, y si la clave sirve en varias elige después de validar.
 #
 # Las cuatro las limita rack-attack por IP. Entrar y activar devuelven el token de sesión igual
 # que el login del equipo (`jwt.dispatch_requests`, la cookie la pone `JwtCookieMiddleware`).
@@ -22,7 +27,7 @@ class PortalAccesoController < ApplicationController
   # Si la clave sirve en una sola organización, entra. Si sirve en varias, contesta cuáles (sólo
   # ahí, después de validar) y la pantalla vuelve a mandar lo mismo con `organizacion_id`.
   def sesion
-    cuentas = PortalAcceso::Cuentas.con_clave(params[:dni], params[:password])
+    cuentas = PortalAcceso::Cuentas.con_clave(params[:dni], params[:password], organizacion: params[:organizacion])
     return render json: { error: ERROR_CREDENCIALES }, status: :unauthorized if cuentas.empty?
 
     if cuentas.size > 1
@@ -101,24 +106,49 @@ class PortalAccesoController < ApplicationController
   ESPERA_ENTRE_LINKS = 10.minutes
 
   def recuperar
-    PortalAcceso::Cuentas.fichas(params[:dni]).each do |ficha|
-      next if ficha.email.blank?
+    fichas = PortalAcceso::Cuentas.fichas(params[:dni], organizacion: params[:organizacion]).select do |ficha|
+      ficha.email.present? &&
+        ActsAsTenant.with_tenant(ficha.club) do
+          !ficha.accesos_portal.where(usado_at: nil, anulado_at: nil).where('created_at > ?', ESPERA_ENTRE_LINKS.ago).exists?
+        end
+    end
 
-      ActsAsTenant.with_tenant(ficha.club) do
-        next if ficha.accesos_portal.where(usado_at: nil, anulado_at: nil).where('created_at > ?', ESPERA_ENTRE_LINKS.ago).exists?
-
-        PortalAcceso::Invitar.call(ficha, motivo: ficha.portal_activado? ? 'recuperacion' : 'invitacion')
+    # Paciente en más de una organización con el mismo mail: UN mail con un botón por cada una, y
+    # elige ahí (Germán, 28-oct-2026: «habría que elegir de qué organización hablás»). La elección
+    # pasa dentro de SU casilla: mostrar la lista en pantalla le decía a cualquiera que tipeara un
+    # DNI ajeno dónde es paciente. Sale por la casilla de la plataforma: por la de una organización,
+    # esa organización se enteraría (su carpeta de enviados) de las otras.
+    fichas.group_by { |f| f.email.to_s.strip.downcase }.each_value do |del_mail|
+      if del_mail.size == 1
+        ficha = del_mail.first
+        ActsAsTenant.with_tenant(ficha.club) { PortalAcceso::Invitar.call(ficha, motivo: motivo_de(ficha)) }
+      else
+        PortalAcceso::InvitarVarias.call(del_mail) { |ficha| motivo_de(ficha) }
       end
     end
 
     render json: {
       mensaje: 'Si tu DNI está en una organización con portal y tenés un mail cargado, te mandamos un link ' \
-               'a ese mail para elegir tu clave. Si no te llega en unos minutos, pedile el link a tu ' \
-               'organización en el mostrador.',
+               'a ese mail para elegir tu clave. Si sos paciente en más de una, en el mail elegís a cuál. ' \
+               'Si no te llega en unos minutos, pedile el link a tu organización en el mostrador.',
     }
   end
 
+  # GET /api/portal_acceso/organizaciones/:slug
+  #
+  # La cara de la puerta de una organización: su nombre y su logo, para que el paciente sepa a cuál
+  # está entrando ANTES de poner nada. Es lo mismo que dice su cartel del mostrador; no dice nada
+  # de ningún paciente. Con el portal cerrado (o un slug que no existe) contesta lo mismo.
+  def organizacion
+    club = PortalAcceso::Cuentas.puerta(params[:slug])
+    return render json: { error: 'Esta organización no tiene el portal del paciente abierto.' }, status: :not_found unless club
+
+    render json: organizacion_json(club)
+  end
+
   private
+
+  def motivo_de(ficha) = ficha.portal_activado? ? 'recuperacion' : 'invitacion'
 
   def con_la_organizacion_del_link(&accion)
     @acceso = AccesoPortal.por_token(params[:token])
@@ -136,6 +166,7 @@ class PortalAccesoController < ApplicationController
   def organizacion_json(club)
     {
       id:            club.id,
+      slug:          club.slug,
       nombre:        club.name,
       logo_url:      club.logo.attached? ? url_for(club.logo) : nil,
       theme_primary: club.theme_primary,

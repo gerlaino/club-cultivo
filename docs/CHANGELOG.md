@@ -1,5 +1,32 @@
 # Changelog
 
+## Octubre 2026 (gl) — Cada organización tiene su puerta del portal: `/paciente/<slug>` (28-oct)
+
+Germán (28-oct, probando en producción): «abrí el portal de Club Modelo, con mi DNI quise ingresar, me
+llegó un mail de mitocondriatest y entré a mitocondriatest… tiene que haber una seguridad implacable».
+No fue una fuga entre organizaciones (cada link sigue atado a una ficha y pide su DNI), pero la puerta
+era UNA para todas: «Es mi primera vez» mandaba un link por cada organización con el portal abierto, y
+el de Club Modelo no llegó (lo más probable: el link que mandó la ficha minutos antes frenaba uno nuevo, y
+ese mail no salió —Sentry: `Net::OpenTimeout` en `MailDeliveryJob` a esa hora—). Llegó sólo el de Mitocondria, el asunto de recuperación no decía de cuál era, y la pantalla del link lo decía chiquito.
+
+- **Puerta por organización** `/paciente/<slug>` (la del cartel del mostrador y la que copia el panel):
+  muestra su logo y su nombre antes de pedir nada; entrar y «Es mi primera vez» van SÓLO a ella
+  (`PortalAcceso::Cuentas.fichas(dni, organizacion:)`, `puerta(slug)`). Con la misma clave en las dos,
+  por esa puerta entra a esa sin preguntar; mandar `organizacion_id` de otra no la abre. Cerrada o
+  inexistente: «Este portal no está abierto». `GET /api/portal_acceso/organizaciones/:slug` (nombre y
+  logo, nada de pacientes; rack-attack 30/min).
+- La puerta general `/paciente`: entrar sigue con «¿A cuál entrás?» después de la clave. Pedir el link
+  con un mismo mail en varias organizaciones manda **UN mail con un botón por organización** y se elige
+  ahí (Germán: «habría que elegir de qué organización hablás»; elegido sobre mostrar la lista en
+  pantalla, que le decía a cualquiera con un DNI ajeno dónde es paciente). Sale por la casilla de la
+  plataforma, nunca por la de una de ellas (se enteraría de las otras). `PortalAcceso::InvitarVarias`,
+  `AccesoMailer#portal_varias`. Con mails distintos, uno a cada mail.
+- El asunto del mail de recuperación lleva el nombre de la organización; la pantalla del link dice
+  «Activá tu portal de paciente de **X**» y «De ahora en más entrás a X…»; si el link no sirve, vuelve a
+  la puerta de su organización. Al cerrar sesión, el paciente vuelve a la puerta de la suya.
+- `slug` en `/preferences` y en `/portal/club`. Specs: 10 nuevos en `portal_acceso_spec` (el caso de
+  Germán: paciente en las dos con portal abierto); vitest `portalEntrada` +4.
+
 ## Octubre 2026 (gk) — El portal rediseñado: «Armá tu portal» para el admin, la ficha del paciente en secciones y el portal del paciente en el teléfono (28-oct)
 
 Germán (28-oct): «el portal no queda abierto cuando clickeo el toggle; tiene que ser mucho más fácil e

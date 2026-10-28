@@ -57,6 +57,10 @@ unless Rails.env.test?
     throttle('portal_link/ip', limit: 30, period: 1.minute) do |req|
       req.ip if req.path.start_with?('/api/portal_acceso/links/') && req.get?
     end
+    # La cara de la puerta de una organización: que no sirva para recorrer slugs.
+    throttle('portal_organizacion/ip', limit: 30, period: 1.minute) do |req|
+      req.ip if req.path.start_with?('/api/portal_acceso/organizaciones/') && req.get?
+    end
     # «Me olvidé la clave» manda un mail: mismo criterio que el del equipo.
     throttle('portal_recuperar/ip', limit: 5, period: 10.minutes) do |req|
       req.ip if req.path == '/api/portal_acceso/recuperar' && req.post?

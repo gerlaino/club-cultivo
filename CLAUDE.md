@@ -145,7 +145,7 @@ créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo co
 vaso = 0,335 L), «Mi cultivo» en teléfono y compu, «Mis informes» (PDF/Excel, `Informes::Autocultivo`)
 y la página pública rearmada (dos puertas, celular en autocultivo, oficios con su pantalla, precios
 con «un pack / los dos»). Detalle en `docs/CHANGELOG.md` (ek) y `docs/REGLAS_Y_DECISIONES.md`.
-Pendiente de Germán: el correo de producción con Javi (SMTP + `APP_HOST`), su WhatsApp y cómo se paga
+Pendiente de Germán: su WhatsApp y cómo se paga
 en pesos para la página pública, y probar con Martín.
 
 ### Retomada anterior (7-oct-2026)
@@ -166,8 +166,7 @@ consultorio como diferencial), bloque médico (el médico ve SÓLO sus pacientes
 **Commiteado sin pushear — bloque (ed)**: editar una dispensa con «Paga con» (lo que no paga va a
 cuenta corriente) con guardas contra errores silenciosos, y la confirmación final con «Confirmar e
 imprimir etiqueta». Germán lo pushea fuera del horario de dispensario. Abiertos: la #838 de Martín
-Blanco (no correr `CORREGIR=1` hasta que Javi diga si fue descuento o deuda), SMTP + `APP_HOST` en
-Render (web y worker). Detalle en `docs/CHANGELOG.md` (eb)–(ed) y `docs/REGLAS_Y_DECISIONES.md`.
+Blanco (no correr `CORREGIR=1` hasta que Javi diga si fue descuento o deuda). Detalle en `docs/CHANGELOG.md` (eb)–(ed) y `docs/REGLAS_Y_DECISIONES.md`.
 
 **Regla que gobierna código nuevo (6-oct, ajustada el 7-oct):** en una dispensa el total NO se
 tipea: es la suma del carrito menos los descuentos (% o pesos, `descuento_dispensa_ars`); lo que
@@ -223,11 +222,15 @@ autoregistro depende de que el correo de producción ande (Gmail + `APP_HOST`).
 
 **Pospuesto por Germán:** app en las tiendas (cuando haya clientes fijos) · miniaturas con
 libvips (ya no urge).
-**De Germán (no código):** rotar el secreto de Render · `APP_HOST` + SMTP en Render ·
+**De Germán (no código):** rotar el secreto de Render ·
 `rake seguridad:usuarios_con_password_default` · `rake stocks:balance_descuadrado` ·
 `rake auditorias:limpiar_blobs` · confirmar el push por worker al iPhone · el candado de Chrome.
 
 ## Trampas del entorno
+
+**El correo de producción ANDA** (SMTP de cultivoespacial + `APP_HOST` cargados en Render, confirmado por
+Germán el 28-oct-2026): no listarlo como pendiente. Si un mail no sale, buscar la causa concreta.
+
 
 `localhost:5173` puede ser `vite preview` (sirve `dist/`: build antes de Playwright) — hoy es el dev
 server de docker. rack-attack: 5 logins/min (la e2e hace 7; en dev localhost no se throttlea). No

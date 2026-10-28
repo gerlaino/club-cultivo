@@ -96,6 +96,14 @@ const routes = [
     component: () => import("../views/portal/PortalEntrarView.vue"),
     meta: { public: true, fullscreen: true },
   },
+  // La puerta de UNA organización (28-oct-2026): la del cartel del mostrador. Dice de cuál es
+  // antes de pedir nada, y el link que manda y la cuenta en la que entra son sólo de ella.
+  {
+    path: "/paciente/:organizacion",
+    name: "portal-entrar-organizacion",
+    component: () => import("../views/portal/PortalEntrarView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
   // El link de invitación (o de «me olvidé la clave») que le llega al paciente. Va ANTES que el
   // portal: es público, y `/portal` pide sesión.
   {
@@ -1518,7 +1526,7 @@ router.beforeEach(async (to) => {
     to.path === '/contacto' || to.path === '/login' ||
     to.path === '/olvide-contrasena' || to.path === '/restablecer' ||
     to.path.startsWith('/registro') || to.path === '/terminos' || to.path === '/privacidad' ||
-    to.path === '/paciente' || to.path.startsWith('/portal/entrar/');
+    to.path === '/paciente' || to.path.startsWith('/paciente/') || to.path.startsWith('/portal/entrar/');
 
   if (noEsperaBootstrap) {
     auth.ensureBootstrapped();
@@ -1543,7 +1551,7 @@ router.beforeEach(async (to) => {
     return { name: "login", query: { redirect: to.fullPath } };
   }
   // El paciente con sesión que vuelve a su puerta, directo a su portal.
-  if (to.path === '/paciente' && auth.user?.role === 'paciente') return '/portal';
+  if ((to.path === '/paciente' || to.path.startsWith('/paciente/')) && auth.user?.role === 'paciente') return '/portal';
   if (to.meta.guestOnly && auth.isAuthenticated) {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";

@@ -1676,6 +1676,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **CADA ORGANIZACIÓN TIENE SU PUERTA DEL PORTAL** (Germán, 28-oct-2026: «se tiene que mostrar el portal
+  del club que se elija»). `/paciente/<slug>` dice de cuál es antes de pedir nada y todo lo que pasa por
+  ahí (link, cuenta) es sólo de esa organización. El cartel y el panel llevan esa puerta. Todo mail y
+  toda pantalla del portal nombran la organización: quien es paciente en dos recibe uno de cada una.
 - **EL PORTAL SE ARMA EN UNA PANTALLA Y LOS INTERRUPTORES GUARDAN AL TOCARLOS** (Germán, 28-oct-2026: «no
   es alguien de sistemas»). `/configuracion/portal` dice si está listo (pasos deducidos de lo cargado,
   no guardados), qué espera respuesta y quiénes entran, con la acción al lado (`Portal::Panel`). Un

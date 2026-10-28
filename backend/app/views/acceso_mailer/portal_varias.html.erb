@@ -1,0 +1,18 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @nombre %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  Pediste entrar a tu portal de paciente y sos paciente en <%= @items.size %> organizaciones.
+  Tocá la organización a la que querés entrar:
+</p>
+<% @items.each do |i| %>
+  <div style="border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin:0 0 10px;">
+    <p style="font-size:14px; color:#0f172a; margin:0 0 10px;"><strong><%= i[:club].name %></strong></p>
+    <a href="<%= i[:link] %>" style="display:inline-block; background:#1b5e20; color:#ffffff; text-decoration:none; padding:10px 16px; border-radius:8px; font-weight:bold; font-size:13px;"><%= i[:invita] ? 'Activar mi portal de' : 'Elegir clave nueva en' %> <%= i[:club].name %></a>
+    <p style="font-size:12px; color:#94a3b8; margin:8px 0 0; word-break:break-all;">Vence el <%= i[:vence].strftime('%d/%m a las %H:%M') %> · <%= i[:link] %></p>
+  </div>
+<% end %>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:12px 0 8px;">
+  Cada organización tiene su propia clave. Te va a pedir tu DNI; cada link sirve una sola vez.
+</p>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:0 0 8px;">
+  Si no lo pediste, ignorá este mail: sin abrir un link nadie puede cambiar tu clave.
+</p>

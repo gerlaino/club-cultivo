@@ -32,7 +32,7 @@ module Portal
         para_atender: para_atender,
         pacientes:    pac,
         publicado:    publicado,
-        link_entrada: "#{App.base_url}/paciente",
+        link_entrada: "#{App.base_url}/paciente/#{@club.slug}",
       }
     end
 

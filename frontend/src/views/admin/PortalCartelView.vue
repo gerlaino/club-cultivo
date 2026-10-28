@@ -43,8 +43,13 @@ const club = useClubStore()
 const { generatePNG } = useQRCode()
 const qr = ref(null)
 
-// La puerta del paciente es la misma para todas las organizaciones: el DNI dice de cuál es.
-const link = computed(() => `${window.location.origin}/paciente`)
+// La puerta de ESTA organización (28-oct-2026): el que escanea el cartel de Club Modelo entra a
+// Club Modelo aunque también sea paciente en otra. La general (`/paciente`) le mandaba un link de
+// cada una y quien es paciente en dos abría el que no era.
+const link = computed(() => {
+  const slug = club.data?.slug
+  return `${window.location.origin}/paciente${slug ? `/${encodeURIComponent(slug)}` : ''}`
+})
 const linkCorto = computed(() => link.value.replace(/^https?:\/\//, ''))
 
 onMounted(async () => {

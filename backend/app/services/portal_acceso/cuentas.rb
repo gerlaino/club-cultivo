@@ -12,22 +12,40 @@ module PortalAcceso
 
     # Las fichas que pueden entrar al portal con este DNI: activas, en una organización vigente que
     # tiene el portal contratado y abierto. Sin tenant: la entrada no tiene sesión.
-    def fichas(dni)
+    #
+    # `organizacion` (su slug) es la puerta de UNA organización, `/paciente/<slug>` (28-oct-2026,
+    # Germán: «abrí el portal de Club Modelo y me llegó el mail de Mitocondria, y entré a
+    # Mitocondria»). Por esa puerta todo queda en ella: el link que se manda, la cuenta en la que
+    # entra. Un slug que no existe o con el portal cerrado no encuentra nada, como un DNI que no está.
+    def fichas(dni, organizacion: nil)
       normalizado = dni.to_s.gsub(/\D/, '')
       return [] if normalizado.length < 6
 
       ActsAsTenant.without_tenant do
-        Paciente.where(dni_normalizado: normalizado, es_paciente: true)
-                .where.not(aprobado_at: nil)
-                .includes(:club, :user)
-                .select { |p| p.club && p.club.deleted_at.nil? && p.club.portal_paciente_disponible? }
+        alcance = Paciente.where(dni_normalizado: normalizado, es_paciente: true).where.not(aprobado_at: nil)
+        if organizacion.present?
+          club = puerta(organizacion)
+          return [] unless club
+
+          alcance = alcance.where(club_id: club.id)
+        end
+        alcance.includes(:club, :user)
+               .select { |p| p.club && p.club.deleted_at.nil? && p.club.portal_paciente_disponible? }
       end
+    end
+
+    # La organización de una puerta, si tiene el portal abierto. Sin tenant (no hay sesión).
+    def puerta(slug)
+      return nil if slug.blank?
+
+      club = ActsAsTenant.without_tenant { Club.find_by(slug: slug.to_s, deleted_at: nil) }
+      club if club&.portal_paciente_disponible?
     end
 
     # Las cuentas en las que esta clave es la correcta. Se prueba en todas aunque la primera
     # acierte: cuánto tarda la respuesta no tiene que decir cuántas organizaciones hay.
-    def con_clave(dni, password)
-      fichas(dni).filter_map do |ficha|
+    def con_clave(dni, password, organizacion: nil)
+      fichas(dni, organizacion:).filter_map do |ficha|
         user = ficha.user
         user if user && user.valid_password?(password.to_s)
       end

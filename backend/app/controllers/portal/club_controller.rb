@@ -7,6 +7,7 @@ module Portal
 
       render json: {
         id: club.id,
+        slug: club.slug,
         name: club.name,
         legal_name: club.legal_name,
         phone: club.phone,

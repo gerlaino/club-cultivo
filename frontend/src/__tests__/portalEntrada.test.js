@@ -10,15 +10,18 @@ import { createPinia, setActivePinia } from 'pinia'
 //   - «Me olvidé la clave» pide el DNI y muestra lo que contesta el backend (siempre lo mismo).
 //   - El link de invitación muestra de qué organización es y a quién saluda; pide DNI y la clave
 //     dos veces; si el link no sirve (venció, ya se usó), lo dice y lleva a entrar con el DNI.
+//   - La puerta de UNA organización (`/paciente/<slug>`, 28-oct-2026): dice de cuál es antes de
+//     pedir nada, y entrar y «Es mi primera vez» van sólo a ella. Cerrada o inexistente, lo dice.
 
 const api = vi.hoisted(() => ({
-  entrarPortal: vi.fn(), linkPortal: vi.fn(), activarPortal: vi.fn(), recuperarPortal: vi.fn(), me: vi.fn(),
+  entrarPortal: vi.fn(), linkPortal: vi.fn(), activarPortal: vi.fn(), recuperarPortal: vi.fn(), me: vi.fn(), puertaPortal: vi.fn(),
 }))
 vi.mock('../lib/api', () => ({
   entrarPortal: (...a) => api.entrarPortal(...a),
   linkPortal: (...a) => api.linkPortal(...a),
   activarPortal: (...a) => api.activarPortal(...a),
   recuperarPortal: (...a) => api.recuperarPortal(...a),
+  puertaPortal: (...a) => api.puertaPortal(...a),
   me: (...a) => api.me(...a),
   signIn: vi.fn(), signOut: vi.fn(), clearAuthToken: vi.fn(),
 }))
@@ -43,6 +46,7 @@ async function llenar(w, selector, valor) {
 
 describe('Entrar con DNI', () => {
   const montar = async () => mount((await import('../views/portal/PortalEntrarView.vue')).default, { global: { stubs } })
+  beforeEach(() => { params = {} })
 
   it('con DNI y clave entra y va a su portal', async () => {
     api.entrarPortal.mockResolvedValue({ data: { id: 5, role: 'paciente' } })
@@ -54,7 +58,7 @@ describe('Entrar con DNI', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    expect(api.entrarPortal).toHaveBeenCalledWith('30111222', 'clave-larga', null)
+    expect(api.entrarPortal).toHaveBeenCalledWith('30111222', 'clave-larga', null, null)
     expect(router.push).toHaveBeenCalledWith('/portal')
   })
 
@@ -77,7 +81,7 @@ describe('Entrar con DNI', () => {
     await orgs[1].trigger('click')
     await flushPromises()
 
-    expect(api.entrarPortal).toHaveBeenLastCalledWith('30111222', 'clave-larga', 2)
+    expect(api.entrarPortal).toHaveBeenLastCalledWith('30111222', 'clave-larga', 2, null)
     expect(router.push).toHaveBeenCalledWith('/portal')
   })
 
@@ -103,8 +107,61 @@ describe('Entrar con DNI', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
 
-    expect(api.recuperarPortal).toHaveBeenCalledWith('30111222')
+    expect(api.recuperarPortal).toHaveBeenCalledWith('30111222', null)
     expect(w.text()).toContain('te mandamos un link')
+  })
+})
+
+describe('La puerta de una organización', () => {
+  const montar = async () => {
+    const w = mount((await import('../views/portal/PortalEntrarView.vue')).default, { global: { stubs } })
+    await flushPromises()
+    return w
+  }
+  beforeEach(() => {
+    params = { organizacion: 'club-modelo' }
+    api.puertaPortal.mockResolvedValue({ data: { id: 7, slug: 'club-modelo', nombre: 'Club Modelo', logo_url: null } })
+  })
+
+  it('dice de qué organización es antes de pedir nada', async () => {
+    const w = await montar()
+    expect(api.puertaPortal).toHaveBeenCalledWith('club-modelo')
+    expect(w.find('[data-testid="puerta-organizacion"]').text()).toContain('Club Modelo')
+    expect(w.find('#pe-dni').exists()).toBe(true)
+  })
+
+  it('entra sólo a esa organización', async () => {
+    api.entrarPortal.mockResolvedValue({ data: { id: 5, role: 'paciente' } })
+    api.me.mockResolvedValue({ data: { id: 5, role: 'paciente', club_id: 7 } })
+    const w = await montar()
+
+    await llenar(w, '#pe-dni', '30111222')
+    await llenar(w, '#pe-clave', 'clave-larga')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(api.entrarPortal).toHaveBeenCalledWith('30111222', 'clave-larga', null, 'club-modelo')
+  })
+
+  it('«Es mi primera vez» pide el link sólo a esa organización, y lo dice', async () => {
+    api.recuperarPortal.mockResolvedValue({ data: { mensaje: 'Te mandamos un link.' } })
+    const w = await montar()
+
+    await w.find('[data-testid="primera-vez"]').trigger('click')
+    expect(w.text()).toContain('cargado en Club Modelo')
+    await llenar(w, '#pe-dni-rec', '30111222')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(api.recuperarPortal).toHaveBeenCalledWith('30111222', 'club-modelo')
+  })
+
+  it('con el portal cerrado (o una organización que no existe) lo dice y no pide DNI', async () => {
+    api.puertaPortal.mockRejectedValue({ response: { status: 404 } })
+    const w = await montar()
+
+    expect(w.find('[data-testid="puerta-cerrada"]').text()).toContain('no tiene el portal del paciente abierto')
+    expect(w.find('#pe-dni').exists()).toBe(false)
   })
 })
 

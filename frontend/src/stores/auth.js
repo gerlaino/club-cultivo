@@ -157,8 +157,8 @@ export const useAuthStore = defineStore("auth", {
     // (`activarPortal`). Las dos dejan la sesión abierta igual que el login del equipo. Si la clave
     // sirve en más de una organización, el backend contesta `{ elegir: [...] }` y esto lo devuelve
     // sin entrar: la pantalla pregunta a cuál y vuelve a llamar con `organizacionId`.
-    async loginPaciente(dni, password, organizacionId = null) {
-      return this._entrarAlPortal(() => entrarPortal(dni, password, organizacionId))
+    async loginPaciente(dni, password, organizacionId = null, organizacion = null) {
+      return this._entrarAlPortal(() => entrarPortal(dni, password, organizacionId, organizacion))
     },
 
     async activarPortalPaciente(token, dni, password, confirmacion) {
@@ -260,6 +260,15 @@ export const useAuthStore = defineStore("auth", {
       this.error = null;
       this.loggingOut = true;   // los 401 en vuelo no deben setear ?redirect
       const eraPaciente = this.user?.role === 'paciente';
+      // El paciente vuelve a la puerta de SU organización, no a la general.
+      let puertaPaciente = '/paciente';
+      if (eraPaciente) {
+        try {
+          const { usePortalClubStore } = await import('./portalClub.js');
+          const slug = usePortalClubStore().club?.slug;
+          if (slug) puertaPaciente = `/paciente/${encodeURIComponent(slug)}`;
+        } catch (_) {}
+      }
       try {
         await signOut();
       } catch (_) {
@@ -297,7 +306,7 @@ export const useAuthStore = defineStore("auth", {
         // A dónde: la misma regla que `/` sin sesión (router). En la web, la portada; en la app
         // instalada, el login: quien la abre viene a trabajar, no a que le vendan la plataforma.
         // El paciente vuelve a SU puerta (DNI y clave), no al login del equipo ni a la portada.
-        const destino = eraPaciente ? '/paciente' : (usePWA().isPWA() ? '/login' : '/bienvenida');
+        const destino = eraPaciente ? puertaPaciente : (usePWA().isPWA() ? '/login' : '/bienvenida');
         window.location.replace(destino + '?loggedout=' + Date.now());
       }
     },
