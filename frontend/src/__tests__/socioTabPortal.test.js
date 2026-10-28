@@ -40,9 +40,9 @@ describe('Acceso al portal, en la ficha del paciente', () => {
     expect(invitar).toHaveBeenCalledWith(7)
     expect(confirmar).not.toHaveBeenCalled()
     expect(document.body.querySelector('[data-testid="link-portal"]').textContent).toContain('/portal/entrar/abc123')
-    // Para WhatsApp, el mensaje entero (con el link) va en el texto del enlace.
-    const wa = document.body.querySelector('[data-testid="link-portal-whatsapp"]').getAttribute('href')
-    expect(decodeURIComponent(wa)).toContain('/portal/entrar/abc123')
+    // Sin WhatsApp: el link viaja por mail y copiarlo queda de respaldo.
+    expect(document.body.querySelector('[data-testid="link-portal-whatsapp"]')).toBeNull()
+    expect(document.body.textContent).toContain('Copiar el link')
   })
 
   it('no muestra ni pide ninguna contraseña', () => {

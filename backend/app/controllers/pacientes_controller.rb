@@ -4,7 +4,7 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :invitar_portal, :iniciar_tramite_reprocann,
+                                          :invitar_portal, :invitacion_portal, :iniciar_tramite_reprocann,
                                           :reprocann_aprobado, :reprocann_no_indicado, :reprocann_rechazado,
                                           :volver_a_entrevistar]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
@@ -96,6 +96,13 @@ class PacientesController < ApplicationController
     # turnos al lado. No es asunto del mostrador, como el REPROCANN.
     agenda = current_user.dispensador? ? {} : Pacientes::Agenda.para(pacientes.map(&:id))
 
+    # Si entra a su portal, para invitar en lote (27-oct-2026). Lo ve quien gestiona el acceso, y
+    # sólo con el portal abierto: invitar a algo cerrado no abre nada.
+    ver_portal = current_user.club.portal_paciente_disponible? && Paciente::ROLES_APRUEBAN.include?(current_user.role)
+    activados  = ver_portal ? AccesoPortal.where(paciente_id: pacientes.map(&:id)).where.not(usado_at: nil).distinct.pluck(:paciente_id).to_set : Set.new
+    # La última invitación, para no mandarle dos veces al que ya se la mandaron y no entró.
+    invitados  = ver_portal ? AccesoPortal.where(paciente_id: pacientes.map(&:id), motivo: 'invitacion').group(:paciente_id).maximum(:created_at) : {}
+
     # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
       fila = p.as_json(only: campos_visibles, methods: metodos_lista)
@@ -103,6 +110,12 @@ class PacientesController < ApplicationController
                      'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]))
       unless current_user.dispensador?
         fila['situacion'] = p.situacion(ultima_dispensacion: ultimas[p.id], agenda: agenda[p.id], usuario: current_user)
+      end
+      if ver_portal
+        activado = activados.include?(p.id)
+        # «Sin activar» = la regla de `InvitarEnLote`: activo, admitido y nunca eligió su clave.
+        fila['portal'] = { activado: activado, tiene_mail: p.email.present?,
+                           sin_activar: p.es_paciente? && p.aprobado? && !activado, invitado_at: invitados[p.id] }
       end
       fila
     end
@@ -208,6 +221,25 @@ class PacientesController < ApplicationController
     return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
 
     render json: { data: acceso_json(@paciente.reload), link: link_json(resultado) }, status: :created
+  end
+
+  # GET /pacientes/:id/acceso/invitacion — si el modal de dispensa ofrece el tilde «Mandarle por
+  # mail cómo entrar a su portal» y si viene marcado (`PortalAcceso::InvitacionEnDispensa`). Lo
+  # pide el mostrador también: es quien dispensa.
+  def invitacion_portal
+    render json: { data: PortalAcceso::InvitacionEnDispensa.para(@paciente) }
+  end
+
+  # POST /pacientes/acceso/invitar_lote — la invitación por mail a varios pacientes a la vez,
+  # elegidos en la lista (`PortalAcceso::InvitarEnLote`). Sólo administración, como la de la ficha.
+  def invitar_portal_lote
+    return unless autorizado_para_acceso?
+
+    resultado = PortalAcceso::InvitarEnLote.call(club: current_user.club, paciente_ids: params[:paciente_ids], por: current_user)
+    return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
+
+    render json: { data: { enviados: resultado.enviados, omitidos: resultado.omitidos,
+                           restante_hoy: PortalAcceso::InvitarEnLote.restante(current_user.club) } }
   end
 
   def subir_reprocann
@@ -761,15 +793,13 @@ class PacientesController < ApplicationController
     return { modulo: false } unless club.feature?(:vista_paciente)
 
     user    = paciente.user
-    vigente = paciente.accesos_portal.where(usado_at: nil, anulado_at: nil).where('expira_at > ?', Time.current)
-                      .order(created_at: :desc).first
+    vigente = paciente.link_portal_vigente
     {
       modulo:          true,
       portal_abierto:  club.portal_paciente_disponible?,
       activo:          paciente.es_paciente?,
-      # Entra con su DNI. «Activó» = eligió su clave desde un link (antes de esto no hay forma de
-      # que la sepa: la inicial no se le muestra a nadie).
-      activado:        paciente.accesos_portal.where.not(usado_at: nil).exists?,
+      # Entra con su DNI. «Activó» = eligió su clave desde un link.
+      activado:        paciente.portal_activado?,
       ultimo_ingreso:  user&.visto_at,
       link_vigente:    vigente && { motivo: vigente.motivo, expira_at: vigente.expira_at, creado_at: vigente.created_at },
       tiene_mail:      paciente.email.present?,

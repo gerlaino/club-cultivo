@@ -100,6 +100,11 @@ class Club < ApplicationRecord
 
   before_validation :generar_slug, on: :create
   after_create :crear_geneticas_default!
+  # Abrir el portal lo habilita para TODO el padrón (27-oct-2026): los pacientes de antes del
+  # portal no tenían cuenta y no podían ni pedir «me olvidé la clave». No se manda nada.
+  after_update_commit :habilitar_portal_para_todos, if: -> {
+    (saved_change_to_vista_paciente_activa? || saved_change_to_features?) && portal_paciente_disponible?
+  }
 
   ROLES_DEFAULT    = %w[admin].freeze
   ROLES_VALIDOS_CLUB = %w[admin medico cultivador supervisor abogado auditor dispensador manicura delivery].freeze
@@ -579,6 +584,10 @@ class Club < ApplicationRecord
   # en dos lugares": vivía en cero.
   def portal_paciente_disponible?
     feature?(:vista_paciente) && vista_paciente_activa?
+  end
+
+  def habilitar_portal_para_todos
+    HabilitarPortalJob.perform_later(id)
   end
 
   def addon_disponible?(key)

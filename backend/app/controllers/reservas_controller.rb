@@ -226,7 +226,12 @@ class ReservasController < ApplicationController
     rescue => e
       return render json: { errors: [e.message] }, status: :unprocessable_entity
     end
-    render json: serialize_reserva(@reserva.reload)
+    json = serialize_reserva(@reserva.reload)
+    # Entregar una reserva es dispensar: el mismo tilde que el modal de dispensa (27-oct-2026).
+    if ActiveModel::Type::Boolean.new.cast(params[:invitar_portal])
+      json[:invitacion_portal] = PortalAcceso::InvitacionEnDispensa.mandar_si_corresponde(paciente, por: current_user)
+    end
+    render json: json
   end
 
   # PATCH /reservas/:id/cancelar

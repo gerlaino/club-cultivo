@@ -1669,6 +1669,22 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **LA INVITACIÓN AL PORTAL VA POR MAIL, NO POR WHATSAPP** (Germán, 27-oct-2026). Tres caminos y una
+  regla: (1) **abrir el portal lo habilita para todo el padrón** (activos y admitidos): se les crea la
+  cuenta en un job (`HabilitarPortalJob` → `PortalAcceso::HabilitarTodos`, idempotente) y no se manda
+  nada; (2) **la invitación llega en la próxima dispensa**: tilde «Mandarle por mail cómo entrar a su
+  portal» en el modal (también al entregar una reserva), que decide `PortalAcceso::InvitacionEnDispensa`
+  —se ofrece si tiene mail, no lo activó y no tiene link vigente; viene **marcado salvo que se lo haya
+  invitado en los últimos 30 días**—; el create lo vuelve a mirar y **nunca hace fallar la dispensa**.
+  Lo manda quien dispensa (dispensador incluido): es la excepción a «el mostrador no reparte accesos»;
+  (3) **en lote desde la lista** («Portal: sin activar», sólo admin, `PortalAcceso::InvitarEnLote`): un
+  mail por paciente, tope de 450 por día contando los links que salieron hoy; si no entra entero no se
+  manda ninguno. Del modal del link salió «Mandar por WhatsApp»: queda «Copiar el link».
+  **Los mails del portal (invitación y «me olvidé la clave») salen por la casilla de la organización
+  si la conectó** (Germán, 27-oct-2026: al paciente lo invita SU organización); si no, por la de la
+  plataforma, porque el portal no puede depender de que alguien cargue el correo. Con casilla propia el
+  tope es el MISMO cupo del correo (`Correo::CupoDiario`: masivos + sueltos + links del portal de hoy);
+  sin ella, el tope cuenta sólo los links del portal de hoy.
 - **El paciente NO escucha `ClubChannel`** (le contaba cada cambio del equipo): escucha
   `PacienteChannel` (su ficha, nunca un parámetro). Todo lo del portal que cambia en vivo va por ahí.
 - **El chat del portal**: una conversación por paciente, texto cifrado, la atiende administración

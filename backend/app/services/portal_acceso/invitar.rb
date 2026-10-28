@@ -4,7 +4,7 @@
 #
 # Reemplaza a la contraseña que el admin veía una vez y tenía que dictar (27-oct-2026): ahora nadie
 # de la organización conoce la clave del paciente. El link se puede mandar por mail (si la ficha
-# tiene uno) y siempre se devuelve para compartirlo por WhatsApp desde la ficha.
+# tiene uno) y siempre se devuelve para copiarlo desde la ficha (sin WhatsApp desde el 27-oct-2026).
 module PortalAcceso
   class Invitar
     Resultado = Struct.new(:link, :expira_at, :mail_enviado, :texto, :error, keyword_init: true) do
@@ -47,12 +47,12 @@ module PortalAcceso
       AccesoMailer.portal_link(acceso: emitido.acceso, token: emitido.token).deliver_later
       true
     rescue StandardError => e
-      # Que el mail falle no deja al paciente sin link: está en la ficha para mandarlo por WhatsApp.
+      # Que el mail falle no deja al paciente sin link: está en la ficha para copiarlo.
       Rails.logger.warn("[portal] no se pudo mandar el link al paciente #{@paciente.id}: #{e.class} #{e.message}")
       false
     end
 
-    # El mensaje que la ficha pega en WhatsApp. Sin datos de salud: sólo el nombre y el link.
+    # El mensaje listo para pegar donde sea. Sin datos de salud: sólo el nombre y el link.
     def texto_para_compartir(link, club)
       nombre = @paciente.nombre.to_s.split.first
       if @motivo == 'invitacion'

@@ -15,6 +15,7 @@ import { hoyISO } from '../utils/dates.js'
 import { reprocannSit, pacienteSit, vinculoSit, datosChicos, FILTROS } from '../composables/useSituacionPaciente.js'
 import '../components/pacientes/formulario/formulario.css'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
+import { invitarPortalLote } from '../lib/api.js'
 
 const store  = usePacientesStore()
 const auth   = useAuthStore()
@@ -171,6 +172,7 @@ const filtrados = computed(() => {
   else list = nomina.value
   const f = FILTROS[filterEstado.value]
   if (f && filterEstado.value !== 'cerrados') list = list.filter(f)
+  if (soloSinActivar.value) list = list.filter(s => s.portal?.sin_activar)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     // El DNI se compara sin puntos ni espacios de los dos lados: se escribe "90.000.027" y se
@@ -185,6 +187,54 @@ const filtrados = computed(() => {
   }
   return list
 })
+
+// ── Invitar al portal en lote (27-oct-2026) ──────────────────────────────────────
+// «Portal: sin activar» filtra la lista y deja elegir a varios para mandarles la invitación por
+// mail. Quién está sin activar lo dice el backend por fila (`portal.sin_activar`); la fila sólo
+// trae `portal` si quien mira gestiona el acceso y el portal está abierto.
+const hayPortal      = computed(() => store.items.some(s => s.portal))
+const soloSinActivar = ref(route.query.portal === 'sin_activar')
+const elegidos       = ref(new Set())
+const invitando      = ref(false)
+const omitidosLote   = ref([])
+watch(soloSinActivar, (val) => {
+  elegidos.value = new Set()
+  omitidosLote.value = []
+  router.replace({ query: { ...route.query, portal: val ? 'sin_activar' : undefined } })
+})
+const invitable = (s) => !!(s.portal?.sin_activar && s.portal?.tiene_mail)
+function alternarElegido(s) {
+  if (!invitable(s)) return
+  const set = new Set(elegidos.value)
+  set.has(s.id) ? set.delete(s.id) : set.add(s.id)
+  elegidos.value = set
+}
+const invitablesVisibles = computed(() => filtrados.value.filter(invitable))
+const todosElegidos = computed(() => invitablesVisibles.value.length > 0 && invitablesVisibles.value.every(s => elegidos.value.has(s.id)))
+function elegirTodos() {
+  elegidos.value = todosElegidos.value ? new Set() : new Set(invitablesVisibles.value.map(s => s.id))
+}
+async function invitarElegidos() {
+  const n = elegidos.value.size
+  if (!n) return
+  const ok = await confirm({
+    title: 'Invitar al portal',
+    message: `A ${n === 1 ? 'este paciente le llega' : `estos ${n} pacientes les llega`} un mail con un link para entrar a su portal y elegir su clave. El link vence en 72 horas.`,
+    confirmText: n === 1 ? 'Mandar la invitación' : `Mandar ${n} invitaciones`,
+  })
+  if (!ok) return
+  invitando.value = true
+  try {
+    const { data } = await invitarPortalLote([...elegidos.value])
+    const r = data?.data || {}
+    omitidosLote.value = r.omitidos || []
+    elegidos.value = new Set()
+    toast.success(r.enviados === 1 ? 'Le mandamos la invitación' : `Les mandamos la invitación a ${r.enviados}`)
+    store.refrescar({ limite: LIMITE_PADRON })
+  } catch (e) {
+    toast.error(e.response?.data?.errors?.[0] || 'No se pudieron mandar las invitaciones')
+  } finally { invitando.value = false }
+}
 
 // El color de la fila sale del REPROCANN: es lo que más cambia lo que se hace con esa persona.
 const nivelFila = (s) => reprocannSit(s.situacion)?.nivel || 'off'
@@ -272,7 +322,26 @@ async function descargar(formato) {
         />
         <span v-if="search" class="sv__search-count">{{ filtrados.length }}</span>
       </div>
+      <button v-if="hayPortal" type="button" class="sv__chip" :class="{ 'sv__chip--on': soloSinActivar }"
+              data-testid="filtro-portal" @click="soloSinActivar = !soloSinActivar">
+        <i class="bi bi-envelope-paper"></i> Portal: sin activar
+      </button>
       <BotonesDescarga v-if="canEdit" :disabled="!filtrados.length" :generando="generando" @descargar="descargar" />
+    </div>
+
+    <!-- Invitar en lote: aparece con el filtro del portal puesto. -->
+    <div v-if="soloSinActivar" class="sv__lote" data-testid="lote-portal">
+      <label class="sv__lote-todos">
+        <input type="checkbox" :checked="todosElegidos" :disabled="!invitablesVisibles.length" @change="elegirTodos" />
+        {{ elegidos.size ? `${elegidos.size} elegido${elegidos.size !== 1 ? 's' : ''}` : 'Elegir a todos los que tienen mail' }}
+      </label>
+      <button class="sv__btn-primary" :disabled="!elegidos.size || invitando" data-testid="lote-portal-mandar" @click="invitarElegidos">
+        <i class="bi bi-send"></i> {{ invitando ? 'Mandando…' : 'Mandar invitación por mail' }}
+      </button>
+      <p class="sv__lote-ayuda">Los que todavía no eligieron su clave. Sin mail en la ficha no se los puede invitar desde acá: cargáselo o copiá el link desde su ficha.</p>
+      <ul v-if="omitidosLote.length" class="sv__lote-omitidos">
+        <li v-for="o in omitidosLote" :key="o.id"><strong>{{ o.nombre || `#${o.id}` }}</strong>: {{ o.motivo }}</li>
+      </ul>
     </div>
 
     <!-- Loading -->
@@ -298,7 +367,7 @@ async function descargar(formato) {
     <div v-else class="sv__table-wrap">
       <table class="sv-table">
         <colgroup>
-          <col class="sv-col--ind" />
+          <col class="sv-col--ind" :class="{ 'sv-col--elegir': soloSinActivar }" />
           <col />
           <col class="sv-col--estado" />
           <col class="sv-col--rep" />
@@ -318,13 +387,19 @@ async function descargar(formato) {
         <tbody>
           <tr v-for="s in paginadosSv" :key="s.id" class="sv-table__row" :class="`sv-table__row--${nivelFila(s)}`"
               @click="router.push(`/pacientes/${s.id}`)">
-            <td class="sv-td-ind"><div class="sv-indicator" :class="`sv-ind--${nivelFila(s)}`"></div></td>
+            <td v-if="soloSinActivar" class="sv-td-elegir" @click.stop>
+              <input type="checkbox" :checked="elegidos.has(s.id)" :disabled="!invitable(s)" :aria-label="`Elegir a ${nombreListado(s)}`"
+                     :title="invitable(s) ? '' : 'No tiene mail en la ficha'" @change="alternarElegido(s)" />
+            </td>
+            <td v-else class="sv-td-ind"><div class="sv-indicator" :class="`sv-ind--${nivelFila(s)}`"></div></td>
             <td>
               <!-- "Apellido, Nombre": la lista se ordena por apellido. -->
               <div class="sv-pac-nombre">{{ nombreListado(s) }}<span v-if="s.apodo" class="sv-pac-apodo"> «{{ s.apodo }}»</span></div>
               <div class="sv-pac-sec">
                 <span class="sv-mono">DNI {{ dniLegible(s.dni) }}</span>
                 <span v-if="edad(s.fecha_nacimiento)"> · {{ edad(s.fecha_nacimiento) }} años</span>
+                <span v-if="soloSinActivar && !s.portal?.tiene_mail" class="sv-sin-mail"> · sin mail</span>
+                <span v-if="soloSinActivar && s.portal?.invitado_at" class="sv-invitado"> · invitado el {{ formatDate(s.portal.invitado_at) }}</span>
               </div>
             </td>
             <td>
@@ -356,10 +431,14 @@ async function descargar(formato) {
       <ul class="sv-cards">
         <li v-for="s in paginadosSv" :key="s.id" class="sv-card" :class="`sv-card--${nivelFila(s)}`" @click="router.push(`/pacientes/${s.id}`)">
           <div class="sv-card__top">
+            <input v-if="soloSinActivar" type="checkbox" class="sv-card__elegir" :checked="elegidos.has(s.id)" :disabled="!invitable(s)"
+                   :aria-label="`Elegir a ${nombreListado(s)}`" @click.stop @change="alternarElegido(s)" />
             <div class="sv-card__quien">
               <div class="sv-pac-nombre">{{ nombreListado(s) }}<span v-if="s.apodo" class="sv-pac-apodo"> «{{ s.apodo }}»</span></div>
               <div class="sv-pac-sec"><span class="sv-mono">DNI {{ dniLegible(s.dni) }}</span>
-                <span v-if="s.ultima_dispensacion"> · retiró {{ formatDate(s.ultima_dispensacion) }}</span></div>
+                <span v-if="s.ultima_dispensacion"> · retiró {{ formatDate(s.ultima_dispensacion) }}</span>
+                <span v-if="soloSinActivar && !s.portal?.tiene_mail" class="sv-sin-mail"> · sin mail</span>
+                <span v-if="soloSinActivar && s.portal?.invitado_at" class="sv-invitado"> · invitado el {{ formatDate(s.portal.invitado_at) }}</span></div>
             </div>
             <button v-if="canEdit" class="sv-action-btn" aria-label="Editar" @click.stop="openEdit(s)"><i class="bi bi-pencil"></i></button>
           </div>
@@ -415,6 +494,17 @@ async function descargar(formato) {
   .sv__kpi { flex: 0 0 132px; scroll-snap-align: start; padding: .75rem; }
   .sv__kpi-val { font-size: 1.5rem; }
 }
+.sv__chip { display: inline-flex; align-items: center; gap: .4rem; min-height: 40px; padding: .45rem .9rem; border-radius: 999px; border: 1.5px solid var(--c-slate-200); background: #fff; color: var(--c-slate-700); font-size: .82rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sv__chip:hover { border-color: var(--c-slate-400); }
+.sv__chip--on { border-color: var(--c-leaf-700); background: var(--c-leaf-50); color: var(--c-leaf-800); }
+.sv__lote { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; padding: .85rem 1rem; margin-bottom: 1rem; border: 1.5px solid var(--c-leaf-300); background: var(--c-leaf-50); border-radius: 12px; }
+.sv__lote-todos { display: inline-flex; align-items: center; gap: .5rem; font-size: .85rem; font-weight: 600; color: var(--c-leaf-800); cursor: pointer; margin-right: auto; }
+.sv__lote-todos input, .sv-td-elegir input, .sv-card__elegir { accent-color: var(--c-leaf-700); width: 18px; height: 18px; cursor: pointer; }
+.sv__lote-ayuda { flex-basis: 100%; margin: 0; font-size: .78rem; color: var(--c-slate-600); }
+.sv__lote-omitidos { flex-basis: 100%; margin: 0; padding-left: 1.1rem; font-size: .8rem; color: var(--c-slate-700); }
+.sv-sin-mail { color: var(--c-slate-400); }
+.sv-invitado { color: var(--c-leaf-600); }
+.sv-card__elegir { flex-shrink: 0; margin-top: .2rem; }
 .sv__kpi { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 12px; padding: 1rem; text-align: left; cursor: pointer; transition: all .15s; }
 .sv__kpi:hover { border-color: var(--c-slate-400); }
 .sv__kpi--active { border-color: var(--c-slate-900) !important; box-shadow: 0 0 0 1px var(--c-slate-900); }
@@ -429,8 +519,8 @@ async function descargar(formato) {
 .sv__kpi--gray.sv__kpi--active { border-color: var(--c-slate-500) !important; box-shadow: 0 0 0 1px var(--c-slate-500); }
 .sv__kpi-lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-400); }
 
-.sv__toolbar { margin-bottom: 1.25rem; display: flex; align-items: center; gap: .75rem; }
-.sv__search-wrap { flex: 1; }
+.sv__toolbar { margin-bottom: 1.25rem; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.sv__search-wrap { flex: 1 1 240px; }
 .sv__btn-export {
   display: flex; align-items: center; gap: .35rem;
   padding: .55rem .9rem; background: #1b5e20; color: #fff;
@@ -454,6 +544,7 @@ async function descargar(formato) {
 /* Los anchos van acá y no en el markup. Paciente NO tiene ancho a propósito: con
    `table-layout: fixed` es la única que se queda con lo que sobra. */
 .sv-col--ind    { width: 8px; }
+.sv-col--elegir { width: 44px; }
 .sv-col--estado { width: 130px; }
 .sv-col--rep    { width: 250px; }
 .sv-col--ultima { width: 130px; }
@@ -468,6 +559,7 @@ async function descargar(formato) {
 .sv-table__row--warn    { background: color-mix(in srgb, var(--c-amber-100) 30%, transparent); }
 
 .sv-td-ind { width: 8px; padding-right: 0 !important; }
+.sv-td-elegir { padding-right: 0 !important; vertical-align: middle; }
 .sv-indicator { width: 3px; height: 36px; border-radius: 999px; }
 .sv-ind--danger { background: var(--c-rust-600); }
 .sv-ind--warn   { background: var(--c-amber-500); }
@@ -503,7 +595,7 @@ async function descargar(formato) {
 .sv-card--info   { border-left-color: var(--c-sky-600); }
 .sv-card--ok     { border-left-color: var(--c-leaf-500); }
 .sv-card__top { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; }
-.sv-card__quien { min-width: 0; }
+.sv-card__quien { min-width: 0; flex: 1; }
 .sv-card__pills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
 .sv-card__datos { display: flex; flex-wrap: wrap; gap: .25rem .85rem; margin-top: .2rem; }
 

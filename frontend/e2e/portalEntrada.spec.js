@@ -36,9 +36,8 @@ test('el admin invita, el paciente activa con su DNI y después entra con DNI y 
   const link = page.locator('[data-testid="link-portal"]')
   await expect(link).toContainText('/portal/entrar/')
   const url = new URL((await link.textContent()).trim())
-  // El botón de WhatsApp lleva el mensaje con el link adentro.
-  const wa = await page.locator('[data-testid="link-portal-whatsapp"]').getAttribute('href')
-  expect(decodeURIComponent(wa)).toContain(url.pathname)
+  // Sin WhatsApp (27-oct-2026): el link viaja por mail; copiarlo queda de respaldo.
+  await expect(page.locator('[data-testid="link-portal-whatsapp"]')).toHaveCount(0)
 
   // ── 2. El paciente abre el link en su teléfono ────────────────────────────
   const telefono = await browser.newContext({ viewport: { width: 390, height: 844 } })

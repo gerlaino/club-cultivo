@@ -344,6 +344,9 @@ export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${paciente
 // Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña nueva.
 // El link para que el paciente entre a su portal (la primera vez o cuando perdió la clave).
 export const invitarPortalPaciente = (id) => api.post(`/pacientes/${id}/acceso/invitar`)
+// ¿El modal de dispensa ofrece mandarle la invitación al portal? { ofrecer, marcada } (27-oct-2026).
+export const getInvitacionPortal = (id) => api.get(`/pacientes/${id}/acceso/invitacion`)
+export const invitarPortalLote = (pacienteIds) => api.post('/pacientes/acceso/invitar_lote', { paciente_ids: pacienteIds })
 // El chat del portal, del lado de la organización (27-oct-2026).
 export const listChatPacientes   = (params = {}) => api.get('/mensajes_pacientes', { params })
 export const getChatPaciente     = (id) => api.get(`/pacientes/${id}/mensajes`)

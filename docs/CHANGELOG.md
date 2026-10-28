@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (gh) — La invitación al portal, por mail: en la próxima dispensa, en lote y para todo el padrón (27-oct)
+
+Germán: «no hay WhatsApp; al activar el portal, para todos los pacientes; la invitación por mail en
+la próxima dispensa; desde admin, invitar en lote» y «por las dudas agregá el check al crear dispensa».
+
+- **Abrir el portal lo habilita para todos** (`Club` `after_update_commit` → `HabilitarPortalJob` →
+  `PortalAcceso::HabilitarTodos`): cuenta para cada paciente activo y admitido que no la tenía, sin
+  mandar nada. Con eso el «me olvidé la clave» ya contesta a los pacientes de antes del portal.
+- **El tilde en la dispensa**: «Mandarle por mail cómo entrar a su portal» en el paso 3 del modal (y al
+  entregar una reserva). Lo ofrece el backend (`GET /pacientes/:id/acceso/invitacion`,
+  `PortalAcceso::InvitacionEnDispensa`): con mail, sin activar y sin link vigente; marcado salvo que se
+  lo haya invitado en los últimos 30 días. El create lo vuelve a validar, la dispensa nunca falla por el
+  mail y el aviso dice «le mandamos el mail para entrar a su portal».
+- **Invitar en lote**: en Pacientes, «Portal: sin activar» filtra y deja elegir (los sin mail, sin
+  casilla); «Mandar invitación por mail» (`POST /pacientes/acceso/invitar_lote`, sólo admin): un mail por
+  paciente, tope de 450 por día (cuentan los links que salieron hoy), los que no se pueden vuelven con
+  el motivo. Los links salen por la casilla de la organización si la conectó (y entonces el tope es el
+  cupo del correo, `Correo::CupoDiario`); si no, por la de la plataforma. La fila dice «invitado el dd/mm». La fila trae `portal` sólo para admin con el portal abierto.
+- **Sin WhatsApp**: el modal del link queda con «Copiar el link».
+- `Paciente#portal_activado?` y `#link_portal_vigente` (la ficha y lo nuevo leen lo mismo).
+- Specs: `portal_invitacion_en_dispensa_spec`, `portal_invitar_lote_spec`, `habilitar_todos_spec`
+  (29 casos, con aislamiento de tenant y el caso de UN solo paciente en el lote) y
+  `dispensaInvitarPortal.test.js`. Visto en Playwright (compu y teléfono) contra la demo local.
+
 ## Octubre 2026 (gg) — El portal del paciente, para usarse: entrada con DNI, dispensas con trazabilidad, chat, renovación del REPROCANN, «Asistiré» y catálogo (27-oct)
 
 Germán: «quiero que implementes y desarrolles el portal del paciente, teniendo en cuenta todas las

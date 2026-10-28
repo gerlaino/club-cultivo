@@ -155,6 +155,16 @@ class Paciente < ApplicationRecord
   def aprobado?  = aprobado_at.present?
   def pendiente_aprobacion? = aprobado_at.nil?
 
+  # «Activó» el portal = eligió su clave desde un link. Antes de eso no hay forma de que la sepa:
+  # la inicial no se le muestra a nadie (`Pacientes::Acceso`).
+  def portal_activado? = accesos_portal.where.not(usado_at: nil).exists?
+
+  # El link sin usar que todavía sirve, si hay uno. Cada link nuevo anula el anterior.
+  def link_portal_vigente
+    accesos_portal.where(usado_at: nil, anulado_at: nil).where('expira_at > ?', Time.current)
+                  .order(created_at: :desc).first
+  end
+
   def aprobar!(usuario)
     return false if aprobado?
     update!(aprobado_at: Time.current, aprobado_por: usuario, updated_by: usuario)

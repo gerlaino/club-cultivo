@@ -319,12 +319,16 @@ Rails.application.routes.draw do
         # Resolver el carnet escaneado a su paciente. El endpoint público (/c/:token) devuelve el
         # carnet anonimizado a propósito; el dispensador está autenticado y necesita la ficha.
         get 'por_carnet/:token', action: :por_carnet
+        # Invitar al portal a varios a la vez, desde la lista (27-oct-2026).
+        post 'acceso/invitar_lote', action: :invitar_portal_lote
       end
       # Admitir a alguien cargado desde el mostrador. Sólo admin y médico (ver Paciente).
       member do
         post :aprobar
         # El link para entrar a su portal: la primera vez y cuando perdió la clave (27-oct-2026).
         post 'acceso/invitar', action: :invitar_portal
+        # Si el modal de dispensa ofrece mandarle la invitación (27-oct-2026).
+        get  'acceso/invitacion', action: :invitacion_portal
         # El chat del portal con este paciente, del lado de la organización (27-oct-2026).
         get  'mensajes',          to: 'mensajes_pacientes#show'
         post 'mensajes',          to: 'mensajes_pacientes#create'

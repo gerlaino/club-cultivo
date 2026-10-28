@@ -272,7 +272,13 @@ class DispensacionesController < ApplicationController
       end
     end
 
-    render json: serialize_dispensacion(@dispensacion), status: :created
+    json = serialize_dispensacion(@dispensacion)
+    # «Mandarle por mail cómo entrar a su portal» (27-oct-2026): después de guardar, y sin poder
+    # hacer fallar a la dispensa. Si no corresponde (`InvitacionEnDispensa`), el tilde se ignora.
+    if ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :invitar_portal))
+      json[:invitacion_portal] = PortalAcceso::InvitacionEnDispensa.mandar_si_corresponde(@paciente, por: current_user)
+    end
+    render json: json, status: :created
 
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity

@@ -38,7 +38,7 @@
         También podés mandarle un link nuevo desde acá.
       </p>
       <p v-else class="stp__nota">
-        Mandale el link: lo abre, pone su DNI y elige su clave. {{ acceso.tiene_mail ? 'Le llega también a su mail.' : 'No tiene mail cargado: mandáselo por WhatsApp.' }}
+        Mandale el link: lo abre, pone su DNI y elige su clave. {{ acceso.tiene_mail ? 'Le llega también a su mail.' : 'No tiene mail cargado: cargáselo en la ficha, o copiá el link y pasáselo vos.' }}
       </p>
 
       <div v-if="acceso.puede_gestionar && acceso.portal_abierto && acceso.activo" class="stp__acts">

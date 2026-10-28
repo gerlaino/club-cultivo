@@ -10,7 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import { hoyISO, toISO } from '../../utils/dates.js'
 import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
-         getMostrador, listMostradores } from '../../lib/api.js'
+         getMostrador, listMostradores, getInvitacionPortal } from '../../lib/api.js'
 import SelectorDireccionEntrega from './SelectorDireccionEntrega.vue'
 import ResumenDispensaModal from './ResumenDispensaModal.vue'
 import { useEtiquetaDispensa } from '../../composables/useEtiquetaDispensa.js'
@@ -857,6 +857,26 @@ const precioFinal = computed(() => {
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
 const totalProductos = computed(() => precioFinal.value ?? 0)
 
+// «Mandarle por mail cómo entrar a su portal» (27-oct-2026): la invitación llega en la próxima
+// dispensa. Si se ofrece y si viene marcado lo decide el backend (`InvitacionEnDispensa`): sólo
+// cuando tiene mail y no lo activó; sin marcar si ya se lo invitó en los últimos 30 días.
+const invitacionPortal = ref({ ofrecer: false, marcada: false })
+const invitarPortal = ref(false)
+async function cargarInvitacionPortal() {
+  invitacionPortal.value = { ofrecer: false, marcada: false }
+  invitarPortal.value = false
+  if (modoCambio.value) return
+  try {
+    const { data } = await getInvitacionPortal(props.socioId)
+    invitacionPortal.value = data?.data || { ofrecer: false, marcada: false }
+    invitarPortal.value = !!invitacionPortal.value.marcada
+  } catch { /* sin el dato no se ofrece: la dispensa sigue igual */ }
+}
+const ofrecerInvitacion = computed(() => invitacionPortal.value.ofrecer && !form.value.es_reserva)
+function avisoDispensa(base, resp) {
+  return resp?.invitacion_portal?.mail_enviado ? `${base} · le mandamos el mail para entrar a su portal` : base
+}
+
 watch(() => props.modelValue, (open) => {
   if (open) {
     form.value = emptyForm()
@@ -870,6 +890,7 @@ watch(() => props.modelValue, (open) => {
     cargarStocks().then(precargarCambio)
     cargarEstadoCaja()
     cargarCajasAbiertas()
+    cargarInvitacionPortal()
     // Cambio: gratis por dentro (mismo camino que el regalo: sin medio, sin crédito), y el
     // backend lo ata a la anulada con `reemplaza_a_id`.
     if (modoCambio.value) form.value.es_regalo = true
@@ -1108,9 +1129,10 @@ async function handleSubmit() {
         payload.contacto_nombre   = form.value.contacto_nombre || undefined
         payload.contacto_telefono = form.value.contacto_telefono || undefined
       }
-      await entregarReserva(props.reserva.id, payload)
+      if (ofrecerInvitacion.value && invitarPortal.value) payload.invitar_portal = true
+      const { data: entregada } = await entregarReserva(props.reserva.id, payload)
       cerrar()
-      toast.success('Reserva entregada')
+      toast.success(avisoDispensa('Reserva entregada', entregada))
       emit('saved')
     } catch (e) {
       const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al entregar la reserva'
@@ -1261,6 +1283,7 @@ async function handleSubmit() {
     }
     // El backend descuenta el saldo a favor antes que cualquier línea, salvo que se destilde.
     payload.usar_saldo_a_favor = usarSaldo.value
+    if (ofrecerInvitacion.value && invitarPortal.value) payload.invitar_portal = true
     if (modoCambio.value) payload.reemplaza_a_id = props.cambioDe.id
     else if (form.value.es_regalo) payload.es_regalo = true
     // El total lo calcula el server (la suma menos los descuentos): no se manda.
@@ -1307,7 +1330,7 @@ async function handleSubmit() {
     if (!decision) { saving.value = false; return }
     const { data: creada } = await createDispensacion(props.socioId, payload)
     cerrar()
-    toast.success(modoCambio.value ? 'Cambio entregado' : 'Dispensación registrada')
+    toast.success(modoCambio.value ? 'Cambio entregado' : avisoDispensa('Dispensación registrada', creada))
     emit('saved')
     if (decision === 'imprimir') imprimirEtiqueta(creada?.data || creada)
   } catch (e) {
@@ -2116,6 +2139,17 @@ async function handleSubmit() {
             </span>
           </div>
 
+          <!-- La invitación al portal, con el paciente enfrente (27-oct-2026). -->
+          <label v-if="ofrecerInvitacion" class="mnd__portal" data-test="invitar-portal">
+            <input type="checkbox" v-model="invitarPortal" />
+            <span>
+              Mandarle por mail cómo entrar a su portal
+              <span class="mnd__opt">{{ invitacionPortal.marcada
+                ? 'Todavía no entró: le llega un link para elegir su clave.'
+                : 'Ya se lo invitamos este mes y todavía no entró. Marcalo para mandárselo de nuevo.' }}</span>
+            </span>
+          </label>
+
           <!-- Observaciones -->
           <div class="mnd__field">
             <label class="mnd__label">Observaciones <span class="mnd__opt">opcional</span></label>
@@ -2587,6 +2621,9 @@ async function handleSubmit() {
 .mnd__cambio-box { display: flex; gap: .6rem; align-items: flex-start; margin: .2rem 0 .9rem; padding: .7rem .85rem; background: var(--c-rust-100); border: 1.5px solid var(--c-rust-100); border-radius: 10px; font-size: .82rem; color: var(--c-slate-700); line-height: 1.45; }
 .mnd__cambio-box > i { color: var(--c-rust-600); font-size: 1rem; margin-top: .05rem; }
 .mnd__cambio-box--pasado { border-color: var(--c-rust-600); }
+.mnd__portal { display: flex; align-items: flex-start; gap: .55rem; margin: .2rem 0 .9rem; padding: .7rem .85rem; background: var(--c-leaf-50); border: 1.5px solid var(--c-leaf-300); border-radius: 10px; font-size: .84rem; font-weight: 600; color: var(--c-leaf-800); cursor: pointer; }
+.mnd__portal input { margin-top: .15rem; accent-color: var(--c-leaf-700); }
+.mnd__portal .mnd__opt { display: block; font-weight: 400; color: var(--c-slate-600); margin-top: .1rem; }
 .mnd__regalo { display: flex; align-items: flex-start; gap: .55rem; margin-top: .9rem; padding: .7rem .85rem; background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; font-size: .84rem; font-weight: 600; color: #6b21a8; cursor: pointer; }
 .mnd__regalo input { margin-top: .15rem; accent-color: #7c3aed; }
 .mnd__regalo .mnd__opt { display: block; font-weight: 400; color: #a78bca; margin-top: .1rem; }

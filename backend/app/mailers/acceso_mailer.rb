@@ -1,6 +1,10 @@
 # Mails de ACCESO a la plataforma: salen por la casilla de la PLATAFORMA (`Club::PLATFORM_FROM`
 # y el SMTP del entorno), no por la de la organización. Es a propósito: quien no puede entrar
 # no puede conectar su correo, y el admin sin contraseña es exactamente ese caso.
+#
+# La excepción es `portal_link`: al paciente lo invita SU organización, así que sale por la casilla
+# de ella cuando la conectó (Germán, 27-oct-2026). Si no la conectó, por la de la plataforma: el
+# portal y el «me olvidé la clave» no pueden depender de que alguien haya cargado el correo.
 class AccesoMailer < ApplicationMailer
   # El link para elegir una contraseña nueva. Va a `email_real`, nunca al login inventado.
   def restablecer_contrasena(user:, token:)
@@ -25,7 +29,8 @@ class AccesoMailer < ApplicationMailer
 
   # El link del portal del paciente: la invitación de la organización o el «me olvidé la clave».
   # Va al mail de la FICHA del paciente (su usuario de ingreso es su DNI, no un mail). No lleva
-  # ningún dato de salud: sólo el nombre, la organización y el link.
+  # ningún dato de salud: sólo el nombre, la organización y el link. Sale por la casilla de la
+  # organización si la conectó (ver arriba).
   def portal_link(acceso:, token:)
     @paciente = acceso.paciente
     @club     = acceso.club
@@ -34,7 +39,12 @@ class AccesoMailer < ApplicationMailer
     @vence    = acceso.expira_at.in_time_zone('America/Argentina/Buenos_Aires')
     adjuntar_logo(@club)
     asunto = @invita ? "#{@club.name} te invita a tu portal de paciente" : 'Elegí una clave nueva para tu portal'
-    mail(to: @paciente.email, subject: asunto)
+    opts = { to: @paciente.email, subject: asunto }
+    if @club.email_propio?
+      opts[:from] = @club.email_from
+      opts[:delivery_method_options] = @club.email_delivery_options
+    end
+    mail(**opts)
   end
 
   # Aviso de que la contraseña cambió. Como el perfil ya no pide la actual para cambiarla, esto es

@@ -5,7 +5,7 @@
         <div class="lpn__head">
           <i class="bi bi-send-check-fill"></i>
           <div>
-            <h3 id="lpn-titulo" class="lpn__title">Mandale el link a {{ primerNombre }}</h3>
+            <h3 id="lpn-titulo" class="lpn__title">El link del portal de {{ primerNombre }}</h3>
             <p class="lpn__sub">Con este link entra a su portal: pone su DNI y elige su clave. Sirve una sola vez y vence {{ vence }}.</p>
           </div>
         </div>
@@ -18,13 +18,10 @@
         </div>
 
         <p v-if="datos.mail_enviado" class="lpn__mail"><i class="bi bi-envelope-check"></i> También se lo mandamos a su mail.</p>
-        <p v-else class="lpn__mail lpn__mail--off"><i class="bi bi-envelope-slash"></i> No tiene mail cargado: mandáselo por WhatsApp.</p>
+        <p v-else class="lpn__mail lpn__mail--off"><i class="bi bi-envelope-slash"></i> No tiene mail cargado: cargáselo en la ficha, o copiá el link y pasáselo vos.</p>
 
         <div class="lpn__acts">
-          <a class="lpn__btn lpn__btn--wa" :href="whatsapp" target="_blank" rel="noopener" data-testid="link-portal-whatsapp">
-            <i class="bi bi-whatsapp"></i> Mandar por WhatsApp
-          </a>
-          <button class="lpn__btn" @click="copiar(datos.texto, 'Mensaje copiado')">Copiar el mensaje</button>
+          <button class="lpn__btn" @click="copiar(datos.url, 'Link copiado')">Copiar el link</button>
           <button class="lpn__btn lpn__btn--primary" @click="cerrar">Listo</button>
         </div>
       </div>
@@ -53,9 +50,8 @@ const vence = computed(() => {
   const d = new Date(props.datos.expira_at)
   return `el ${d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'numeric' })} a las ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
 })
-// Sin número: WhatsApp le pregunta a quién mandárselo. Adivinar el número a partir de cómo se
-// cargó el teléfono (con o sin 15, con o sin 0) manda el link a otra persona.
-const whatsapp = computed(() => `https://wa.me/?text=${encodeURIComponent(props.datos?.texto || '')}`)
+// Sin WhatsApp (27-oct-2026): el link viaja por mail. Copiarlo queda de respaldo para el que no
+// tiene mail cargado.
 
 async function copiar(texto, aviso) {
   try {
@@ -93,7 +89,6 @@ function cerrar() { emit('cerrar') }
   border: 1px solid var(--c-slate-200); background: #fff; color: var(--c-slate-700);
 }
 .lpn__btn:hover { background: var(--c-slate-50); }
-.lpn__btn--wa { border-color: var(--c-leaf-600); color: var(--c-leaf-700); }
 .lpn__btn--primary { background: var(--c-leaf-700); border-color: var(--c-leaf-700); color: #fff; }
 .lpn__btn--primary:hover { background: var(--c-leaf-800); }
 </style>
