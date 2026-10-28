@@ -60,8 +60,22 @@
               <span v-if="l.dias_en_estado != null"><Clock :size="13" :stroke-width="2" /> hace {{ l.dias_en_estado }} día{{ l.dias_en_estado === 1 ? '' : 's' }}</span>
             </div>
           </div>
+          <div v-if="abiertaDe(l)" class="apm__card-meta">
+            <span><Clock :size="13" :stroke-width="2" /> Jornada abierta de {{ abiertaDe(l).manicurador_nombre }}: {{ abiertaDe(l).plantas_registradas }} planta{{ abiertaDe(l).plantas_registradas === 1 ? '' : 's' }} · {{ abiertaDe(l).peso_calculado_g }} g</span>
+          </div>
           <div class="apm__card-actions">
             <RouterLink :to="`/lotes/${l.id}`" class="apm__btn-eliminar" style="text-decoration:none">Ver lote</RouterLink>
+            <button
+              v-if="abiertaDe(l)?.plantas_registradas > 0"
+              class="apm__btn-eliminar"
+              :disabled="enviandoId === abiertaDe(l).id"
+              @click="mandarAConfirmar(abiertaDe(l))"
+            >
+              <Send :size="13" :stroke-width="2.5" /> Mandar a confirmar
+            </button>
+            <button class="apm__btn-confirmar" @click="abrirPesar(l)">
+              <Scale :size="13" :stroke-width="2.5" /> Pesar
+            </button>
           </div>
         </div>
       </div>
@@ -270,8 +284,8 @@ import { formatG } from '../../lib/formatters.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw, Plus } from 'lucide-vue-next'
-import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
+import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw, Plus, Send } from 'lucide-vue-next'
+import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, enviarPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -296,6 +310,31 @@ const enCurso = computed(() => {
     l.manicurador_id !== auth.user?.id && !enviados.has(l.id)
   )
 })
+// Las jornadas abiertas de las manicuras (27-oct-2026): el admin ve cuánto lleva pesado cada una
+// y puede mandarla a confirmar él, sin esperar a que ella la cierre. Lo pesado sigue siendo de ella.
+const abiertas   = ref([])
+const enviandoId = ref(null)
+function abiertaDe(l) {
+  return abiertas.value.find(p => p.lote_id === l.id && p.manicurador_id === l.manicurador_id) || null
+}
+async function mandarAConfirmar(p) {
+  const ok = await confirm({
+    title: 'Mandar a confirmar',
+    message: `La jornada de ${p.manicurador_nombre} (${p.plantas_registradas} plantas · ${p.peso_calculado_g} g) pasa a «Para confirmar». Si quiere seguir pesando, abre una jornada nueva.`,
+    confirmText: 'Mandar a confirmar',
+  })
+  if (!ok) return
+  enviandoId.value = p.id
+  try {
+    await enviarPesajeManicura(p.lote_id, p.id)
+    toast.success('Jornada enviada a confirmar')
+    cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo mandar a confirmar')
+  } finally {
+    enviandoId.value = null
+  }
+}
 const showPesar   = ref(false)
 const lotePesar   = ref(null)
 function abrirPesar(l) { lotePesar.value = l; showPesar.value = true }
@@ -341,6 +380,10 @@ async function cargar() {
   } finally {
     loading.value = false
   }
+  try {
+    const { data } = await listPesajesManicuraAdmin({ abiertas: 1 })
+    abiertas.value = data || []
+  } catch { abiertas.value = [] }
   // Cosechas en manicura asignadas a mí, todavía sin un pesaje enviado.
   try {
     const { data } = await listLotes({ estado: 'en_manicura' })

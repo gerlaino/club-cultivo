@@ -181,11 +181,12 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(response).to have_http_status(:created)
   end
 
-  it 'el admin NO puede crear un pesaje batch si el lote está asignado a un manicura' do
+  # Germán, 27-oct-2026: admin y supervisor pesan aunque el lote esté asignado a una manicura.
+  it 'el admin SÍ puede crear un pesaje batch aunque el lote esté asignado a un manicura' do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura", headers: auth_headers
-    expect(response).to have_http_status(:forbidden)
+    expect(response).to have_http_status(:created)
   end
 
   it 'el admin SÍ puede crear un pesaje si el lote no tiene manicura asignado' do
@@ -318,13 +319,14 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     expect(p2.reload.peso_seco.to_f).to eq(10.0)
   end
 
-  it 'registrar_directo: bloqueado si el lote tiene un manicura asignado' do
+  # Germán, 27-oct-2026: el admin registra directo aunque el lote tenga una manicura asignada.
+  it 'registrar_directo: también si el lote tiene un manicura asignado' do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
          params: { resto: { plantas_count: 1, peso_total_g: 10 } },
          headers: auth_headers, as: :json
-    expect(response).to have_http_status(:forbidden)
+    expect(response).to have_http_status(:created), response.body
   end
 
   # Al confirmar un pesaje sin elegir contenedor se crea un Stock 'pendiente_asignacion'

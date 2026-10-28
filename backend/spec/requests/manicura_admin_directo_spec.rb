@@ -40,16 +40,16 @@ RSpec.describe 'Manicura registrada por admin', type: :request do
     expect(ps.last(2).map { |p| p.reload.peso_seco }).to all(be_blank)
   end
 
-  # El candado de manicura asignada sigue mandando: si el lote es de otra persona, ni el
-  # admin lo pesa por ella.
-  it 'no aplica si el lote está asignado a otro responsable' do
+  # Germán, 27-oct-2026: el admin pesa aunque el lote esté asignado a una manicura (antes el
+  # candado se lo impedía). Ver `manicura_admin_pesa_ajeno_spec.rb`.
+  it 'también aplica si el lote está asignado a una manicura' do
     plantas!(2)
     lote.update!(manicurador: create(:user, :manicura, club: club))
 
     post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
          params: { resto: { peso_total_g: 100 } }, as: :json
 
-    expect(response).to have_http_status(:forbidden)
+    expect(response).to have_http_status(:created)
   end
 
   it 'el pesaje de un manicura SÍ queda pendiente de aprobación' do

@@ -661,6 +661,16 @@ class Lote < ApplicationRecord
   # Admin asigna un manicurador → cosecha → en_manicura (nuevo flujo).
   ROLES_MANICURA = %w[manicura admin supervisor].freeze
 
+  # Quién pesa en la manicura (Germán, 27-oct-2026). Admin y supervisor pesan siempre, aunque el
+  # lote esté asignado a otra manicura: lo suyo va a SU jornada y lo ya pesado queda en la de ella
+  # (una planta se pesa en una sola jornada). Otra manicura sigue sin poder: dos manicuras sobre el
+  # mismo lote se pisan. Es la única regla para las tres puertas (QR, carga conjunta, directo).
+  def pesa_manicura?(user)
+    return true if user.admin? || user.supervisor?
+
+    user.manicura? && (manicurador_id.nil? || manicurador_id == user.id)
+  end
+
   def asignar_manicurador!(manicurador:, asignado_por:, sala_id: nil)
     raise ArgumentError, "El lote no está en cosecha" unless estado == 'cosecha'
     raise ArgumentError, "El usuario no tiene rol válido para manicura" unless ROLES_MANICURA.include?(manicurador.role)

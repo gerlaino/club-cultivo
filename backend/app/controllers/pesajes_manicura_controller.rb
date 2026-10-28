@@ -24,18 +24,20 @@ class PesajesManicuraController < ApplicationController
     render json: pesajes.recientes.map { |p| PesajeManicuraSerializer.serialize(p) }
   end
 
-  # GET /pesajes_manicura — admin/supervisor: todos los enviados del club
+  # GET /pesajes_manicura — admin/supervisor: todos los enviados del club. Con `abiertas=1`, las
+  # jornadas abiertas de cada manicura (27-oct-2026): el admin las ve y puede mandarlas a confirmar.
   def index_admin
     unless current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
+    abiertas = ActiveModel::Type::Boolean.new.cast(params[:abiertas])
     # joins(:lote) aplica el default_scope del lote (deleted_at: nil) → un pesaje cuyo lote fue
     # borrado NUNCA aparece en el board (defensa además del cleanup en Lote#soft_delete!).
     pesajes = current_user.club.pesajes_manicura
-                          .enviados
+                          .then { |r| abiertas ? r.borradores.where(lotes: { estado: 'en_manicura' }) : r.enviados }
                           .joins(:lote)
                           .includes(:lote, :manicurador, :stock, pesadas_plantas: :plant)
-                          .order(enviado_at: :desc)
+                          .order(abiertas ? { created_at: :desc } : { enviado_at: :desc })
     render json: pesajes.map { |p| PesajeManicuraSerializer.serialize(p, include_plantas: true) }
   end
 
@@ -48,18 +50,13 @@ class PesajesManicuraController < ApplicationController
   # Crea un pesaje (borrador) para cargar plantas por QR. Si se pasan plantas_count +
   # peso_total_g es una CARGA MANUAL sin QR; con enviar=true se manda a confirmar en el acto.
   def create
-    # Cualquier usuario con rol manicura/admin/supervisor del club puede registrar un
-    # pesaje en un lote en manicura (es trabajo de equipo sobre el batch — varios pesan a
-    # la vez). El "responsable" (manicurador_id) sigue siendo quien lo tiene asignado, pero
-    # no bloquea a los demás. La trazabilidad queda cubierta: el pesaje guarda quién lo
-    # registró y los de no-admin requieren confirmación antes de impactar el stock.
+    # Quién pesa: `Lote#pesa_manicura?` (admin y supervisor siempre; otra manicura no, si el lote
+    # tiene responsable). El pesaje guarda quién lo registró y los de no-admin requieren
+    # confirmación antes de impactar el stock.
     unless current_user.manicura? || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
-    # Si el lote tiene un manicura asignado, SOLO esa persona registra el pesaje (evita
-    # ediciones concurrentes / pesos que se pisan). Si no hay asignado, cualquiera de los
-    # roles habilitados puede. (Provisorio hasta afinar el flujo de equipo.)
-    if @lote.manicurador_id.present? && @lote.manicurador_id != current_user.id
+    unless @lote.pesa_manicura?(current_user)
       return render json: { error: 'Este lote está asignado a otro responsable de manicura. Solo esa persona puede registrar el pesaje.' }, status: :forbidden
     end
     unless @lote.estado == 'en_manicura'
@@ -120,14 +117,11 @@ class PesajesManicuraController < ApplicationController
   # POST /lotes/:lote_id/pesajes_manicura/registrar_directo
   # Atajo del admin/supervisor (última palabra): pesa Y confirma en un solo paso, sin pasar
   # por la cola de aprobación. Acepta pesos individuales por planta y/o una carga conjunta
-  # del resto, más un contenedor (stock_id) y sede destino. Solo si el lote no tiene un
-  # manicura asignado (o está asignado a sí mismo).
+  # del resto, más un contenedor (stock_id) y sede destino. También en un lote asignado a una
+  # manicura (27-oct-2026): pesa las plantas que ella no pesó; las de su jornada siguen siendo suyas.
   def registrar_directo
     unless current_user.admin? || current_user.supervisor?
       return render json: { error: 'Solo admin o supervisor pueden registrar directo' }, status: :forbidden
-    end
-    unless @lote.manicurador_id.nil? || @lote.manicurador_id == current_user.id
-      return render json: { error: 'El lote está asignado a un manicura' }, status: :forbidden
     end
     unless @lote.estado == 'en_manicura'
       return render json: { error: 'El lote no está en manicura activa' }, status: :unprocessable_entity
@@ -305,7 +299,8 @@ class PesajesManicuraController < ApplicationController
   end
 
   # POST /lotes/:lote_id/pesajes_manicura/:id/enviar
-  # Manicurador cierra el día y manda a aprobación.
+  # Manicurador cierra el día y manda a aprobación. Admin/supervisor también pueden mandar a
+  # confirmar la jornada abierta de una manicura (27-oct-2026): lo pesado sigue siendo de ella.
   def enviar
     unless @pesaje.manicurador == current_user || current_user.admin? || current_user.supervisor?
       return render json: { error: 'No autorizado' }, status: :forbidden

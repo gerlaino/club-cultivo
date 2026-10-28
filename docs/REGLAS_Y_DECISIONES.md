@@ -939,6 +939,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   confirmar/enviar/reajustar/quitar van con candado; el destino es un frasco de flor seca del lote;
   reajustar después del cierre recalcula el rendimiento del lote. `rake manicura:diagnostico`
   encuentra lo que haya quedado mal de antes.
+- **QUIÉN PESA** (Germán, 27-oct-2026): **admin y supervisor pesan siempre**, aunque el lote esté
+  asignado a otra manicura (QR, carga conjunta y «registrar directo»: el suyo queda confirmado). Lo
+  que ella ya pesó queda en SU jornada (una planta, una jornada) y el lote no cierra hasta que se
+  confirme. El admin ve la jornada abierta de ella en «Pesajes de manicura» (`GET /pesajes_manicura
+  ?abiertas=1`) y puede **«Mandar a confirmar»** (`…/enviar`); sigue siendo de ella. **Otra manicura
+  sigue sin poder** pesar ni enviar un lote que no es suyo. Una regla, `Lote#pesa_manicura?`, para
+  las tres puertas; el candado viejo («ni el admin lo pesa por ella») quedó derogado.
 - **«EN REVISIÓN POR X»** (16-oct-2026, Javi: «al abrir para confirmar se debería bloquear al
   manicura»): abrir «Confirmar» toma el pesaje (`POST …/revisar`, `revisando_por`/`revisando_at`);
   mientras dure nadie más lo reabre, lo borra, lo devuelve a cosecha ni lo confirma. Se libera al

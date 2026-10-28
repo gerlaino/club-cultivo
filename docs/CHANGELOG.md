@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (gi) — Admin y supervisor pesan el lote de una manicura y le mandan la jornada a confirmar (28-oct)
+
+- **Quién pesa, una sola regla** (`Lote#pesa_manicura?`): admin y supervisor pesan aunque el lote esté
+  asignado a otra manicura, por QR (`plants#registrar_peso`), carga conjunta (`pesajes_manicura#create`)
+  y «registrar directo» (que queda confirmado). Otra manicura sigue sin poder. Lo que ella ya pesó se
+  queda en su jornada: el resto del admin reparte sólo entre las plantas que nadie pesó.
+- **«Mandar a confirmar»**: en «Pesajes de manicura», cada lote asignado muestra la jornada abierta de
+  la manicura (plantas y gramos, `GET /pesajes_manicura?abiertas=1`) con «Pesar» y «Mandar a
+  confirmar» (pide confirmación; la jornada pasa a «Para confirmar» y sigue a nombre de ella).
+- «Completar manicura» del admin/supervisor registra directo también en un lote ajeno.
+- Specs: `manicura_admin_pesa_ajeno_spec.rb` (admin y supervisor por cada puerta, la planta de ella no
+  se toca, otra manicura no, aislamiento de organización) y `manicuraAdminPesaAjeno.test.js`; los
+  specs del candado viejo pasaron al AC nuevo.
+
 ## Octubre 2026 (gh) — La invitación al portal, por mail: en la próxima dispensa, en lote y para todo el padrón (27-oct)
 
 Germán: «no hay WhatsApp; al activar el portal, para todos los pacientes; la invitación por mail en

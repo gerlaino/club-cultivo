@@ -112,12 +112,10 @@ const error  = ref(null)
 const saving = ref(false)
 
 // El admin/supervisor tiene la última palabra: su pesaje se confirma solo y genera el stock.
-// Mandarlo a la cola de aprobación lo dejaba esperando que él mismo se aprobara. El atajo no
-// aplica si el lote está asignado a otro manicura: ahí el candado de asignación manda.
+// Mandarlo a la cola de aprobación lo dejaba esperando que él mismo se aprobara. Vale también en
+// un lote asignado a una manicura (27-oct-2026, `Lote#pesa_manicura?`): pesa lo que ella no pesó.
 const auth = useAuthStore()
-const confirmaSolo = computed(() =>
-  ['admin', 'supervisor'].includes(auth.user?.role) &&
-  (!props.lote?.manicurador_id || props.lote.manicurador_id === auth.user?.id))
+const confirmaSolo = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 
 // Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
 const { registrarConJornada } = useManicuraJornada()
