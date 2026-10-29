@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore }   from "../stores/auth";
 import { useClubStore }   from "../stores/club";
+import { rutaDePuerta } from "../lib/puertaPortal.js";
 import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
@@ -1391,7 +1392,7 @@ const ROLE_ALLOWED_PREFIX = {
   // El paciente sólo ve lo suyo y el portal que le arma su organización. No lleva `COMUNES`
   // como los demás: ahí adentro está `/mis-horas`, que es la planilla de quien TRABAJA en la
   // organización. Y no lleva "/" a propósito — es el tablero de la organización.
-  paciente:   ['/portal', '/perfil', '/login', '/bienvenida'],
+  paciente:   ['/portal', '/login', '/bienvenida'],
 }
 
 // Decisión pura, exportada para poder verificarla sin montar el router: ¿este rol puede
@@ -1547,11 +1548,14 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     // El portal es del paciente: sin sesión, a SU puerta (DNI y clave), no al login del equipo.
-    if (to.path === '/portal' || to.path.startsWith('/portal/')) return { name: 'portal-entrar' };
+    if (to.path === '/portal' || to.path.startsWith('/portal/')) return rutaDePuerta();
     return { name: "login", query: { redirect: to.fullPath } };
   }
   // El paciente con sesión que vuelve a su puerta, directo a su portal.
   if ((to.path === '/paciente' || to.path.startsWith('/paciente/')) && auth.user?.role === 'paciente') return '/portal';
+  // Su cuenta vive dentro del portal: `/perfil` es la pantalla del equipo (y el backend ya no le
+  // deja cambiar nombre ni mail de ingreso).
+  if (to.path === '/perfil' && auth.user?.role === 'paciente') return '/portal/cuenta';
   if (to.meta.guestOnly && auth.isAuthenticated) {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";

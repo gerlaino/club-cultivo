@@ -1676,6 +1676,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **EL PACIENTE SÓLO LLEGA A SU PORTAL** (28-oct-2026; un paciente leía el padrón entero por
+  `/api/pacientes`). La barrera es UNA y es lista de lo permitido (`paciente_solo_en_su_portal!`), no
+  `require_*` por controller. Un endpoint nuevo para el paciente va bajo `portal/`; si no, no le llega.
+  `spec/security/paciente_solo_su_portal_spec.rb` barre todas las rutas: no se saltea ni se achica.
+- **EL PORTAL SE INSTALA COMO LA APP DE SU ORGANIZACIÓN**: manifest por organización que abre en su puerta,
+  y todo mail del link dice dónde entrar después (el link sirve una vez).
 - **CADA ORGANIZACIÓN TIENE SU PUERTA DEL PORTAL** (Germán, 28-oct-2026: «se tiene que mostrar el portal
   del club que se elija»). `/paciente/<slug>` dice de cuál es antes de pedir nada y todo lo que pasa por
   ahí (link, cuenta) es sólo de esa organización. El cartel y el panel llevan esa puerta. Todo mail y

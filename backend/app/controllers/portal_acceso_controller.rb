@@ -146,6 +146,37 @@ class PortalAccesoController < ApplicationController
     render json: organizacion_json(club)
   end
 
+  # GET /api/portal_acceso/organizaciones/:slug/manifest
+  #
+  # El portal instalado en el teléfono (28-oct-2026, Germán: «las indicaciones para que instale la
+  # PWA para poder entrar al portal es fundamental»). Es otra app que la del equipo: se llama como
+  # SU organización y abre en SU puerta (`/paciente/<slug>`), que con la sesión abierta pasa directo
+  # al portal. La del equipo abre en `/m`, que al paciente no le sirve.
+  def manifest
+    club = PortalAcceso::Cuentas.puerta(params[:slug])
+    return head :not_found unless club
+
+    # Absolutas: el manifest se pide a la API y las direcciones son de la app (en producción es el
+    # mismo dominio; en desarrollo no, y relativas quedaban apuntando al puerto de la API).
+    puerta = "#{App.base_url}/paciente/#{club.slug}"
+    icono  = club.logo.attached? ? url_for(club.logo) : "#{App.base_url}/logo-ce-redondo.png"
+    color  = club.theme_primary.presence || '#0F2A1E'
+    render json: {
+      id:               puerta,
+      name:             club.name,
+      short_name:       club.name.to_s.truncate(24, omission: ''),
+      description:      "Tu portal de paciente de #{club.name}",
+      lang:             'es',
+      start_url:        puerta,
+      scope:            "#{App.base_url}/",
+      display:          'standalone',
+      orientation:      'portrait',
+      theme_color:      color,
+      background_color: color,
+      icons:            [{ src: icono, sizes: '500x500', type: 'image/png', purpose: 'any' }],
+    }, content_type: 'application/manifest+json'
+  end
+
   private
 
   def motivo_de(ficha) = ficha.portal_activado? ? 'recuperacion' : 'invitacion'

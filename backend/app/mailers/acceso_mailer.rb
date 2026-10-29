@@ -36,6 +36,8 @@ class AccesoMailer < ApplicationMailer
     @club     = acceso.club
     @invita   = acceso.motivo == 'invitacion'
     @link     = "#{App.base_url}/portal/entrar/#{token}"
+    # El link sirve UNA vez: la dirección para volver a entrar va en el mismo mail.
+    @puerta   = "#{App.base_url}/paciente/#{@club.slug}"
     @vence    = acceso.expira_at.in_time_zone('America/Argentina/Buenos_Aires')
     adjuntar_logo(@club)
     # El nombre de la organización va SIEMPRE en el asunto: quien es paciente en dos recibe un mail de
@@ -55,7 +57,8 @@ class AccesoMailer < ApplicationMailer
   def portal_varias(email:, nombre:, items:)
     @nombre = nombre
     @items  = items.map do |i|
-      i.merge(vence: i[:expira_at].in_time_zone('America/Argentina/Buenos_Aires'))
+      i.merge(vence:  i[:expira_at].in_time_zone('America/Argentina/Buenos_Aires'),
+              puerta: "#{App.base_url}/paciente/#{i[:club].slug}")
     end
     mail(to: email, subject: 'Tu portal de paciente: elegí la organización')
   end

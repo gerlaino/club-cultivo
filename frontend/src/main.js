@@ -25,6 +25,10 @@ import {useClubStore} from "./stores/club.js";
 import { registerSW } from 'virtual:pwa-register'
 import { anotarReload, leerReloads } from './utils/reloadTrace.js'
 import { iniciarSentry } from './lib/sentry.js'
+import { escucharInstalacion } from './lib/puertaPortal.js'
+
+// El aviso de «instalar» de Android llega una vez, al cargar: se guarda para el portal del paciente.
+escucharInstalacion()
 
 // Para leer desde la consola por qué se recargó sola la pantalla: `ceReloads()`.
 window.ceReloads = leerReloads

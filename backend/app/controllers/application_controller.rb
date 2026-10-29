@@ -14,6 +14,7 @@ class ApplicationController < ActionController::API
   before_action :check_club_activo!
   after_action  :renovar_sesion
   before_action :check_rol_habilitado!
+  before_action :paciente_solo_en_su_portal!
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
   before_action :block_observer_clinico!
@@ -145,6 +146,27 @@ class ApplicationController < ActionController::API
 
     render json: { error: mensaje_rol_deshabilitado(current_user), modulo_rol_apagado: true },
            status: :forbidden
+  end
+
+  # EL PACIENTE SÓLO LLEGA A SU PORTAL (28-oct-2026). Hasta hoy cada controller del equipo se
+  # cuidaba solo con su `require_*`, y varios no tenían ninguno para el rol paciente: un paciente
+  # logueado pedía `/api/pacientes` y recibía el padrón entero de su organización (DNI, mail,
+  # nacimiento). Lo encontró el barrido de `spec/security/paciente_solo_su_portal_spec.rb`.
+  #
+  # Es una lista de lo que SÍ puede (no de lo que no): una pantalla nueva del equipo queda cerrada
+  # para el paciente aunque se olvide de su barrera. Lo público (sin sesión) también le sirve.
+  PACIENTE_CONTROLADORES = %w[portal_acceso me push_subscriptions users/sessions users/passwords health].freeze
+  PACIENTE_PREFIJOS      = %w[portal/ public/].freeze
+  # Del perfil, sólo lo suyo: cambiar su clave y sus avisos. Nombre y mail de ingreso no los toca.
+  PACIENTE_PERFIL        = %w[show password notificaciones actualizar_notificaciones].freeze
+
+  def paciente_solo_en_su_portal!
+    return unless current_user&.paciente?
+    return if PACIENTE_CONTROLADORES.include?(controller_path)
+    return if PACIENTE_PREFIJOS.any? { |p| controller_path.start_with?(p) }
+    return if controller_path == 'profile' && PACIENTE_PERFIL.include?(action_name)
+
+    render json: { error: 'Esta sección es del equipo de la organización.' }, status: :forbidden
   end
 
   def mensaje_rol_deshabilitado(user)

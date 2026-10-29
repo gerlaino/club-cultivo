@@ -43,7 +43,9 @@
               <span v-else>{{ esInvitacion ? 'Activar y entrar' : 'Guardar la clave y entrar' }}</span>
             </button>
           </form>
-          <p class="hb-pie">De ahora en más entrás a {{ link.organizacion.nombre }} con tu DNI y esta clave.</p>
+          <p class="hb-pie" data-testid="activar-puerta">
+            Las próximas veces entrás en <strong>{{ puertaTexto }}</strong> con tu DNI y esta clave. Adentro te mostramos cómo dejarlo en tu teléfono.
+          </p>
         </template>
 
         <!-- El link no sirve (venció, ya se usó, hay uno más nuevo o no existe) -->
@@ -82,6 +84,10 @@ const confirmacion = ref('')
 const enviando = ref(false)
 const error = ref(null)
 
+const puertaTexto = computed(() => {
+  const slug = link.value?.organizacion?.slug
+  return `${window.location.host}/paciente${slug ? `/${slug}` : ''}`
+})
 const esInvitacion = computed(() => link.value?.motivo === 'invitacion')
 const inicial = computed(() => (link.value?.organizacion?.nombre || '?').trim().charAt(0).toUpperCase())
 const puedeEnviar = computed(() => dni.value && clave.value.length >= MINIMO && confirmacion.value)

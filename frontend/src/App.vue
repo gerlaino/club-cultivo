@@ -173,7 +173,9 @@ watch(
   async (logged) => {
     if (logged) {
       try {
-        if (auth.user?.role !== 'super_admin') {
+        // El paciente no lee la configuración de la organización ni el plan: lo suyo viene de
+        // `/portal/*`, y el backend le cierra todo lo demás (`paciente_solo_en_su_portal!`).
+        if (!['super_admin', 'paciente'].includes(auth.user?.role)) {
           await club.fetch();
           await fetchPlan();
         }
@@ -198,7 +200,7 @@ onMounted(async () => {
       toast.info(`Administración cambió tu rol: ahora sos ${rolInfo(auth.user.role).label}. Tu menú y tus pantallas son las de ese rol.`, { timeout: 9000 });
     }
   } catch { /* sin almacenamiento: no hay aviso que mostrar */ }
-  if (auth.isAuthenticated && !club.data && auth.user?.role !== 'super_admin') {
+  if (auth.isAuthenticated && !club.data && !['super_admin', 'paciente'].includes(auth.user?.role)) {
     await club.fetch();
     await fetchPlan();
   }

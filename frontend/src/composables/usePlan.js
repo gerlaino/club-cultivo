@@ -2,6 +2,7 @@ import { logger } from '../utils/logger.js'
 // frontend/src/composables/usePlan.js
 import { ref, computed } from 'vue'
 import { getPlan } from '../lib/api'
+import { useAuthStore } from '../stores/auth.js'
 
 const planData = ref(null)
 const loading  = ref(false)
@@ -10,6 +11,8 @@ export function usePlan() {
 
   async function fetchPlan() {
     if (planData.value) return
+    // El plan es de la organización, no del paciente (el backend se lo cierra).
+    if (useAuthStore().user?.role === 'paciente') return
     loading.value = true
     try {
       const { data } = await getPlan()

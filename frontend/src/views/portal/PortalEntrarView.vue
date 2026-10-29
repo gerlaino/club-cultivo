@@ -121,6 +121,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { puertaPortal, recuperarPortal } from '../../lib/api'
+import { recordarPuerta, usarManifestDe } from '../../lib/puertaPortal.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
 import '../../assets/herbario.css'
@@ -143,6 +144,8 @@ onMounted(async () => {
   try {
     const { data } = await puertaPortal(slug)
     puerta.value = data
+    recordarPuerta(data.slug)
+    usarManifestDe(data.slug, data.nombre)
   } catch (e) {
     errorPuerta.value = e?.response?.status === 404
       ? 'Esta organización no tiene el portal del paciente abierto. Consultalo en el mostrador.'

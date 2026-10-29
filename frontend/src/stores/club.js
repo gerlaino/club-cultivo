@@ -33,6 +33,11 @@ export const useClubStore = defineStore('club', {
     },
 
     async _pedir() {
+      // El paciente no lee la configuración de su organización: lo suyo viene de `/portal/*` y el
+      // backend le cierra `/preferences` (`paciente_solo_en_su_portal!`). Sin esto, cada pantalla
+      // del portal pedía y recibía un 403.
+      const { useAuthStore } = await import('./auth.js')
+      if (useAuthStore().user?.role === 'paciente') return
       this.loading = true
       this.error   = null
       try {

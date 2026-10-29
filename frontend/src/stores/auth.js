@@ -265,8 +265,8 @@ export const useAuthStore = defineStore("auth", {
       if (eraPaciente) {
         try {
           const { usePortalClubStore } = await import('./portalClub.js');
-          const slug = usePortalClubStore().club?.slug;
-          if (slug) puertaPaciente = `/paciente/${encodeURIComponent(slug)}`;
+          const { rutaDePuerta } = await import('../lib/puertaPortal.js');
+          puertaPaciente = rutaDePuerta(usePortalClubStore().club?.slug || undefined);
         } catch (_) {}
       }
       try {
@@ -297,9 +297,13 @@ export const useAuthStore = defineStore("auth", {
           // Las migas de `reloadTrace` sobreviven al logout: no llevan nada de la sesión (motivo,
           // hora, ruta y build) y son la única evidencia del refresh de hace media hora. Si el
           // clear se las lleva, cerrar sesión borra justo lo que se está investigando.
+          // La puerta del paciente tampoco: es sólo de qué organización es este teléfono (lo mismo
+          // que dice su cartel) y sin ella la app instalada lo mandaba a la puerta general.
           const migas = localStorage.getItem('ce_reload');
+          const puerta = localStorage.getItem('ce_puerta');
           localStorage.clear(); sessionStorage.clear();
           if (migas) localStorage.setItem('ce_reload', migas);
+          if (puerta) localStorage.setItem('ce_puerta', puerta);
         } catch (_) {}
         // Hard reload (con replace) limpia todos los stores de Pinia y evita volver
         // atrás a una pantalla autenticada. Cache-bust para saltear cualquier SW.

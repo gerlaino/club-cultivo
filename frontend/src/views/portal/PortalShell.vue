@@ -32,10 +32,19 @@ import PortalTabBar from '@/components/portal/PortalTabBar.vue'
 import { usePortalChatStore } from '@/stores/portalChat'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { storeToRefs } from 'pinia'
+import { recordarPuerta, usarManifestDe } from '@/lib/puertaPortal'
 
 const store = usePortalClubStore()
 const { club } = storeToRefs(store)
-onMounted(() => store.fetchClub())
+// Y deja recordada SU puerta en este teléfono, con el manifest de su organización: si lo instala,
+// el ícono se llama como ella y abre en su puerta (28-oct-2026).
+onMounted(async () => {
+  await store.fetchClub()
+  if (club.value?.slug) {
+    recordarPuerta(club.value.slug)
+    usarManifestDe(club.value.slug, club.value.name)
+  }
+})
 
 // El chat con la organización: se escucha desde que entra (los «sin leer» del botón flotante y
 // de la barra se ven en cualquier pantalla del portal).

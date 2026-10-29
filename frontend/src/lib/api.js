@@ -1,4 +1,5 @@
 import axios from "axios";
+import { rutaDePuerta } from './puertaPortal.js';
 import { useToast } from "../composables/useToast.js";
 import { anotarReload } from "../utils/reloadTrace.js";
 
@@ -82,7 +83,7 @@ api.interceptors.response.use(
         anotarReload('http-401', { pedido: url });
         // El paciente vuelve a SU puerta (DNI y clave): el login del equipo no le sirve.
         window.location.href = path.startsWith('/portal')
-          ? '/paciente'
+          ? rutaDePuerta()
           : `/login?redirect=${retorno}`;
       }
     }

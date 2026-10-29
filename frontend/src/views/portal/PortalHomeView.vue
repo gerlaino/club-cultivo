@@ -30,6 +30,9 @@
         <ChevronRight :size="22" :stroke-width="2" aria-hidden="true" />
       </RouterLink>
 
+      <!-- ── A3 · El portal en el teléfono (28-oct-2026): el link del mail sirve una vez ── -->
+      <PortalInstalar :nombre="club?.name" />
+
       <!-- ── B · Lo mío ─────────────────────────────────────────────────── -->
       <section class="pmi__sec">
         <h2 class="pmi__sec-t">Lo mío</h2>
@@ -138,6 +141,7 @@ import {
 import { storeToRefs } from 'pinia'
 import { usePortalClubStore } from '@/stores/portalClub'
 import PortalCredencial from '@/components/portal/PortalCredencial.vue'
+import PortalInstalar from '@/components/portal/PortalInstalar.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
 const cargando   = ref(true)

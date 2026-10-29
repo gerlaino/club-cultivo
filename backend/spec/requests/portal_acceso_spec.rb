@@ -401,9 +401,11 @@ RSpec.describe 'La entrada al portal del paciente', type: :request do
       ficha!
       ficha!(en: club!('Mitocondria'))
 
-      expect { recuperar('30111222') }
-        .to have_enqueued_mail(AccesoMailer, :portal_varias).once
-        .and not_have_enqueued_mail(AccesoMailer, :portal_link)
+      expect { recuperar('30111222') }.to have_enqueued_mail(AccesoMailer, :portal_varias).once
+      metodos = ActiveJob::Base.queue_adapter.enqueued_jobs
+                               .select { |j| j['job_class'] == 'ActionMailer::MailDeliveryJob' }
+                               .map { |j| j['arguments'][1] }
+      expect(metodos).to eq(['portal_varias'])
     end
 
     it 'con un mail distinto en cada organización, le llega uno a cada mail' do
@@ -426,6 +428,32 @@ RSpec.describe 'La entrada al portal del paciente', type: :request do
       expect(response).to have_http_status(:ok)
       expect(json.keys).to contain_exactly('id', 'slug', 'nombre', 'logo_url', 'theme_primary')
       expect(json['nombre']).to eq('Club Modelo')
+    end
+
+    it 'el portal instalado se llama como la organización y abre en su puerta' do
+      get "/api/portal_acceso/organizaciones/#{modelo.slug}/manifest"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq('application/manifest+json')
+      expect(json['name']).to eq('Club Modelo')
+      expect(json['start_url']).to end_with("/paciente/#{modelo.slug}")
+      expect(json['display']).to eq('standalone')
+    end
+
+    it 'con el portal cerrado no hay app para instalar' do
+      cerrada = club!('Cerrada', abierto: false)
+      get "/api/portal_acceso/organizaciones/#{cerrada.slug}/manifest"
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'el mail del link dice dónde entrar las próximas veces: el link sirve una sola vez' do
+      ficha!(en: modelo)
+      recuperar('30111222', organizacion: modelo.slug)
+      perform_enqueued_jobs
+
+      mail = ActionMailer::Base.deliveries.last
+      expect(mail.text_part.body.decoded).to include("/paciente/#{modelo.slug}")
+      expect(mail.html_part.body.decoded).to include("/paciente/#{modelo.slug}")
     end
 
     it 'con el portal cerrado, sin contratar o un slug que no existe, no hay puerta' do

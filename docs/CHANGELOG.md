@@ -1,5 +1,38 @@
 # Changelog
 
+## Octubre 2026 (gm) — SEGURIDAD: el paciente sólo llega a su portal · el portal en el teléfono (28-oct)
+
+Germán (28-oct): «al iniciar sesión el paciente vería lo del paciente, nada más, ¿eso está bien seguro?» y
+«la mejora A es fundamental, y las indicaciones para que instale la PWA».
+
+**El agujero (en producción desde que el portal tiene pacientes):** un paciente logueado pedía
+`/api/pacientes` (o `/api/socios`) y recibía **el padrón entero de su organización** (DNI, mail,
+nacimiento). Además le contestaban `/api/preferences`, `/api/stats`, `/api/plantillas_mail`, `/api/buscar`,
+`/api/rendiciones`, `/api/historial`, `/api/plan` y los turnos/médicos de otro paciente por id. Cada
+controller del equipo se cuidaba con su `require_*` y varios no tenían ninguno para el rol paciente.
+
+- **Barrera general** `ApplicationController#paciente_solo_en_su_portal!`: lista de lo que el paciente SÍ
+  puede (`portal/*`, `public/*`, `portal_acceso`, `me`, `push_subscriptions`, sesión/clave, y del perfil sólo
+  ver, su clave y sus avisos). Todo lo demás: 403. Una pantalla nueva del equipo queda cerrada sola.
+- **`spec/security/paciente_solo_su_portal_spec.rb`**: barre TODAS las rutas de la API con la sesión de un
+  paciente, con ids de otro paciente de su organización y de otra organización; falla si alguna del equipo
+  contesta, si en lo suyo aparece otro paciente, o si la sesión se cae a mitad (el barrido mentiría).
+  Verificado que sin la barrera falla (3/3).
+- La app del paciente ya no pide `/preferences` ni `/plan` (`stores/club.js`, `usePlan`); `/perfil` lo
+  manda a `/portal/cuenta`.
+
+**El portal en el teléfono:**
+- Los mails del link dicen **dónde entrar las próximas veces** (`/paciente/<slug>`): el link sirve una vez.
+  La pantalla del link lo repite.
+- **Manifest por organización** `GET /api/portal_acceso/organizaciones/:slug/manifest`: instalado, el ícono
+  se llama como la organización y abre en su puerta (la app del equipo abre en `/m`). El portal y la puerta
+  lo cambian en la página (`lib/puertaPortal.js#usarManifestDe`).
+- **«Tené tu portal en el teléfono»** en el Inicio (`PortalInstalar`): Android con el aviso del navegador →
+  botón «Instalar el portal»; iPhone → los pasos de Safari; otro Android → los del menú. No aparece en la
+  compu ni abierto como app; «Ahora no» lo esconde dos semanas.
+- **La puerta queda recordada en el teléfono** (`ce_puerta`, sobrevive al cerrar sesión): sesión vencida,
+  401 o cerrar sesión vuelven a `/paciente/<slug>` y no a la general.
+
 ## Octubre 2026 (gl) — Cada organización tiene su puerta del portal: `/paciente/<slug>` (28-oct)
 
 Germán (28-oct, probando en producción): «abrí el portal de Club Modelo, con mi DNI quise ingresar, me

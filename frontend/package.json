@@ -22,7 +22,7 @@
     "@rails/actioncable": "^8.1.300",
     "@sentry/vue": "^8.55.2",
     "@zxing/browser": "^0.2.1",
-    "axios": "^1.20.0",
+    "axios": "^1.21.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",

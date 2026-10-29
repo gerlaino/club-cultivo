@@ -4,6 +4,8 @@ Hola <%= @paciente.nombre.to_s.split.first %>,
 
 <%= @invita ? 'Activalo acá' : 'Elegí la clave nueva acá' %> (te pide tu DNI; sirve una vez y vence el <%= @vence.strftime('%d/%m a las %H:%M') %>):
 <%= @link %>
+
+Las próximas veces: este link sirve una sola vez. Después entrás en <%= @puerta %> con tu DNI y tu clave. Al entrar te mostramos cómo dejar el portal en tu teléfono, como una app.
 <% unless @invita %>
 Si no lo pediste, ignorá este mail: sin abrir el link nadie puede cambiar tu clave.
 <% end %>
