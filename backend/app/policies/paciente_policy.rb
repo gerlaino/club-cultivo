@@ -6,9 +6,10 @@ class PacientePolicy < ApplicationPolicy
   # clínica sigue afuera — ROLES_CLINICA no lo incluye — y eso es a propósito.
   ROLES_LECTURA        = %w[admin medico supervisor dispensador].freeze
   # Quién puede VER datos clínicos / historia clínica. Decisión POR ROL (allowlist),
-  # NO por presencia/ausencia de club: super_admin y dispensador quedan FUERA a propósito
-  # (super_admin es rol de plataforma; el dispensador no accede a datos de salud).
-  ROLES_CLINICA        = %w[admin medico supervisor].freeze
+  # NO por presencia/ausencia de club: super_admin, supervisor y dispensador quedan FUERA a
+  # propósito. El supervisor es administración, no salud: la decisión de junio lo dejaba afuera
+  # pero había quedado acá y veía diagnóstico, notas, alergias y medicación (29-oct-2026).
+  ROLES_CLINICA        = %w[admin medico].freeze
   # Quién puede EDITAR datos clínicos (más restrictivo que verlos).
   ROLES_EDITAR_CLINICA = %w[admin medico].freeze
 

@@ -14,6 +14,12 @@
         <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
       </nav>
 
+      <!-- Su cuenta (y la salida) a un toque en el teléfono: dentro del menú no la encontraba nadie
+           (Germán, 29-oct-2026: «no tengo manera de cerrar sesión siendo un paciente»). -->
+      <RouterLink to="/portal/cuenta" class="pnb__cuenta" aria-label="Mi cuenta" data-testid="portal-mi-cuenta"
+                  @click="abierto = false">
+        <CircleUserRound :size="22" :stroke-width="1.75" />
+      </RouterLink>
       <button class="pnb__ham" :aria-expanded="abierto" aria-label="Menú" @click="abierto = !abierto">
         <Menu v-if="!abierto" :size="20" :stroke-width="1.75" />
         <X v-else :size="20" :stroke-width="1.75" />
@@ -49,7 +55,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { Menu, X } from 'lucide-vue-next'
+import { Menu, X, CircleUserRound } from 'lucide-vue-next'
 import LeafSeal from '@/design-system/icons/LeafSeal.vue'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { useAuthStore } from '@/stores/auth'
@@ -139,8 +145,12 @@ async function salir() {
 .pnb__link.router-link-exact-active { color: #fff; background: rgb(255 255 255 / .12); }
 .pnb__sep { width: 1px; height: 18px; background: rgb(255 255 255 / .18); margin: 0 var(--sp-2); }
 
+.pnb__cuenta {
+  margin-left: auto; color: rgb(255 255 255 / .8); display: flex; align-items: center; padding: var(--sp-1);
+}
+.pnb__cuenta.router-link-exact-active { color: var(--p-papel); }
 .pnb__ham {
-  margin-left: auto; background: none; border: 0; color: rgb(255 255 255 / .8);
+  margin-left: var(--sp-2); background: none; border: 0; color: rgb(255 255 255 / .8);
   display: flex; align-items: center; cursor: pointer; padding: var(--sp-1);
 }
 
@@ -157,6 +167,7 @@ async function salir() {
 }
 
 @media (min-width: 860px) {
+  .pnb__cuenta { display: none; }
   .pnb__nav { display: flex; }
   .pnb__ham { display: none; }
   .pnb__movil { display: none; }

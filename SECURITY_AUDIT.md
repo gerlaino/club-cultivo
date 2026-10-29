@@ -28,6 +28,31 @@
 
 ---
 
+## 00. Revisión del 29-oct-2026 (manda sobre lo de abajo)
+
+Herramientas (brakeman 8.0.4, bundler-audit con la base del día, npm audit) + barridos de TODAS las rutas
+con datos sembrados (`spec/security/`). Detalle en `docs/CHANGELOG.md` (gm) y (gn).
+
+**Cerrado en (gm)/(gn):** paciente que leía el padrón (`paciente_solo_en_su_portal!`) · supervisor con
+historia clínica (`ROLES_CLINICA`) · **LOG-01** · **HDR-01** (sin `script-src` todavía) · **DEP-01** (78 → 3
+avisos que no aplican) · caché del service worker en compu compartida (cubre parte de **FE-01**) ·
+`/api/portal_panel` sin sesión daba 500. Verificado sin hallazgos: sin sesión, cruce de organización,
+médico no vinculado, CORS, cookie de sesión, cifrado, Sentry.
+
+**Abierto, en orden:**
+| ID | Qué | Tanda |
+|---|---|---|
+| AUTH-2FA | Super admin entra sólo con mail y clave y abre todas las organizaciones: falta segundo paso (TOTP). Necesita columna. | 2 |
+| AUTH-RATE | El freno de login es por IP, no por cuenta; detrás de Cloudflare la IP puede ser la de Cloudflare (verificar `request.remote_ip` en prod). Clave mínima 6. | 2 |
+| AUTH-PASS | `PATCH /profile/password` no pide la actual (decisión de Germán 25-sep, opción A, compensada con cierre de sesiones + mail). A revisar: sesión ajena abierta = cuenta tomada. | 2 |
+| FILES-01 | Comprobantes (transferencias, entregas) con `rails_blob_path`: link firmado que no vence y no pide sesión. | 2 |
+| CSP-01 | `script-src` en modo `Report-Only` primero. | 2 |
+| COOKIE-01 | `_club_session` con `SameSite=None; domain: :all`: sigue. Evaluar sacarla. | 2 |
+| EOL-01 | Rails 7.2 y Ruby 3.2 fuera de soporte de seguridad: Rails 8 + Ruby 3.4 (+ puma 8, sidekiq-cron 2, devise 5). | 3 |
+| RET-01 / AUD-01 | Supresión y acceso a sus datos (Ley 25.326 art. 14/16); registro de LECTURAS de lo clínico; inscripción de la base en la AAIP; AI-02. | 4 |
+
+---
+
 ## 0. Estado de remediación (2026-06-25)
 
 | ID | Estado | Cambio |

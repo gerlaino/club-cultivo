@@ -1,6 +1,7 @@
 # GET /api/portal_panel — la pantalla del portal del lado del admin: si está listo, qué espera que
 # conteste y quiénes entran (ver `Portal::Panel`). Es del admin, como la configuración del portal.
 class PortalPanelController < ApplicationController
+  before_action :authenticate_user!
   before_action :require_admin!
 
   def show

@@ -4,6 +4,7 @@ import { signIn, signOut, me, clearAuthToken, entrarPortal, activarPortal } from
 import { useClubStore } from "../stores/club.js";
 import { usePlan } from '../composables/usePlan.js'
 import { usePWA } from '../composables/usePWA.js'
+import { borrarCachesDeSesion } from '../lib/cachesSesion.js'
 
 // Promesa del bootstrap en vuelo. Fuera del state a propósito: no es dato de la app, es un
 // candado para que dos navegaciones seguidas no disparen dos /me.
@@ -169,6 +170,7 @@ export const useAuthStore = defineStore("auth", {
       authEpoch++;
       bootstrapPromise = null;
       this.loggingOut = false;
+      await borrarCachesDeSesion();   // lo guardado de la persona anterior en este teléfono
       const { data } = await pedir();
       if (data?.elegir) return data;
       await this.fetchMe();
@@ -199,6 +201,7 @@ export const useAuthStore = defineStore("auth", {
       if (!conservarError) this.error = null;
       this.loggingOut = false;
       try {
+        await borrarCachesDeSesion();   // lo guardado de la persona anterior en esta compu
         await signIn(email, password);
         await this.fetchMe();
 
@@ -281,18 +284,8 @@ export const useAuthStore = defineStore("auth", {
         soltarCambios();   // nada de lo anotado vale para el próximo usuario; se cierra el WebSocket
         const { planData } = usePlan();
         planData.value = null;
-        // Borra los cachés del service worker con datos de la sesión: las respuestas de la API y
-        // las imágenes (fotos subidas, documentos de pacientes), que en una compu compartida le
-        // quedarían al que se sienta después. Lo que NO se borra es la cáscara de la app
-        // (`workbox-precache-*`): borrarla con el service worker activo lo dejaba sin nada que
-        // servir —«Failed to fetch» en la consola— y la app instalada ya no abría sin señal
-        // (26-oct-2026). La cáscara no tiene nada de nadie.
-        if (typeof caches !== 'undefined') {
-          try {
-            const keys = await caches.keys();
-            await Promise.all(keys.filter((k) => !k.startsWith('workbox-precache')).map((k) => caches.delete(k)));
-          } catch (_) {}
-        }
+        // Lo que guardó el service worker es de esta persona (`lib/cachesSesion.js`).
+        await borrarCachesDeSesion({ techoMs: null });
         try {
           // Las migas de `reloadTrace` sobreviven al logout: no llevan nada de la sesión (motivo,
           // hora, ruta y build) y son la única evidencia del refresh de hace media hora. Si el

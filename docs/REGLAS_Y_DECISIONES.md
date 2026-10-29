@@ -1676,6 +1676,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   salen de UN lugar, `PortalAcceso::Cuentas` (activo, aprobado, organización vigente con el portal
   contratado y abierto). Con varias organizaciones, se elige DESPUÉS de validar la clave. Las
   respuestas de la puerta no dicen si un DNI existe.
+- **LO CLÍNICO ES DE ADMIN Y MÉDICO** (29-oct-2026; el supervisor lo veía). `PacientePolicy::ROLES_CLINICA`
+  = admin + médico (el médico, sólo sus vinculados). El supervisor es administración, no salud.
+  `spec/security/barrido_de_rutas_spec.rb` barre todas las rutas por rol: no se saltea ni se achica.
+- **LOS DATOS DE LAS PERSONAS NO VAN A LOS LOGS**: todo campo nuevo con datos de una persona o de salud
+  se suma a `filter_parameter_logging.rb` en el mismo commit.
+- **LO GUARDADO EN EL TELÉFONO ES DE QUIEN TENÍA LA SESIÓN**: se borra al salir, al vencerse y al entrar
+  (`lib/cachesSesion.js`). Toda caché nueva del service worker con datos entra en esa limpieza.
 - **EL PACIENTE SÓLO LLEGA A SU PORTAL** (28-oct-2026; un paciente leía el padrón entero por
   `/api/pacientes`). La barrera es UNA y es lista de lo permitido (`paciente_solo_en_su_portal!`), no
   `require_*` por controller. Un endpoint nuevo para el paciente va bajo `portal/`; si no, no le llega.

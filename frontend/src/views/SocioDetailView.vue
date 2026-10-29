@@ -303,9 +303,10 @@ const ALL_TABS = [
   { key: 'direcciones',      label: 'Direcciones',       icon: MapPin,        roles: ['admin', 'supervisor', 'medico', 'dispensador'] },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
-  { key: 'indicaciones',     label: 'Indicaciones',      icon: FileHeart,     roles: ['admin', 'medico', 'supervisor'] },
+  // Lo de salud es de admin y médico: el backend se lo rechaza a todo otro rol (29-oct-2026).
+  { key: 'indicaciones',     label: 'Indicaciones',      icon: FileHeart,     roles: ['admin', 'medico'] },
   { key: 'notas',            label: 'Notas',             icon: BookOpen,      roles: ['admin', 'medico'] },
-  { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
+  { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico'] },
   { key: 'timeline',         label: 'Historial',         icon: Clock,         roles: ['admin', 'medico'] },
   { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
   // Su cuenta del portal. Sólo aparece si la organización tiene el módulo (ver TABS).

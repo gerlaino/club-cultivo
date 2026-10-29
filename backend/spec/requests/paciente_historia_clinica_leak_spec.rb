@@ -1,8 +1,8 @@
 require 'rails_helper'
 
 # Blindaje AZ-01/02: la historia clínica (campos de salud) NO debe filtrarse a roles no
-# clínicos vía pacientes#show ni #index. Allowlist: admin/medico/supervisor ven lo clínico;
-# dispensador y super_admin NO.
+# clínicos vía pacientes#show ni #index. Allowlist: admin/medico ven lo clínico; supervisor,
+# dispensador y super_admin NO (el supervisor salió el 29-oct-2026: es administración, no salud).
 RSpec.describe 'Pacientes — no filtrar historia clínica a roles no clínicos', type: :request do
   let(:club)        { create(:club) }
   let(:admin)       { create(:user, club: club, role: 'admin') }
@@ -48,7 +48,15 @@ RSpec.describe 'Pacientes — no filtrar historia clínica a roles no clínicos'
       expect(data).not_to have_key('reprocann_estado')
     end
 
-    %i[admin medico supervisor].each do |rol|
+    it 'el supervisor NO recibe la historia clínica (ve la ficha, sin lo de salud)' do
+      sign_in_as(supervisor)
+      get "/pacientes/#{paciente.id}", headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      data = JSON.parse(response.body)['data']
+      CAMPOS_CLINICOS.each { |c| expect(data).not_to have_key(c), c }
+    end
+
+    %i[admin medico].each do |rol|
       it "el #{rol} SÍ recibe la historia clínica" do
         sign_in_as(send(rol))
         get "/pacientes/#{paciente.id}", headers: auth_headers, as: :json

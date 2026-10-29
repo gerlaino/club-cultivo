@@ -1,5 +1,43 @@
 # Changelog
 
+## Octubre 2026 (gn) — SEGURIDAD: revisión completa, tanda 1 · el paciente tiene cómo salir (29-oct)
+
+Germán (29-oct): «necesito que analicemos todo el tema ciberseguridad y datos, no podemos fallar nada» →
+«sí a todo». Y en el medio: «no tengo manera de cerrar sesión siendo un paciente».
+
+**Cómo se revisó:** brakeman, bundler-audit, npm audit, lectura de lo que quedaba abierto de
+`SECURITY_AUDIT.md` (junio) y tres barridos de TODAS las rutas con datos sembrados (ver abajo). Lo que
+aguantó: sin sesión no se ve a nadie, un admin no ve pacientes de otra organización, el médico no
+vinculado no ve lo clínico, cifrado en la base, Sentry sin datos de personas, CORS cerrado.
+
+- **El supervisor veía la historia clínica** (diagnóstico, notas, alergias, medicación) en
+  `pacientes#show`: `PacientePolicy::ROLES_CLINICA` lo incluía, contra la decisión de junio. Ahora es
+  admin y médico. La ficha tampoco le ofrece Indicaciones (el backend ya se las negaba) ni a
+  auditor/abogado Documentos.
+- **Los logs guardaban los datos de los pacientes** (LOG-01, abierto desde junio): DNI, nombre, teléfono,
+  domicilio, todo lo clínico, el chat y las búsquedas pasan a `[FILTERED]` (`filter_parameter_logging.rb`).
+- **Encabezados de seguridad** (HDR-01): `EncabezadosDeSeguridad` los pone en todo lo que sale, también la
+  cáscara de `public/`: la app no se muestra dentro de otra página (`frame-ancestors`, `X-Frame-Options`),
+  `nosniff`, `Referrer-Policy`, `Permissions-Policy`. Todavía sin `script-src` (va aparte, en modo aviso).
+- **La compu compartida**: lo que guarda el service worker (respuestas de la API, imágenes) se borraba sólo
+  con «Cerrar sesión»; si la sesión se vencía sola quedaba para el siguiente. `lib/cachesSesion.js` lo
+  borra al cerrar, al vencerse mientras se usa y al entrar.
+- **Librerías**: de 78 avisos de seguridad a 3 que no aplican (Devise confirmable/timeoutable, que no se
+  usan; rubyzip al extraer a disco, que no se hace; sidekiq-cron en `/sidekiq`, con clave). Rails 7.2.4,
+  rack 3.2, jwt 3.3, nokogiri 1.19, puma 7.2.1 (fijado en 7.x: el 8 va con Rails 8).
+- `/api/portal_panel` sin sesión daba 500: ahora 401.
+- **Barridos permanentes** `spec/security/barrido_de_rutas_spec.rb`: sin sesión, cruce de organización y
+  lo clínico por rol, sobre todas las rutas. Encontraron el supervisor y el 500 antes del arreglo.
+- **El paciente tiene cómo salir**: la salida estaba dentro del menú de tres rayas y al pie de páginas
+  largas. Ahora hay un ícono de «Mi cuenta» arriba en el teléfono, y «Mi cuenta» tiene «Cerrar sesión» y
+  dice por dónde entrar (su puerta, con DNI) en vez de mostrar el usuario interno `…@<org>.paciente`.
+- Test del chat que fallaba entre las 0 y las 2 (dependía de la hora): fijado.
+
+**Quedan (tandas 2–4, ver `SECURITY_AUDIT.md`):** segundo paso para super admin, freno por cuenta y clave
+mínima, comprobantes con link que vence, la IP real detrás de Cloudflare, cambiar la clave sin pedir la
+actual (decisión del 25-sep, a revisar), Rails 8 + Ruby 3.4, y lo legal (acceso/supresión, registro de
+lecturas, AAIP).
+
 ## Octubre 2026 (gm) — SEGURIDAD: el paciente sólo llega a su portal · el portal en el teléfono (28-oct)
 
 Germán (28-oct): «al iniciar sesión el paciente vería lo del paciente, nada más, ¿eso está bien seguro?» y

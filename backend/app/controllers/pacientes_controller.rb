@@ -37,7 +37,7 @@ class PacientesController < ApplicationController
                         reprocann_vinculo reprocann_tramite_iniciado_el reprocann_resultado_el].freeze
 
   # Campos CLÍNICOS / de salud: SÓLO se agregan si el rol puede ver la historia clínica
-  # (allowlist medico/admin/supervisor, via PacientePolicy#ver_notas_clinicas?).
+  # (allowlist medico/admin, via PacientePolicy#ver_notas_clinicas?).
   CAMPOS_CLINICOS = %w[
     notas_clinicas motivo_consulta anamnesis antecedentes_personales antecedentes_familiares
     diagnostico_principal diagnostico_secundario evolucion_clinica alergias
@@ -155,7 +155,7 @@ class PacientesController < ApplicationController
       json['renovacion_portal'] = renovacion_portal_json(@paciente)
     end
 
-    # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
+    # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin).
     if policy(@paciente).ver_notas_clinicas?
       json.merge!(@paciente.as_json(only: CAMPOS_CLINICOS))
     end

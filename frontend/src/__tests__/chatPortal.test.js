@@ -40,10 +40,13 @@ const ChatHilo = (await import('../components/chat/ChatHilo.vue')).default
 const { useChatPacientesStore } = await import('../stores/chatPacientes')
 
 const hace = (min) => new Date(Date.now() - min * 60000).toISOString()
+// «Ayer» a una hora fija y «hoy» ahora: con «hace 26 horas» el test fallaba entre las 0 y las 2,
+// cuando 26 horas atrás ya es anteayer.
+const ayerALas = (h) => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(h, 0, 0, 0); return d.toISOString() }
 const MENSAJES = [
-  { id: 1, autor: 'paciente', texto: '¿El jueves puedo pasar 19:30?', at: hace(60 * 26) },
-  { id: 2, autor: 'organizacion', quien: 'Javier', texto: 'Sí, te lo dejamos hasta las 20.', at: hace(60 * 25) },
-  { id: 3, autor: 'paciente', texto: 'Genial, gracias!', at: hace(10) },
+  { id: 1, autor: 'paciente', texto: '¿El jueves puedo pasar 19:30?', at: ayerALas(12) },
+  { id: 2, autor: 'organizacion', quien: 'Javier', texto: 'Sí, te lo dejamos hasta las 20.', at: ayerALas(13) },
+  { id: 3, autor: 'paciente', texto: 'Genial, gracias!', at: hace(0) },
 ]
 
 const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:p(.*)*', component: { template: '<div/>' } }] })

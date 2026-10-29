@@ -1,5 +1,6 @@
 import axios from "axios";
 import { rutaDePuerta } from './puertaPortal.js';
+import { borrarCachesDeSesion } from './cachesSesion.js';
 import { useToast } from "../composables/useToast.js";
 import { anotarReload } from "../utils/reloadTrace.js";
 
@@ -50,6 +51,10 @@ api.interceptors.response.use(
     // La puerta del paciente contesta 401 a una clave equivocada: es la respuesta del formulario,
     // no una sesión vencida (igual que el login del equipo).
     if (status === 401 && !url.includes('/users/sign_in') && !url.includes('/portal_acceso/')) {
+      // La sesión se venció mientras se usaba: lo guardado no le queda al que entre después. El /me
+      // del arranque (alguien abre la app sin sesión) no borra: no hay nada nuevo, y el login de
+      // quien entre borra lo del anterior (`stores/auth.js`).
+      if (!url.replace(/\?.*$/, '').endsWith('/me')) await borrarCachesDeSesion();
       let loggingOut = false;
       let auth = null;
       try {

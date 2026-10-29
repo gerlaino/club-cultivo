@@ -2,16 +2,15 @@
   <div class="pcv">
     <header class="pcv__hd">
       <h1 class="pcv__title">Mi cuenta</h1>
-      <p class="pcv__sub">Tu usuario y tu contraseña.</p>
+      <p class="pcv__sub">Cómo entrás, tu contraseña y la salida.</p>
     </header>
 
+    <!-- El usuario interno (`…@<org>.paciente`) no se muestra: el paciente entra con su DNI y no
+         lo usa nunca. Mostrarlo como «tu usuario» confundía. -->
     <section class="pcv__bloque">
-      <div class="pcv__dato">
-        <span class="pcv__lbl">Usuario</span>
-        <code class="pcv__val">{{ auth.user?.email }}</code>
-      </div>
-      <p class="pcv__nota">
-        El usuario no se cambia: lo arma tu organización. Si está mal escrito, avisales.
+      <h2 class="pcv__h2">Cómo entrás</h2>
+      <p class="pcv__nota pcv__nota--arriba" data-testid="cuenta-puerta">
+        En <strong>{{ puertaTexto }}</strong> con tu DNI y tu contraseña.
       </p>
     </section>
 
@@ -43,6 +42,16 @@
         </button>
       </form>
     </section>
+
+    <section class="pcv__bloque">
+      <h2 class="pcv__h2">Cerrar sesión</h2>
+      <p class="pcv__nota pcv__nota--arriba">
+        Si este teléfono o esta compu no es tuyo, cerrá la sesión al terminar.
+      </p>
+      <button type="button" class="pcv__salir" data-testid="cuenta-salir" :disabled="saliendo" @click="salir">
+        {{ saliendo ? 'Cerrando…' : 'Cerrar sesión' }}
+      </button>
+    </section>
   </div>
 </template>
 
@@ -53,12 +62,23 @@
 // paciente que la abre aterriza en la barra lateral de la organización — ve una app que no es la
 // suya. El endpoint es el mismo que usa todo el equipo.
 import { ref, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { updateMyPassword } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import { usePortalClubStore } from '@/stores/portalClub'
 import { useToast } from '@/composables/useToast'
 
 const auth  = useAuthStore()
 const toast = useToast()
+const { club } = storeToRefs(usePortalClubStore())
+
+const puertaTexto = computed(() => `${window.location.host}/paciente${club.value?.slug ? `/${club.value.slug}` : ''}`)
+
+const saliendo = ref(false)
+async function salir() {
+  saliendo.value = true
+  await auth.logOut()
+}
 
 const actual    = ref('')
 const nueva     = ref('')
@@ -106,15 +126,13 @@ async function cambiar() {
 }
 .pcv__h2 { font-size: 1rem; font-weight: 700; color: var(--p-tinta); margin: 0 0 .35rem; }
 
-.pcv__dato { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.pcv__lbl {
-  font-size: .7rem; color: var(--p-suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
-}
-.pcv__val {
-  font-family: monospace; font-size: .88rem; background: var(--p-hundido); border: 1px solid var(--p-linea);
-  border-radius: 7px; padding: .3rem .6rem; user-select: all; color: var(--p-tinta);
-}
 .pcv__nota { font-size: .82rem; color: var(--p-suave); margin: .8rem 0 0; line-height: 1.55; }
+.pcv__nota--arriba { margin-top: .35rem; }
+.pcv__salir {
+  margin-top: 1rem; background: none; color: var(--p-urgente); border: 1px solid currentColor;
+  border-radius: 8px; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+}
+.pcv__salir:disabled { opacity: .5; cursor: default; }
 
 .pcv__form { display: flex; flex-direction: column; gap: .9rem; margin-top: 1.1rem; }
 .pcv__campo { display: flex; flex-direction: column; gap: .3rem; }
