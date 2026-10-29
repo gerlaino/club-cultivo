@@ -160,7 +160,7 @@ class PacientesController < ApplicationController
       json.merge!(@paciente.as_json(only: CAMPOS_CLINICOS))
     end
 
-    json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
+    json['reprocann_documento_url'] = Seguridad::ArchivoPrivado.url(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
 
     ultima = @paciente.dispensaciones.includes(:stock).recientes.first
     json['suspendido'] = Paciente.suspendido?(es_paciente: @paciente.es_paciente,
@@ -253,7 +253,7 @@ class PacientesController < ApplicationController
       return render json: { error: 'No se recibió ningún archivo' }, status: :unprocessable_entity
     end
     @paciente.reprocann_documento.attach(params[:archivo])
-    render json: { reprocann_documento_url: url_for(@paciente.reprocann_documento) }
+    render json: { reprocann_documento_url: Seguridad::ArchivoPrivado.url(@paciente.reprocann_documento) }
   end
 
   def eliminar_reprocann
@@ -817,7 +817,7 @@ class PacientesController < ApplicationController
     return nil unless r
 
     { id: r.id, subida_at: r.created_at,
-      constancia_url: r.constancia.attached? ? url_for(r.constancia) : nil,
+      constancia_url: Seguridad::ArchivoPrivado.url(r.constancia),
       constancia_nombre: r.constancia.attached? ? r.constancia.filename.to_s : nil,
       es_imagen: r.constancia.attached? && r.constancia.content_type.to_s.start_with?('image/') }
   end

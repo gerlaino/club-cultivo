@@ -1,5 +1,35 @@
 # Changelog
 
+## Octubre 2026 (go) — SEGURIDAD, tanda 2: segundo paso del super admin, frenos por cuenta, clave actual, links que vencen (29-oct)
+
+Germán (29-oct): «sí, pusheá, arrancá» (la tanda 2, con la columna del segundo paso).
+
+- **Segundo paso para entrar (AUTH-2FA).** El super admin abre todas las organizaciones y entraba sólo con
+  mail y clave. Ahora además va el código de seis números de una app (Google Authenticator, 1Password…):
+  `Seguridad::Totp` (RFC 6238 sobre el HMAC de OpenSSL, sin gema; los vectores del RFC en el spec),
+  migración `SegundoPasoParaEntrar` (`otp_secret` cifrado, `otp_activado_at`, `otp_ultimo_paso` para que un
+  código no sirva dos veces). El código va en el MISMO pedido del login: sin él, 401 `necesita_codigo` y la
+  pantalla lo pide. **Es obligatorio**: hasta activarlo el super admin sólo ve «Mi perfil → Seguridad»
+  (`exigir_segundo_paso!`, lista de lo permitido; la app lo lleva sola). Activar pide la clave y un primer
+  código; llega un mail avisando. Desde la app no se desactiva: `rake seguridad:segundo_paso:reiniciar
+  EMAIL=…`, y `SEGUNDO_PASO_SUPER_ADMIN=apagado` en Render es la salida de emergencia.
+- **Un login rechazado salía con sesión.** Lo destapó el spec del segundo paso: en el pedido de login,
+  cualquier `current_user` (el before_action del rol apagado, `renovar_sesion`) vuelve a autenticar con la
+  clave de los parámetros y warden-jwt_auth arma OTRO token. El cultivador con Cultivo apagado veía «no
+  podés entrar» y la respuesta traía la cookie. Ahora `JwtCookieMiddleware` saca el token de toda
+  respuesta ≥ 400, `Users::SessionsController#sin_sesion_si_rechaza` suelta la sesión de Rails y
+  `renovar_sesion` descarta los errores antes de preguntar quién es.
+- **Frenos (AUTH-RATE).** Producción está detrás de Cloudflare (`server: cloudflare`): los frenos usan
+  `CF-Connecting-IP` (`Rack::Attack.ip_cliente`) y no la IP del nodo, compartida por mucha gente. Y el
+  login se frena también **por cuenta** (10 en 15 min), contra probar claves desde muchas IPs. El 429 dice
+  qué pasó en castellano y en JSON (antes «Retry later» y el login decía «no pudimos iniciar sesión»).
+- **La clave actual (AUTH-PASS).** Cambiar la contraseña la pide (reemplaza la opción A del 25-sep), y
+  cambiar el mail también (es a donde llega «Olvidé mi contraseña»). El portal del paciente ya la pedía en
+  pantalla y el backend la ignoraba.
+- **Links que vencen (FILES-01).** Comprobantes, documentos, constancias del REPROCANN y adjuntos del chat
+  salían con un link firmado que valía para siempre y no pedía sesión. Ahora `Seguridad::ArchivoPrivado`
+  (1 hora). Las fotos de genéticas y lotes no cambian. Los links ya entregados siguen valiendo.
+
 ## Octubre 2026 (gn) — SEGURIDAD: revisión completa, tanda 1 · el paciente tiene cómo salir (29-oct)
 
 Germán (29-oct): «necesito que analicemos todo el tema ciberseguridad y datos, no podemos fallar nada» →

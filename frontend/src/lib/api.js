@@ -158,8 +158,10 @@ api.interceptors.response.use(
 // que puede pegarle a un backend dormido. En Render, despertar el servicio tarda decenas de
 // segundos, y con el timeout general el intento moría antes de que el servidor llegara a
 // contestar — se veía como "se colgó el login" cuando en realidad estaba arrancando.
-export const signIn  = (email, password) =>
-  api.post("/users/sign_in", { user: { email, password } }, { timeout: 45000 });
+// `codigo`: el segundo paso (29-oct-2026). Va en el MISMO pedido que la clave; el backend contesta
+// 401 con `necesita_codigo` si falta o está mal, y la pantalla lo pide y reenvía todo.
+export const signIn  = (email, password, codigo = null) =>
+  api.post("/users/sign_in", { user: { email, password, ...(codigo ? { codigo } : {}) } }, { timeout: 45000 });
 export const signOut = () => api.delete("/users/sign_out");
 // «Olvidé mi contraseña»: pedir el link (por usuario de ingreso o mail personal) y elegir la
 // nueva con el token que trae el mail. No llevan sesión.
@@ -269,6 +271,10 @@ export const deleteGenetica = (id) => api.delete(`/geneticas/${id}`);
 export const getProfile       = () => api.get("/profile");
 export const updateProfile    = (payload) => api.patch("/profile", { user: payload });
 export const updateMyPassword = (payload) => api.patch("/profile/password", { user: payload });
+// Segundo paso al entrar (29-oct-2026): estado, empezar (con la clave; da el QR) y activar (con un código).
+export const getSegundoPaso      = ()                => api.get("/profile/segundo_paso");
+export const iniciarSegundoPaso  = (currentPassword) => api.post("/profile/segundo_paso/iniciar", { user: { current_password: currentPassword } });
+export const activarSegundoPaso  = (codigo)          => api.post("/profile/segundo_paso/activar", { codigo });
 // Qué avisos quiere en el teléfono: la lista viene ya filtrada para esta persona.
 export const getMisNotificaciones    = () => api.get("/profile/notificaciones");
 export const updateMisNotificaciones = (payload) => api.patch("/profile/notificaciones", payload);

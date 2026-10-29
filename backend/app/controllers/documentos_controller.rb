@@ -57,7 +57,7 @@ class DocumentosController < ApplicationController
     unless @documento.archivo.attached?
       return render json: { error: 'Sin archivo' }, status: :not_found
     end
-    redirect_to Rails.application.routes.url_helpers.url_for(@documento.archivo)
+    redirect_to Seguridad::ArchivoPrivado.url(@documento.archivo), allow_other_host: true
   end
 
   private
@@ -89,7 +89,7 @@ class DocumentosController < ApplicationController
       fecha_vencimiento: d.fecha_vencimiento,
       estado:           d.estado,
       tiene_archivo:    d.archivo.attached?,
-      archivo_url:      d.archivo.attached? ? Rails.application.routes.url_helpers.url_for(d.archivo) : nil,
+      archivo_url:      Seguridad::ArchivoPrivado.url(d.archivo),
       archivo_nombre:   d.archivo.attached? ? d.archivo.filename.to_s : nil,
       usuario:          d.user.nombre_completo,
       subido_por:       d.subido_por&.nombre_completo,

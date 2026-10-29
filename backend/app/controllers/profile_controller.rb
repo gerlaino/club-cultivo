@@ -8,7 +8,14 @@ class ProfileController < ApplicationController
     render json: { data: serialize_user(current_user) }
   end
 
+  # Cambiar el mail pide la contraseña actual (29-oct-2026, seguridad tanda 2): el mail es a donde va
+  # «Olvidé mi contraseña», así que con una sesión ajena abierta alcanzaba poner el suyo, pedir el
+  # link y quedarse con la cuenta.
   def update
+    if cambia_el_mail? && !clave_actual_correcta?
+      return render json: { errors: [CLAVE_ACTUAL_INCORRECTA], campo: 'current_password' }, status: :unprocessable_entity
+    end
+
     if current_user.update(profile_params)
       render json: { data: serialize_user(current_user) }, status: :ok
     else
@@ -16,10 +23,15 @@ class ProfileController < ApplicationController
     end
   end
 
-  # Sin pedir la actual (decisión de Germán, 25-sep-2026: más simple). Lo que la reemplaza: al
-  # cambiarla se cortan las sesiones abiertas en otros dispositivos (la huella de `User#jwt_payload`)
-  # y llega un mail avisando, para que quien no fue se entere.
+  # Pide la actual (29-oct-2026, seguridad tanda 2; reemplaza la opción A del 25-sep, que no la
+  # pedía): sin ella, una sesión ajena abierta —una compu del dispensario que quedó logueada—
+  # alcanzaba para cambiarla y dejar afuera al dueño. Lo de antes sigue: al cambiarla se cortan las
+  # sesiones de los otros dispositivos (la huella de `User#jwt_payload`) y llega un mail avisando.
   def password
+    unless clave_actual_correcta?
+      return render json: { errors: [CLAVE_ACTUAL_INCORRECTA], campo: 'current_password' }, status: :unprocessable_entity
+    end
+
     if current_user.update(password_params)
       # El token de ESTA sesión se armó al autenticar, con la huella vieja: volver a fijar el
       # usuario lo rearma con la nueva (lo manda devise-jwt, ver `dispatch_requests`). Sin esto,
@@ -45,6 +57,43 @@ class ProfileController < ApplicationController
     end
   end
 
+  # ── Segundo paso al entrar (29-oct-2026, seguridad tanda 2) ───────────────────────────────
+  # Hoy es del super admin, que lo tiene obligatorio: hasta activarlo no opera (ver
+  # `ApplicationController#exigir_segundo_paso!`). Para desactivarlo o cambiar de teléfono:
+  # `rake seguridad:segundo_paso:reiniciar EMAIL=…`.
+  def segundo_paso
+    render json: estado_segundo_paso
+  end
+
+  # Empezar pide la contraseña: con una sesión ajena abierta, alguien podría atar la cuenta a SU
+  # teléfono. Ya activo, no se rehace desde acá.
+  def iniciar_segundo_paso
+    return render json: { error: 'El segundo paso es del super admin.' }, status: :forbidden unless current_user.super_admin?
+    return render json: { error: 'Ya está activo. Para cambiar de teléfono hay que reiniciarlo.' }, status: :conflict if current_user.segundo_paso_activo?
+    unless clave_actual_correcta?
+      return render json: { errors: [CLAVE_ACTUAL_INCORRECTA], campo: 'current_password' }, status: :unprocessable_entity
+    end
+
+    secreto = Seguridad::Totp.generar_secreto
+    current_user.update!(otp_secret: secreto, otp_activado_at: nil, otp_ultimo_paso: nil)
+    render json: { secreto: secreto, uri: Seguridad::Totp.uri(secreto, current_user.email) }
+  end
+
+  # Activar pide un código de la app: prueba que el teléfono quedó bien atado antes de exigirlo.
+  def activar_segundo_paso
+    return render json: { error: 'El segundo paso es del super admin.' }, status: :forbidden unless current_user.super_admin?
+    return render json: { error: 'Primero escaneá el código QR.' }, status: :unprocessable_entity if current_user.otp_secret.blank?
+    return render json: estado_segundo_paso if current_user.segundo_paso_activo?
+
+    unless current_user.usar_codigo_segundo_paso!(params[:codigo])
+      return render json: { error: 'El código no es correcto. Probá con el que muestra ahora la app.' }, status: :unprocessable_entity
+    end
+
+    current_user.update_columns(otp_activado_at: Time.current)
+    AccesoMailer.segundo_paso_activado(user: current_user).deliver_later if current_user.email_real.present?
+    render json: estado_segundo_paso
+  end
+
   # ── Notificaciones al teléfono ─────────────────────────────────────────────
   # El backend manda la lista YA filtrada para esta persona (rol + módulos de su organización)
   # con el valor vigente de cada una; la pantalla sólo la muestra. Ver `Notificaciones::Catalogo`.
@@ -68,6 +117,24 @@ class ProfileController < ApplicationController
   end
 
   private
+
+  CLAVE_ACTUAL_INCORRECTA = 'La contraseña actual no es correcta.'.freeze
+
+  def clave_actual_correcta?
+    actual = params.dig(:user, :current_password).to_s
+    actual.present? && current_user.valid_password?(actual)
+  end
+
+  def cambia_el_mail?
+    %i[email email_personal].any? do |campo|
+      params.dig(:user)&.key?(campo) && params.dig(:user, campo).to_s.strip.downcase != current_user.public_send(campo).to_s.strip.downcase
+    end
+  end
+
+  def estado_segundo_paso
+    { activo: current_user.segundo_paso_activo?, obligatorio: current_user.segundo_paso_obligatorio?,
+      activado_at: current_user.otp_activado_at, disponible: current_user.super_admin? }
+  end
 
   def serialize_notificaciones
     {

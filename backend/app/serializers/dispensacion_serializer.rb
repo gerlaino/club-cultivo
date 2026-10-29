@@ -49,7 +49,7 @@ class DispensacionSerializer
       # Despachos); el resto no paga la consulta.
       pagado_ars:          (%w[pendiente en_viaje fallido].include?(d.estado_envio) ? Dispensaciones::Cancelar.cobrado_de(d).to_f : nil),
       cobros:              d.cobros.recientes.map { |c| CobroSerializer.serialize(c) },
-      comprobante_entrega_url: (d.comprobante_entrega.attached? ? Rails.application.routes.url_helpers.rails_blob_path(d.comprobante_entrega, only_path: true) : nil),
+      comprobante_entrega_url: Seguridad::ArchivoPrivado.ruta(d.comprobante_entrega),
       con_envio:       d.con_envio,
       estado_envio:    d.estado_envio,
       anulada:         d.cancelada?,
@@ -166,7 +166,7 @@ class DispensacionSerializer
       saldo_pendiente:    d.saldo_pendiente.to_f,
       total_cobrado:      d.total_cobrado.to_f,
       cobros:             d.cobros.recientes.map { |c| CobroSerializer.serialize(c) },
-      comprobante_entrega_url: (d.comprobante_entrega.attached? ? Rails.application.routes.url_helpers.rails_blob_path(d.comprobante_entrega, only_path: true) : nil),
+      comprobante_entrega_url: Seguridad::ArchivoPrivado.ruta(d.comprobante_entrega),
       observaciones:      d.observaciones,
       direccion_envio:    d.direccion_envio,
       # El nombre que el paciente le puso a la dirección («Trabajo»): el repartidor lo lee en

@@ -39,13 +39,15 @@ avisos que no aplican) · caché del service worker en compu compartida (cubre p
 `/api/portal_panel` sin sesión daba 500. Verificado sin hallazgos: sin sesión, cruce de organización,
 médico no vinculado, CORS, cookie de sesión, cifrado, Sentry.
 
+**Cerrado en (go), tanda 2:** **AUTH-2FA** (super admin con código de app, obligatorio; `Seguridad::Totp`) ·
+**AUTH-RATE** (freno por cuenta + IP real detrás de Cloudflare, `CF-Connecting-IP`) · **AUTH-PASS** (cambiar
+clave o mail pide la actual) · **FILES-01** (links a archivos privados vencen en 1 hora; los viejos, sin
+vencimiento, siguen valiendo hasta rotar `secret_key_base`) · de yapa: un login rechazado (rol apagado) salía
+con cookie y token.
+
 **Abierto, en orden:**
 | ID | Qué | Tanda |
 |---|---|---|
-| AUTH-2FA | Super admin entra sólo con mail y clave y abre todas las organizaciones: falta segundo paso (TOTP). Necesita columna. | 2 |
-| AUTH-RATE | El freno de login es por IP, no por cuenta; detrás de Cloudflare la IP puede ser la de Cloudflare (verificar `request.remote_ip` en prod). Clave mínima 6. | 2 |
-| AUTH-PASS | `PATCH /profile/password` no pide la actual (decisión de Germán 25-sep, opción A, compensada con cierre de sesiones + mail). A revisar: sesión ajena abierta = cuenta tomada. | 2 |
-| FILES-01 | Comprobantes (transferencias, entregas) con `rails_blob_path`: link firmado que no vence y no pide sesión. | 2 |
 | CSP-01 | `script-src` en modo `Report-Only` primero. | 2 |
 | COOKIE-01 | `_club_session` con `SameSite=None; domain: :all`: sigue. Evaluar sacarla. | 2 |
 | EOL-01 | Rails 7.2 y Ruby 3.2 fuera de soporte de seguridad: Rails 8 + Ruby 3.4 (+ puma 8, sidekiq-cron 2, devise 5). | 3 |

@@ -1556,6 +1556,11 @@ router.beforeEach(async (to) => {
   // Su cuenta vive dentro del portal: `/perfil` es la pantalla del equipo (y el backend ya no le
   // deja cambiar nombre ni mail de ingreso).
   if (to.path === '/perfil' && auth.user?.role === 'paciente') return '/portal/cuenta';
+  // El super admin sin el segundo paso activo no opera hasta activarlo (29-oct-2026): el backend le
+  // contesta 403 a todo lo demás, así que se lo lleva directo a donde se activa.
+  if (auth.user?.segundo_paso_pendiente && !(to.path === '/perfil' && to.query.solapa === 'seguridad') && !to.meta.guestOnly) {
+    return { path: '/perfil', query: { solapa: 'seguridad' } };
+  }
   if (to.meta.guestOnly && auth.isAuthenticated) {
     const redirect = to.query.redirect || "/";
     return typeof redirect === "string" ? redirect : "/";

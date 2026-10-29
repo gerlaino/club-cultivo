@@ -41,7 +41,7 @@ class MensajesPacientesController < ApplicationController
     end
     mensajes = conv ? conv.mensajes.includes(:user, adjunto_attachment: :blob, dispensacion: { items: { stock: :genetica } }).last(LIMITE) : []
     render json: {
-      data:         mensajes.map { |m| MensajePacienteSerializer.serialize(m, url_helper: method(:url_for)) },
+      data:         mensajes.map { |m| MensajePacienteSerializer.serialize(m, url_helper: Seguridad::ArchivoPrivado.method(:url)) },
       conversacion: MensajePacienteSerializer.conversacion(conv),
       paciente:     paciente_json(@paciente),
     }
@@ -54,7 +54,7 @@ class MensajesPacientesController < ApplicationController
     mensaje.adjunto.attach(params[:adjunto]) if params[:adjunto].present?
 
     if mensaje.save
-      render json: { data: MensajePacienteSerializer.serialize(mensaje, url_helper: method(:url_for)) }, status: :created
+      render json: { data: MensajePacienteSerializer.serialize(mensaje, url_helper: Seguridad::ArchivoPrivado.method(:url)) }, status: :created
     else
       render json: { error: mensaje.errors.full_messages.to_sentence }, status: :unprocessable_entity
     end

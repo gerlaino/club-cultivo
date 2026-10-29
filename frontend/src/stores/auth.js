@@ -40,7 +40,10 @@ export function mensajeDeErrorDeLogin(e) {
   const status = e?.response?.status;
   const data   = e?.response?.data;
 
+  // El segundo paso (29-oct-2026): la clave estaba bien y falta el código o está mal.
+  if (status === 401 && data?.necesita_codigo) return data.error;
   if (status === 401) return "Usuario o contraseña incorrectos.";
+  if (status === 429) return data?.error || "Demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.";
   // El backend ya explica cuál módulo falta o por qué está suspendida la organización.
   if (data?.modulo_rol_apagado || data?.club_suspendido) return data.error;
   if (status === 403) return data?.error || "Tu usuario no tiene permiso para entrar.";
@@ -73,6 +76,8 @@ export const useAuthStore = defineStore("auth", {
     // servidor dormido, donde la espera es larga y legítima. Sin esto, la única señal es un
     // spinner, y un spinner largo sin texto se lee como "se colgó".
     aviso: null,
+    // La clave estuvo bien y falta el código del segundo paso: la pantalla de login lo pide.
+    pideCodigo: false,
     redirectTo: null,
     bootstrapped: false,
     // Mientras cerramos sesión, los 401 de requests en vuelo NO deben capturar la
@@ -180,7 +185,7 @@ export const useAuthStore = defineStore("auth", {
       return data;
     },
 
-    async login(email, password, redirect = null, { conservarError = false } = {}) {
+    async login(email, password, redirect = null, { conservarError = false, codigo = null } = {}) {
       authEpoch++;           // invalida cualquier /me en vuelo del arranque
       bootstrapPromise = null;
       this.loading = true;
@@ -202,7 +207,8 @@ export const useAuthStore = defineStore("auth", {
       this.loggingOut = false;
       try {
         await borrarCachesDeSesion();   // lo guardado de la persona anterior en esta compu
-        await signIn(email, password);
+        await signIn(email, password, codigo);
+        this.pideCodigo = false;
         await this.fetchMe();
 
         if (!this.user) {
@@ -247,6 +253,7 @@ export const useAuthStore = defineStore("auth", {
         // Una sola función decide el texto (ver `mensajeDeErrorDeLogin`), para que ningún camino
         // termine mostrando el mensaje interno de axios en inglés.
         this.error = mensajeDeErrorDeLogin(e);
+        if (e?.response?.data?.necesita_codigo) this.pideCodigo = true;
         throw e;
       } finally {
         clearTimeout(destrabar);

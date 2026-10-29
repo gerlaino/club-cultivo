@@ -44,6 +44,15 @@
             <RouterLink to="/olvide-contrasena" class="hb-link lv__olvide">¿Olvidaste tu contraseña?</RouterLink>
           </div>
 
+          <!-- Segundo paso (29-oct-2026): aparece cuando la clave estuvo bien y la cuenta lo tiene. -->
+          <div v-if="auth.pideCodigo" class="hb-campo" data-testid="login-codigo">
+            <label class="hb-label" for="lv-codigo">Código de tu app</label>
+            <input id="lv-codigo" ref="campoCodigo" v-model.trim="codigo" class="hb-input lv__codigo"
+                   inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"
+                   :disabled="auth.loading" />
+            <p class="hb-nota">Los seis números que muestra Google Authenticator, 1Password o la app que usaste para activarlo.</p>
+          </div>
+
           <!-- Espera larga pero normal (servidor despertando). No es un error: va como nota,
                no en rojo, y sólo aparece si no hay un error de verdad que mostrar. -->
           <Transition name="err">
@@ -57,7 +66,7 @@
             <div v-if="auth.error" class="hb-error">{{ auth.error }}</div>
           </Transition>
 
-          <button class="hb-btn" type="submit" :disabled="auth.loading || retrying || !email || !password">
+          <button class="hb-btn" type="submit" :disabled="auth.loading || retrying || !email || !password || (auth.pideCodigo && codigo.length !== 6)">
             <DsSpinner v-if="auth.loading || retrying" :size="18" />
             <span v-else>Ingresar</span>
           </button>
@@ -76,7 +85,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -98,6 +107,11 @@ function volver () {
 if (route.query.paciente === '1') router.replace('/paciente')
 const email      = ref('')
 const password   = ref('')
+const codigo     = ref('')
+const campoCodigo = ref(null)
+// Otra cuenta, otro código: si cambia el usuario, el campo se va hasta que el backend lo pida.
+watch(email, () => { auth.pideCodigo = false; codigo.value = '' })
+watch(() => auth.pideCodigo, async (pide) => { if (pide) { await nextTick(); campoCodigo.value?.focus() } })
 const showPass   = ref(false)
 const BUILD    = __APP_BUILD__
 const BUILD_AT = __APP_BUILD_AT__
@@ -123,7 +137,7 @@ function esErrorDeConexion(e) {
 }
 
 async function intentarLogin(opciones = {}) {
-  await auth.login(email.value, password.value, route.query.redirect || null, opciones)
+  await auth.login(email.value, password.value, route.query.redirect || null, { ...opciones, codigo: codigo.value || null })
 }
 
 async function onSubmit() {
@@ -167,6 +181,7 @@ async function onSubmit() {
 }
 .lv__eye:hover { color: var(--hb-tinta); }
 .lv__olvide { align-self: flex-end; margin-top: 2px; font-size: .8rem; }
+.lv__codigo { letter-spacing: .3em; font-variant-numeric: tabular-nums; font-size: 1.1rem; }
 .lv__paciente { margin-top: 4px; }
 
 .err-enter-active, .err-leave-active { transition: all .2s; }

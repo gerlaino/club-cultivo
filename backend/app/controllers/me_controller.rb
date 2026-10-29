@@ -11,6 +11,8 @@ class MeController < ApplicationController
     # avatar_url no es columna: es la URL del adjunto ActiveStorage. Con `only:` se
     # ignoraba, por eso el ícono nunca recibía el avatar tras /me ni refreshUser.
     data['avatar_url'] = u.avatar.attached? ? url_for(u.avatar) : nil
+    # El super admin sin el segundo paso activo no opera hasta activarlo: la app lo lleva ahí.
+    data['segundo_paso_pendiente'] = true if u.segundo_paso_obligatorio? && !u.segundo_paso_activo?
 
     # Modo observador: el super admin está viendo un club ajeno en solo lectura. El frontend lo
     # necesita para montar el shell del club en vez del de plataforma y para mostrar el cartel

@@ -16,4 +16,22 @@ namespace :seguridad do
       afectados.each { |u| puts "  id=#{u.id} | #{u.email} | #{u.role} | club_id: #{u.club_id}" }
     end
   end
+
+  namespace :segundo_paso do
+    # Perdió el teléfono o lo cambió (29-oct-2026): borra el secreto y la próxima vez que entra con
+    # mail y clave vuelve a activarlo con el QR. Es a propósito sólo por consola: desde la app,
+    # quien tiene la sesión no puede sacarle el candado a la cuenta.
+    #   EMAIL=german@… bin/rails seguridad:segundo_paso:reiniciar
+    desc 'Reinicia el segundo paso de un usuario (EMAIL=…)'
+    task reiniciar: :environment do
+      email = ENV['EMAIL'].to_s.strip.downcase
+      abort 'Falta EMAIL=…' if email.blank?
+
+      user = ActsAsTenant.without_tenant { User.find_by(email: email) }
+      abort "No hay usuario con #{email}" unless user
+
+      user.update!(otp_secret: nil, otp_activado_at: nil, otp_ultimo_paso: nil)
+      puts "Listo: #{email} vuelve a activar el segundo paso la próxima vez que entra."
+    end
+  end
 end

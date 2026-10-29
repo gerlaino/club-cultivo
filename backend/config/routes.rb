@@ -488,6 +488,10 @@ Rails.application.routes.draw do
       # Qué avisos quiere en el teléfono (ver `Notificaciones::Catalogo`).
       get   :notificaciones
       patch :notificaciones, action: :actualizar_notificaciones
+      # Segundo paso al entrar (29-oct-2026): estado, empezar (da el QR) y activar (con un código).
+      get  :segundo_paso,          action: :segundo_paso
+      post 'segundo_paso/iniciar', action: :iniciar_segundo_paso
+      post 'segundo_paso/activar', action: :activar_segundo_paso
     end
 
     resource :preferences, only: [:show, :update], controller: "preferences" do

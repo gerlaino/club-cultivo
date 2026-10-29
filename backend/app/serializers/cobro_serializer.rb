@@ -8,7 +8,7 @@ class CobroSerializer
       contexto:      c.contexto,
       created_at:    c.created_at,
       registrado_por: c.created_by ? (c.created_by.first_name || c.created_by.email) : nil,
-      comprobante_url: (c.comprobante.attached? ? Rails.application.routes.url_helpers.rails_blob_path(c.comprobante, only_path: true) : nil),
+      comprobante_url: Seguridad::ArchivoPrivado.ruta(c.comprobante),
     }
   end
 end

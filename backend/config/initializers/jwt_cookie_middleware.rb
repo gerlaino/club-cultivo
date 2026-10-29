@@ -10,6 +10,17 @@ class JwtCookieMiddleware
   def call(env)
     status, headers, body = @app.call(env)
 
+    # UNA RESPUESTA DE ERROR NUNCA LLEVA SESIÓN (29-oct-2026, seguridad tanda 2). En el pedido de login,
+    # cualquier `current_user` —de un before_action como el del rol apagado o de un after_action—
+    # vuelve a autenticar con la clave que viaja en los parámetros, y warden-jwt_auth arma un token
+    # para la respuesta. El login rechazado (rol apagado, falta el código del segundo paso) salía con
+    # cookie igual: la pantalla decía «no podés entrar» y la cookie decía que sí.
+    if status.to_i >= 400
+      headers.delete('Authorization')
+      headers.delete('authorization')
+      return [status, headers, body]
+    end
+
     auth_value = headers['Authorization'] || headers['authorization']
     jwt        = auth_value&.sub(/\ABearer /i, '')
     return [status, headers, body] unless jwt.present?

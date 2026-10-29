@@ -80,17 +80,49 @@ describe('Perfil con solapas', () => {
     expect(w.text()).not.toContain('ID usuario')
   })
 
-  // AC (Germán, 25-sep-2026): «directamente pongamos la nueva contraseña, no exijamos la actual».
-  it('Seguridad no pide la contraseña actual: con la nueva y su confirmación alcanza', async () => {
+  // AC (29-oct-2026, seguridad tanda 2; reemplaza la opción A del 25-sep): cambiar la contraseña pide la
+  // actual, y cambiar el mail también (es a donde llega «Olvidé mi contraseña»).
+  it('Seguridad pide la contraseña actual: sin ella no manda nada', async () => {
     const w = await montar({ solapa: 'seguridad' })
-    expect(w.text()).not.toContain('Contraseña actual')
+    expect(w.text()).toContain('Contraseña actual')
 
-    const [nueva, confirmar] = w.findAll('input[type="password"]')
+    const [, nueva, confirmar] = w.findAll('input[type="password"]')
     await nueva.setValue('NuevaClave2026!')
     await confirmar.setValue('NuevaClave2026!')
     await w.find('.pfl__form-actions .pfl__btn-primary').trigger('click')
     await flushPromises()
 
-    expect(api.updateMyPassword).toHaveBeenCalledWith({ password: 'NuevaClave2026!', password_confirmation: 'NuevaClave2026!' })
+    expect(api.updateMyPassword).not.toHaveBeenCalled()
+    expect(w.text()).toContain('Escribí tu contraseña actual')
+  })
+
+  it('con la actual, la manda junto con la nueva', async () => {
+    const w = await montar({ solapa: 'seguridad' })
+
+    const [actual, nueva, confirmar] = w.findAll('input[type="password"]')
+    await actual.setValue('LaDeAntes1')
+    await nueva.setValue('NuevaClave2026!')
+    await confirmar.setValue('NuevaClave2026!')
+    await w.find('.pfl__form-actions .pfl__btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(api.updateMyPassword).toHaveBeenCalledWith({ current_password: 'LaDeAntes1', password: 'NuevaClave2026!', password_confirmation: 'NuevaClave2026!' })
+  })
+
+  it('cambiar el mail pide la contraseña actual; sin tocarlo no aparece', async () => {
+    const w = await montar()
+    expect(w.find('[data-testid="perfil-clave-mail"]').exists()).toBe(false)
+
+    await w.find('input[placeholder="tu@gmail.com"]').setValue('nuevo@real.com')
+    expect(w.find('[data-testid="perfil-clave-mail"]').exists()).toBe(true)
+    const guardar = w.findAll('.pfl__btn-primary').find(b => b.text().includes('Guardar'))
+    expect(guardar.attributes('disabled')).toBeDefined()
+
+    await w.find('[data-testid="perfil-clave-mail"] input').setValue('LaDeAntes1')
+    expect(guardar.attributes('disabled')).toBeUndefined()
+    await guardar.trigger('click')
+    await flushPromises()
+    const { updateProfile } = await import('../lib/api')
+    expect(updateProfile).toHaveBeenCalledWith(expect.objectContaining({ email_personal: 'nuevo@real.com', current_password: 'LaDeAntes1' }))
   })
 })

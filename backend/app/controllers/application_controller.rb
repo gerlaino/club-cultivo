@@ -19,6 +19,7 @@ class ApplicationController < ActionController::API
   before_action :block_observer_writes!
   before_action :block_observer_clinico!
   before_action :block_super_admin_sin_contexto!
+  before_action :exigir_segundo_paso!
 
   # ── Gating por módulo ─────────────────────────────────────────────────────
   #
@@ -159,6 +160,25 @@ class ApplicationController < ActionController::API
   PACIENTE_PREFIJOS      = %w[portal/ public/].freeze
   # Del perfil, sólo lo suyo: cambiar su clave y sus avisos. Nombre y mail de ingreso no los toca.
   PACIENTE_PERFIL        = %w[show password notificaciones actualizar_notificaciones].freeze
+
+  # Quien lo tiene obligatorio (el super admin) y todavía no lo activó NO opera: sólo puede verse a
+  # sí mismo, activarlo y salir (29-oct-2026, seguridad tanda 2). Si no, el «obligatorio» era una
+  # sugerencia: entraba con mail y clave como siempre y abría todas las organizaciones.
+  SEGUNDO_PASO_PERMITIDO = {
+    'me' => nil, 'users/sessions' => nil,
+    'profile' => %w[show notificaciones segundo_paso iniciar_segundo_paso activar_segundo_paso],
+  }.freeze
+
+  def exigir_segundo_paso!
+    return unless current_user&.segundo_paso_obligatorio?
+    return if current_user.segundo_paso_activo?
+    return if controller_path == 'application' && action_name == 'spa_fallback'
+    return if SEGUNDO_PASO_PERMITIDO.key?(controller_path) &&
+              (SEGUNDO_PASO_PERMITIDO[controller_path].nil? || SEGUNDO_PASO_PERMITIDO[controller_path].include?(action_name))
+
+    render json: { error: 'Antes de seguir, activá el segundo paso para entrar (Mi perfil → Seguridad).',
+                   segundo_paso_pendiente: true }, status: :forbidden
+  end
 
   def paciente_solo_en_su_portal!
     return unless current_user&.paciente?
@@ -327,8 +347,13 @@ class ApplicationController < ActionController::API
   # El token viejo NO se revoca: la pantalla manda varios pedidos a la vez con el mismo token, y
   # revocarlo dejaría a los que están en vuelo con un 401. Vence solo.
   def renovar_sesion
-    return unless current_user && response.status < 400
+    # El orden importa (29-oct-2026): `current_user` en el pedido de login, con el mail y la clave
+    # todavía en los parámetros, vuelve a autenticar y warden-jwt_auth arma OTRO token. Un login
+    # rechazado después de validar la clave (rol apagado, falta el código del segundo paso) salía con
+    # cookie y token igual. Se descarta antes de preguntar quién es.
+    return if response.status >= 400
     return if request.path.end_with?('/users/sign_out', '/users/sign_in')
+    return unless current_user
 
     token = request.headers['Authorization'].to_s.sub(/\ABearer /i, '')
     return if token.empty?

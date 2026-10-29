@@ -10,13 +10,23 @@ module AuthHelpers
     # anterior. Es un falso VERDE silencioso —un caso de "el rol X no puede hacer Y" pasaba porque
     # en realidad seguía actuando el admin— así que vale para toda la suite, no para un spec.
     reset!   # nuevo cookie jar: cookies.delete no alcanza con la cookie httpOnly de Devise JWT
-    post '/api/users/sign_in', params: { user: { email: user.email, password: password } }, as: :json
+    post '/api/users/sign_in', params: { user: { email: user.email, password: password, **codigo_segundo_paso(user) } }, as: :json
     expect(response).to have_http_status(:ok), "sign_in_as falló para #{user.email}: #{response.body}"
     # Con require_tenant=true (TEN-01c), el setup de fixtures y las aserciones posteriores al
     # login necesitan un tenant. Usamos test_tenant (no current_tenant) para que sobreviva a
     # los requests siguientes vía el TestTenantMiddleware. Cubre specs sin let(:club). Los
     # specs cross-tenant que crean datos de OTRO club los envuelven en with_tenant(otro_club).
     ActsAsTenant.test_tenant = user.club
+  end
+
+  # Quien tiene el segundo paso activo entra con el código de ahora, como haría con su app. Se olvida
+  # el último usado: dos logins en el mismo medio minuto (dos dispositivos en un spec) no chocan.
+  def codigo_segundo_paso(user)
+    user = User.unscoped { ActsAsTenant.without_tenant { User.find_by(id: user.id) } } || user
+    return {} unless user.pide_segundo_paso_al_entrar?
+
+    user.update_columns(otp_ultimo_paso: nil)
+    { codigo: Seguridad::Totp.codigo(user.otp_secret, Seguridad::Totp.paso_de) }
   end
 
   # Mantenido por compatibilidad con specs existentes que pasan headers: auth_headers.
@@ -28,7 +38,7 @@ module AuthHelpers
   # Variante mobile: devuelve el Bearer token del Authorization response header.
   def mobile_login_as(user, password: DEFAULT_PASSWORD)
     post '/api/users/sign_in',
-         params:  { user: { email: user.email, password: password } },
+         params:  { user: { email: user.email, password: password, **codigo_segundo_paso(user) } },
          headers: { 'X-Mobile-Client' => 'true' },
          as: :json
     expect(response).to have_http_status(:ok)

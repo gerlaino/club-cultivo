@@ -2,6 +2,7 @@
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 const { esPersonal } = useUsoPersonal()
 import { onMounted, reactive, ref, computed } from 'vue'
+import SegundoPasoCard from '../components/perfil/SegundoPasoCard.vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { getProfile, updateProfile, updateMyPassword, uploadAvatar, getMisNotificaciones, updateMisNotificaciones } from '../lib/api'
@@ -37,12 +38,21 @@ const form = reactive({
   phone:          '',
 })
 
+// Cambiar el mail o la contraseña pide la actual (29-oct-2026, seguridad): el backend la exige.
+const claveParaMail = ref('')
+const cambiaElMail = computed(() => !!me.value && (
+  form.email.trim().toLowerCase() !== (me.value.email || '').trim().toLowerCase() ||
+  form.email_personal.trim().toLowerCase() !== (me.value.email_personal || '').trim().toLowerCase()
+))
+
 const pass = reactive({
+  current_password:      '',
   password:              '',
   password_confirmation: '',
 })
 
 const passErrors = reactive({
+  current_password:      '',
   password:              '',
   password_confirmation: '',
 })
@@ -67,8 +77,10 @@ const strengthWidth = computed(() => `${(passwordStrength.value.score / 5) * 100
 
 function validatePassword() {
   let ok = true
+  passErrors.current_password      = ''
   passErrors.password              = ''
   passErrors.password_confirmation = ''
+  if (!pass.current_password)        { passErrors.current_password = 'Escribí tu contraseña actual'; ok = false }
   if (pass.password.length < 8)      { passErrors.password = 'Mínimo 8 caracteres'; ok = false }
   else if (passwordStrength.value.score < 2) { passErrors.password = 'La contraseña es muy débil'; ok = false }
   if (pass.password !== pass.password_confirmation) { passErrors.password_confirmation = 'Las contraseñas no coinciden'; ok = false }
@@ -103,8 +115,9 @@ async function onSave() {
   okMsg.value  = null
   error.value  = null
   try {
-    const { data } = await updateProfile({ ...form })
+    const { data } = await updateProfile({ ...form, ...(cambiaElMail.value ? { current_password: claveParaMail.value } : {}) })
     me.value = data.data
+    claveParaMail.value = ''
     okMsg.value = '✓ Perfil actualizado correctamente'
     await auth.refreshUser?.()
     setTimeout(() => { okMsg.value = null }, 4000)
@@ -152,7 +165,7 @@ async function onChangePassword() {
   try {
     await updateMyPassword({ ...pass })
     pOkMsg.value = '✓ Contraseña actualizada correctamente'
-    Object.assign(pass, { password: '', password_confirmation: '' })
+    Object.assign(pass, { current_password: '', password: '', password_confirmation: '' })
     setTimeout(() => { pOkMsg.value = null }, 4000)
   } catch (e) {
     pError.value = e?.response?.data?.errors?.join(', ') || 'Error al actualizar la contraseña'
@@ -325,13 +338,15 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
           </div>
 
           <!-- Datos personales -->
+          <!-- Llegó obligado a activarlo: es lo primero que ve (después queda abajo de la contraseña). -->
+          <SegundoPasoCard v-if="solapa === 'seguridad' && auth.user?.segundo_paso_pendiente" />
           <div v-if="solapa === 'datos'" class="pfl__card pfl__card--form">
             <div class="pfl__card-header">
               <div>
                 <div class="pfl__card-title">Datos personales</div>
                 <div class="pfl__card-desc">Tu nombre, DNI y datos de contacto</div>
               </div>
-              <button class="pfl__btn-primary" :disabled="saving" @click="onSave">
+              <button class="pfl__btn-primary" :disabled="saving || (cambiaElMail && !claveParaMail)" @click="onSave">
                 <DsSpinner v-if="saving" :size="16" />
                 <i v-else class="bi bi-check2"></i>
                 {{ saving ? 'Guardando...' : 'Guardar' }}
@@ -367,6 +382,12 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
                 <label class="pfl__label">Email personal</label>
                 <input v-model.trim="form.email_personal" type="email" class="pfl__input" placeholder="tu@gmail.com" />
                 <div class="pfl__hint">{{ esPersonal ? 'Tu mail real: ahí te llegan los avisos de tu cuenta.' : 'Tu mail real, donde la organización puede contactarte.' }}</div>
+              </div>
+              <!-- El mail es a donde llega «Olvidé mi contraseña»: cambiarlo pide la actual. -->
+              <div v-if="cambiaElMail" class="pfl__field pfl__field--full" data-testid="perfil-clave-mail">
+                <label class="pfl__label">Tu contraseña actual <span class="pfl__required">*</span></label>
+                <input v-model="claveParaMail" type="password" class="pfl__input" autocomplete="current-password" />
+                <div class="pfl__hint">Para cambiar el mail te la pedimos: es a donde llegan los links para recuperar la cuenta.</div>
               </div>
             </div>
           </div>
@@ -445,6 +466,20 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 
             <div class="pfl__form-grid">
 
+              <!-- La actual: sin ella, una sesión ajena abierta alcanzaba para quedarse con la cuenta. -->
+              <div class="pfl__field pfl__field--full">
+                <label class="pfl__label">Contraseña actual <span class="pfl__required">*</span></label>
+                <input
+                  v-model="pass.current_password"
+                  type="password"
+                  class="pfl__input"
+                  :class="{ 'pfl__input--error': passErrors.current_password }"
+                  autocomplete="current-password"
+                  data-testid="perfil-clave-actual"
+                />
+                <div v-if="passErrors.current_password" class="pfl__field-error">{{ passErrors.current_password }}</div>
+              </div>
+
               <!-- Nueva contraseña -->
               <div class="pfl__field">
                 <label class="pfl__label">Nueva contraseña <span class="pfl__required">*</span></label>
@@ -512,6 +547,8 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             </div>
 
           </div>
+
+          <SegundoPasoCard v-if="solapa === 'seguridad' && auth.user?.role === 'super_admin' && !auth.user?.segundo_paso_pendiente" />
 
         </div>
       </div>

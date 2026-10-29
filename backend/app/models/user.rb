@@ -13,6 +13,8 @@ class User < ApplicationRecord
   # en cada autenticación) — cifrarlo es alto riesgo y queda fuera del alcance ENC-01.
   encrypts :dni
   encrypts :phone
+  # El secreto del segundo paso (29-oct-2026): con él cualquiera genera los códigos.
+  encrypts :otp_secret
 
   has_one_attached :avatar
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'user_id', dependent: :destroy
@@ -179,6 +181,32 @@ class User < ApplicationRecord
   # A dónde se le puede escribir DE VERDAD, o nil. Distinto de `email_notificacion`, que cae en
   # el login cuando no hay personal: para mandar un link de restablecimiento eso es mandarlo a
   # una dirección de un dominio ajeno. Acá, sin casilla real no se manda nada, y se dice.
+  # ── Segundo paso al entrar (29-oct-2026, seguridad tanda 2) ─────────────────────────────────
+  # Hoy lo exige el super admin (abre todas las organizaciones). `SEGUNDO_PASO_SUPER_ADMIN=apagado`
+  # en el entorno lo suspende: es la salida de emergencia si se pierde el teléfono y no hay consola
+  # a mano (la otra: `rake seguridad:segundo_paso:reiniciar EMAIL=…`).
+  def segundo_paso_activo?
+    otp_secret.present? && otp_activado_at.present?
+  end
+
+  def segundo_paso_obligatorio?
+    super_admin? && !Seguridad::Totp.suspendido?
+  end
+
+  # Quien lo activó lo usa al entrar (salvo la salida de emergencia).
+  def pide_segundo_paso_al_entrar?
+    segundo_paso_activo? && !Seguridad::Totp.suspendido?
+  end
+
+  # Verifica el código y lo marca usado (el mismo no sirve dos veces).
+  def usar_codigo_segundo_paso!(codigo)
+    paso = Seguridad::Totp.verificar(otp_secret, codigo, ultimo_paso: otp_ultimo_paso)
+    return false unless paso
+
+    update_columns(otp_ultimo_paso: paso)
+    true
+  end
+
   def email_real
     return email_personal if email_personal.present?
 

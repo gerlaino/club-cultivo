@@ -11,6 +11,13 @@ class Users::SessionsController < Devise::SessionsController
   # (26-oct-2026). Cerrar sesión corre siempre; sin sesión, borrar una cookie que no está no daña.
   skip_before_action :verify_signed_out_user
 
+  # UN LOGIN RECHAZADO NO DEJA A NADIE ADENTRO (29-oct-2026). Los before_action de ApplicationController
+  # (rol apagado, organización suspendida…) preguntan `current_user`: en este pedido eso autentica
+  # con la clave y guarda al usuario en la sesión de Rails, y si después cortan con un 403 quedaba
+  # reconocido en el pedido siguiente. Va primero y envuelve todo: aunque un before_action corte la
+  # cadena, esto termina y suelta la sesión. (El token lo frena `JwtCookieMiddleware`.)
+  prepend_around_action :sin_sesion_si_rechaza, only: :create
+
   def create
     # ENTRAR ES CON LO QUE SE ESCRIBIÓ. Warden, antes de mirar usuario y clave, devuelve el que ya
     # esté en la sesión de Rails (`_club_session`): con esa cookie del usuario anterior viva —una
@@ -25,9 +32,20 @@ class Users::SessionsController < Devise::SessionsController
     # en cada pantalla de adentro. El guard de ApplicationController es el que manda de
     # verdad (cubre las sesiones ya abiertas); esto es la explicación en la puerta.
     unless resource.rol_habilitado?
-      sign_out(resource_name)
+      sin_sesion!
       render json: { error: mensaje_rol_deshabilitado(resource), modulo_rol_apagado: true },
              status: :forbidden and return
+    end
+
+    # SEGUNDO PASO (29-oct-2026, seguridad tanda 2): con la clave bien, quien lo tiene activo además
+    # manda el código de su app en el MISMO pedido (`user[codigo]`). Sin código o con uno equivocado
+    # no sale sesión ni token; la pantalla pide el código y reenvía todo. El freno por cuenta de
+    # rack-attack (`sign_in/cuenta`) cubre probar códigos.
+    if resource.pide_segundo_paso_al_entrar? && !resource.usar_codigo_segundo_paso!(params.dig(:user, :codigo))
+      sin_sesion!
+      codigo = params.dig(:user, :codigo).present?
+      render json: { error: codigo ? 'El código no es correcto o ya se usó. Probá con el que muestra ahora tu app.' : 'Escribí el código de seis números de tu app.',
+                     necesita_codigo: true }, status: :unauthorized and return
     end
 
     sign_in(resource_name, resource)
@@ -55,6 +73,19 @@ class Users::SessionsController < Devise::SessionsController
   end
 
   private
+
+  def sin_sesion_si_rechaza
+    yield
+  ensure
+    sin_sesion! if response.status.to_i >= 400 && warden.authenticated?(resource_name)
+  end
+
+  # Credenciales válidas pero no se entra: se suelta lo que `authenticate!` dejó armado, incluido el
+  # token que warden-jwt_auth ya había preparado para la respuesta.
+  def sin_sesion!
+    sign_out(resource_name)
+    request.env.delete('warden-jwt_auth.token')
+  end
 
   # Cerrar sesión DEJA DE VALER el token, no sólo borra la cookie: si alguien se lo llevó, ya no le
   # sirve. Lo hacemos acá y no en el middleware de warden-jwt_auth porque aquel decodifica DESPUÉS

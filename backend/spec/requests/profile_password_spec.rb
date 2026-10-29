@@ -1,8 +1,8 @@
 require 'rails_helper'
 
-# AC (Germán, 25-sep-2026): en «Mi perfil», cambiar la contraseña sin pedir la actual. Acordado
-# con él (opción A) junto con lo que la reemplaza: al cambiarla se cierran las sesiones en los
-# demás dispositivos y llega un mail avisando.
+# AC (29-oct-2026, seguridad tanda 2, Germán: «sí»): cambiar la contraseña PIDE LA ACTUAL —una
+# sesión ajena abierta ya no alcanza para quedarse con la cuenta—. Sigue lo del 25-sep: al
+# cambiarla se cierran las sesiones en los demás dispositivos y llega un mail avisando.
 RSpec.describe 'PATCH /profile/password', type: :request do
   include AuthHelpers
   include ActiveJob::TestHelper
@@ -10,17 +10,40 @@ RSpec.describe 'PATCH /profile/password', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club, email_personal: 'german@real.com') }
 
-  def cambiar(password = 'NuevaClave2026!', confirmacion = password)
-    patch '/profile/password', params: { user: { password: password, password_confirmation: confirmacion } }, as: :json
+  def cambiar(password = 'NuevaClave2026!', confirmacion = password, actual: AuthHelpers::DEFAULT_PASSWORD)
+    patch '/profile/password', params: { user: { current_password: actual, password: password, password_confirmation: confirmacion }.compact }, as: :json
   end
 
-  it 'cambia la contraseña sin pedir la actual' do
+  it 'con la actual correcta, la cambia' do
     sign_in_as(admin)
 
     cambiar
 
     expect(response).to have_http_status(:ok)
     expect(admin.reload.valid_password?('NuevaClave2026!')).to be(true)
+  end
+
+  it 'sin la actual, no la cambia y dice por qué' do
+    sign_in_as(admin)
+
+    cambiar(actual: nil)
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.parsed_body['errors']).to eq(['La contraseña actual no es correcta.'])
+    expect(admin.reload.valid_password?(AuthHelpers::DEFAULT_PASSWORD)).to be(true)
+  end
+
+  it 'con la actual equivocada, no la cambia ni corta las otras sesiones' do
+    otro_dispositivo = mobile_login_as(admin)
+    sign_in_as(admin)
+
+    cambiar(actual: 'cualquier-cosa')
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(admin.reload.valid_password?(AuthHelpers::DEFAULT_PASSWORD)).to be(true)
+    reset!
+    get '/profile', headers: { 'Authorization' => otro_dispositivo, 'X-Mobile-Client' => 'true' }, as: :json
+    expect(response).to have_http_status(:ok)
   end
 
   it 'si la confirmación no coincide, no la cambia' do

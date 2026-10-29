@@ -1681,6 +1681,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `spec/security/barrido_de_rutas_spec.rb` barre todas las rutas por rol: no se saltea ni se achica.
 - **LOS DATOS DE LAS PERSONAS NO VAN A LOS LOGS**: todo campo nuevo con datos de una persona o de salud
   se suma a `filter_parameter_logging.rb` en el mismo commit.
+- **CAMBIAR LA CLAVE O EL MAIL PIDE LA CLAVE ACTUAL** (29-oct-2026, seguridad tanda 2; reemplaza la opción A
+  del 25-sep, que no la pedía). Con una sesión ajena abierta alcanzaba para quedarse con la cuenta (el mail
+  es a donde llega «Olvidé mi contraseña»). Vale para el equipo y para el paciente (`ProfileController`).
+- **EL SUPER ADMIN ENTRA CON SEGUNDO PASO** (29-oct-2026, AUTH-2FA): mail, clave y el código de seis números
+  de una app (`Seguridad::Totp`, sin gema), en el mismo pedido de login. Hasta activarlo no opera
+  (`exigir_segundo_paso!`, lista de lo permitido). Se reinicia sólo por consola
+  (`rake seguridad:segundo_paso:reiniciar EMAIL=…`); `SEGUNDO_PASO_SUPER_ADMIN=apagado` es la salida de
+  emergencia. **Un login rechazado no deja sesión**: `JwtCookieMiddleware` saca el token de toda respuesta
+  ≥ 400 y `Users::SessionsController#sin_sesion_si_rechaza` suelta la sesión de Rails.
+- **EL LINK A UN ARCHIVO CON DATOS DE UNA PERSONA VENCE** (29-oct-2026, FILES-01): comprobantes, documentos,
+  constancias del REPROCANN y adjuntos del chat salen por `Seguridad::ArchivoPrivado` (1 hora). Nunca
+  `url_for`/`rails_blob_path` a secas para eso. Las fotos de genéticas, lotes y el logo NO (son públicas y el
+  service worker las guarda por URL).
+- **LOS FRENOS DE RACK-ATTACK VAN POR LA IP DE LA PERSONA** (`Rack::Attack.ip_cliente`: `CF-Connecting-IP`,
+  producción está detrás de Cloudflare) y el login además **por cuenta** (10 en 15 min).
 - **LO GUARDADO EN EL TELÉFONO ES DE QUIEN TENÍA LA SESIÓN**: se borra al salir, al vencerse y al entrar
   (`lib/cachesSesion.js`). Toda caché nueva del service worker con datos entra en esa limpieza.
 - **EL PACIENTE SÓLO LLEGA A SU PORTAL** (28-oct-2026; un paciente leía el padrón entero por

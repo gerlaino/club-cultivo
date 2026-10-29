@@ -64,7 +64,7 @@ module Portal
         # El motivo, si la rechazaron: es para él («la foto no se lee, subila de nuevo»).
         observaciones: r.estado == 'rechazada' ? r.observaciones : nil,
         vencimiento_nuevo: r.fecha_vencimiento_nueva,
-        constancia: r.constancia.attached? ? { nombre: r.constancia.filename.to_s, url: url_for(r.constancia) } : nil,
+        constancia: r.constancia.attached? ? { nombre: r.constancia.filename.to_s, url: Seguridad::ArchivoPrivado.url(r.constancia) } : nil,
       }
     end
   end

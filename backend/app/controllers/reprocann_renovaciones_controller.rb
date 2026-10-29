@@ -88,7 +88,7 @@ class ReprocannRenovacionesController < ApplicationController
       fecha_aprobacion:       r.fecha_aprobacion,
       fecha_vencimiento_nueva: r.fecha_vencimiento_nueva,
       origen:                 r.origen,
-      constancia_url:         r.constancia.attached? ? url_for(r.constancia) : nil,
+      constancia_url:         Seguridad::ArchivoPrivado.url(r.constancia),
       constancia_nombre:      r.constancia.attached? ? r.constancia.filename.to_s : nil,
       reprocann_numero_nuevo: r.reprocann_numero_nuevo,
       observaciones:          r.observaciones,

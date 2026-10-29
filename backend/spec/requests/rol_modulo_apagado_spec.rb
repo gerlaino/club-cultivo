@@ -32,6 +32,20 @@ RSpec.describe 'Rol cuyo módulo está apagado', type: :request do
       expect(body['error']).to include('administrador')
     end
 
+    # 29-oct-2026: el rechazo salía igual con cookie y token (lo rearmaba `renovar_sesion` al preguntar
+    # `current_user` con la clave todavía en el pedido). Rechazado = sin sesión.
+    it 'rechazado, no le queda sesión: ni cookie ni token' do
+      user = create(:user, :cultivador, club: club_sin(:cultivo))
+
+      intentar_login(user)
+
+      expect(response.headers['Authorization']).to be_blank
+      expect(response.headers['Set-Cookie'].to_s).not_to include('jwt_token=')
+      # Ni por la sesión de Rails (`_club_session`): el pedido siguiente no lo reconoce.
+      get '/api/me', as: :json
+      expect(response).to have_http_status(:unauthorized)
+    end
+
     # El dispensador atiende dispensa Y mostrador del Buffet: se lo frena sólo cuando no le
     # queda ninguno de los dos.
     it 'deja entrar al dispensador de un club que sólo tiene el Buffet' do

@@ -1,0 +1,9 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @user.first_name.presence || '' %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  El <strong><%= @cuando %></strong> se activó el segundo paso para entrar con tu usuario <strong><%= @user.email %></strong>
+  en Cultivo Espacial. Desde ahora, además de la contraseña, se pide el código de seis números de tu app.
+</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">Si fuiste vos, no tenés que hacer nada.</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  <strong>Si no fuiste vos</strong>, cambiá tu contraseña ya y pedí que reinicien el segundo paso: alguien tiene tu sesión y tu clave.
+</p>

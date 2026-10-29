@@ -74,6 +74,14 @@ class AccesoMailer < ApplicationMailer
     mail(to: user.email_real, subject: 'Tu contraseña cambió — Cultivo Espacial')
   end
 
+  # Se activó el segundo paso al entrar (29-oct-2026). Avisa por si no fue quien es dueño de la cuenta:
+  # alguien con la sesión y la clave podría haber atado la cuenta a su teléfono.
+  def segundo_paso_activado(user:)
+    @user   = user
+    @cuando = Time.current.in_time_zone('America/Argentina/Buenos_Aires').strftime('%d/%m/%Y a las %H:%M')
+    mail(to: user.email_real, subject: 'Activaste el segundo paso para entrar — Cultivo Espacial')
+  end
+
   # El plan vence (en `dias` días) o venció hoy (`dias == 0`). Va al admin de la organización.
   def plan_vence(user:, club:, dias:)
     @user  = user
