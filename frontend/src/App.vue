@@ -53,6 +53,12 @@ const lotes  = useLotesStore();
 const plants = usePlantsStore();
 const router = useRouter();
 const route  = useRoute();
+// La misma pantalla con otro id (de un paciente a otro desde el buscador, de un lote a otro) se
+// vuelve a montar: las fichas leen el id una sola vez, y sin esto Vue la reusaba y mostraba la
+// anterior con la dirección nueva (29-oct-2026). La clave son SÓLO los parámetros: cambiar de
+// pantalla o de query sigue igual que antes. El teléfono (`MobileShell`) y el super admin
+// (`SuperAdminLayout`) tienen su propio RouterView adentro y no se tocan.
+const claveVista = (r) => JSON.stringify(r.params)
 // Quién atiende el chat del portal: administración, con el portal contratado (27-oct-2026).
 const atiendeChat = computed(() =>
   auth.isAuthenticated && ['admin', 'supervisor'].includes(auth.user?.role) && club.data?.features?.vista_paciente === true)
@@ -240,7 +246,7 @@ onMounted(async () => {
           <div class="admin-accent-bar"></div>
           <AvisoVencimientoPlan />
           <main class="admin-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -265,7 +271,7 @@ onMounted(async () => {
           <CultivadorMobileHeader />
           <div class="cvd-accent-bar"></div>
           <main class="cvd-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -290,7 +296,7 @@ onMounted(async () => {
           <SupervisorTopBar @toggle-drawer="svrDrawerOpen = !svrDrawerOpen" />
           <div class="svr-accent-bar"></div>
           <main class="svr-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -314,7 +320,7 @@ onMounted(async () => {
           <DispensadorTopBar @open-drawer="dpvDrawerOpen = true" />
           <div class="dpv-accent-bar"></div>
           <main class="dpv-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -338,7 +344,7 @@ onMounted(async () => {
           <ManicuraTopBar @open-drawer="mncDrawerOpen = true" />
           <div class="mnc-accent-bar"></div>
           <main class="mnc-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -362,7 +368,7 @@ onMounted(async () => {
           <MedicoTopBar @open-drawer="medDrawerOpen = true" />
           <div class="med-accent-bar"></div>
           <main class="med-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -385,7 +391,7 @@ onMounted(async () => {
           <AbogadoTopBar @open-drawer="abgDrawerOpen = true" />
           <div class="abg-accent-bar"></div>
           <main class="abg-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -408,7 +414,7 @@ onMounted(async () => {
           <AuditorTopBar @open-drawer="audDrawerOpen = true" />
           <div class="aud-accent-bar"></div>
           <main class="aud-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -431,7 +437,7 @@ onMounted(async () => {
           <DeliveryTopBar @open-drawer="dlvDrawerOpen = true" />
           <div class="dlv-accent-bar"></div>
           <main class="dlv-main">
-            <router-view />
+            <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
           </main>
         </div>
       </div>
@@ -605,11 +611,11 @@ onMounted(async () => {
 
     <!-- ── CONTENIDO PRINCIPAL ── -->
     <main v-if="$route.meta.fullscreen">
-      <router-view />
+      <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
     </main>
     <main v-else class="app-main">
       <AuditorBanner v-if="auth.user?.role === 'auditor'" />
-      <router-view />
+      <router-view v-slot="{ Component, route: r }"><component :is="Component" :key="claveVista(r)" /></router-view>
     </main>
 
     </template><!-- /layout estándar -->

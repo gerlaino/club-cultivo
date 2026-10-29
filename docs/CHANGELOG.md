@@ -1,5 +1,14 @@
 # Changelog
 
+## Octubre 2026 (gp-1) — El buscador abre al paciente aunque ya estés en otra ficha (29-oct)
+
+Javi: «cuando clickeás en el paciente no te lleva al paciente». Desde la ficha de un paciente, elegir
+otro en el buscador cambiaba la dirección y seguía mostrando el primero: la ficha lee el id una sola vez
+y Vue reusaba la pantalla. Error viejo (desde que existe la ficha), no de un cambio reciente; pasaba
+igual de un lote a otro o de una sala a otra. `App.vue` ahora vuelve a montar la pantalla cuando cambian
+los parámetros de la ruta (`claveVista`); el teléfono (`MobileShell`) ya lo hacía. Probado en la app:
+Ana Álvarez → buscador → Bruno Herrera (sin el arreglo seguía Ana).
+
 ## Octubre 2026 (gp) — Calidad de la flor seca y producir desde «Otro» (29-oct)
 
 Pedido de Javi. Germán: «1 sí; 2 obligatorio a partir de ahora, poder agregarlo al editar el stock;
