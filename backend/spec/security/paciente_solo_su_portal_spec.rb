@@ -106,4 +106,34 @@ RSpec.describe 'El paciente sólo llega a su portal', type: :request do
     get '/api/profile/notificaciones', as: :json
     expect(response).to have_http_status(:ok)
   end
+
+  # Recargar /portal (Ctrl+Shift+R, un link, el ícono instalado) pide la PÁGINA al servidor, que la
+  # sirve `application#spa_fallback`. La barrera la dejaba afuera y el paciente veía el 403 en JSON
+  # en lugar de su portal (29-oct-2026). El barrido de arriba mira sólo /api: esto mira la página.
+  describe 'la página de la app' do
+    let(:index_html) { Rails.root.join('public', 'index.html') }
+
+    around do |ex|
+      creado = !index_html.exist?
+      File.write(index_html, '<!doctype html><title>app</title><div id="app">CASCARA</div>') if creado
+      ex.run
+    ensure
+      File.delete(index_html) if creado && index_html.exist?
+    end
+
+    it 'le carga al paciente logueado en cualquier dirección del portal' do
+      ActsAsTenant.test_tenant = club
+      yo = create(:paciente, club: club, dni: '30111222', aprobado_at: Time.current, email: 'yo@example.com')
+      user = Pacientes::Acceso.crear!(yo).user
+      user.update!(password: AuthHelpers::DEFAULT_PASSWORD, password_confirmation: AuthHelpers::DEFAULT_PASSWORD)
+      sign_in_as(user)
+
+      ['/', '/portal', '/portal/cuenta', '/portal/historial', "/paciente/#{club.slug}"].each do |url|
+        # Dirección completa: el helper de specs le antepone /api a todo lo que empieza con «/».
+        get "http://www.example.com#{url}", headers: { 'Accept' => 'text/html' }
+        expect(response).to have_http_status(:ok), "#{url}: #{response.status} #{response.body[0, 80]}"
+        expect(response.body).to include('CASCARA'), url
+      end
+    end
+  end
 end

@@ -162,6 +162,10 @@ class ApplicationController < ActionController::API
 
   def paciente_solo_en_su_portal!
     return unless current_user&.paciente?
+    # La página de la app (`index.html`) no es del equipo ni del paciente: es la cáscara que sirve
+    # cualquier dirección. Sin esto, recargar /portal (Ctrl+Shift+R, abrir un link, el ícono
+    # instalado) le contestaba al paciente el 403 en JSON en vez de la app (29-oct-2026).
+    return if controller_path == 'application' && action_name == 'spa_fallback'
     return if PACIENTE_CONTROLADORES.include?(controller_path)
     return if PACIENTE_PREFIJOS.any? { |p| controller_path.start_with?(p) }
     return if controller_path == 'profile' && PACIENTE_PERFIL.include?(action_name)
