@@ -120,7 +120,10 @@ const breadcrumbs = computed(() => {
     if (/^\d+$/.test(seg)) { crumbs.push({ label: 'Detalle' }); break }
     const label = SEGMENT_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' '))
     const isLast = acc === path
-    crumbs.push(isLast ? { label } : { label, to: acc })
+    // Un tramo intermedio es link sólo si es una pantalla: `/stocks` (de `/stocks/13/etiqueta`) no
+    // existe y caía en el comodín, que mandaba al inicio.
+    const esPantalla = !router.resolve(acc).matched.some(r => r.path.includes(':pathMatch'))
+    crumbs.push(isLast || !esPantalla ? { label } : { label, to: acc })
   }
   return crumbs
 })

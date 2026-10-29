@@ -786,6 +786,8 @@ onMounted(() => {
   text-decoration: none; color: #9aa39c;
   transition: color .15s; position: relative;
   -webkit-tap-highlight-color: transparent;
+  /* «Más» es un <button> y los demás son <a>: sin esto salía con el recuadro gris del navegador. */
+  background: none; border: 0; font: inherit; cursor: pointer;
 }
 .msh__tab-icon { font-size: 1.28rem; line-height: 1; }
 .msh__tab-punto {

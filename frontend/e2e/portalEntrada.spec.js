@@ -27,8 +27,9 @@ test('el admin invita, el paciente activa con su DNI y después entra con DNI y 
     return (lista.data ?? lista.pacientes ?? []).find((p) => p.dni === dni)?.id
   }, [API, DNI])
   await page.goto(`/pacientes/${id}`)
-  // La solapa del portal vive en «Más» (aparece cuando la ficha confirma que el módulo está).
-  await page.getByRole('button', { name: /Más/ }).click()
+  // La solapa del portal vive en «Datos y contacto» (aparece cuando la ficha confirma que el
+  // módulo está). Hasta la ficha en secciones (gk) estaba en «Más».
+  await page.getByText('Datos y contacto', { exact: true }).first().click()
   await page.getByText('Acceso al portal', { exact: true }).click()
   await expect(page.locator('[data-testid="portal-estado"]')).toHaveText('Sin invitar', { timeout: 15_000 })
   await page.locator('[data-testid="portal-invitar"]').click()
@@ -72,7 +73,8 @@ test('el admin invita, el paciente activa con su DNI y después entra con DNI y 
 
   // ── 3b. Mis dispensas: el detalle con la trazabilidad del lote ────────────
   await pac.goto('/portal/historial')
-  await pac.getByRole('link', { name: 'Ver detalle' }).first().click()
+  // Desde (gk) la fila entera es el link al detalle (no hay «Ver detalle»).
+  await pac.getByRole('link', { name: /E2E Kush/ }).first().click()
   await expect(pac.getByText('Trazabilidad del lote')).toBeVisible({ timeout: 15_000 })
   await expect(pac.locator('.pdv__mono').first()).toHaveText('L-E2E-001')
   await expect(pac.locator('.pdv__etapa b')).toContainText(['Floración', 'Envasado', 'Te lo entregaron'])
@@ -82,11 +84,12 @@ test('el admin invita, el paciente activa con su DNI y después entra con DNI y 
   // ── 4. El link ya no sirve ────────────────────────────────────────────────
   await pac.goto(url.pathname)
   await expect(pac.getByRole('heading', { name: 'Este link no sirve' })).toBeVisible({ timeout: 15_000 })
-  await expect(pac.locator('a[href="/paciente"]')).toBeVisible()
+  // Desde (gl) el botón lleva a la puerta de SU organización, no a la general.
+  await expect(pac.getByRole('link', { name: 'Entrar con mi DNI' })).toHaveAttribute('href', /^\/paciente\/[a-z0-9_-]+$/)
 
   // ── 5. La ficha dice que lo activó ────────────────────────────────────────
   await page.reload()
-  await page.getByRole('button', { name: /Más/ }).click()
+  await page.getByText('Datos y contacto', { exact: true }).first().click()
   await page.getByText('Acceso al portal', { exact: true }).click()
   await expect(page.locator('[data-testid="portal-estado"]')).toHaveText('Activó su portal', { timeout: 15_000 })
 

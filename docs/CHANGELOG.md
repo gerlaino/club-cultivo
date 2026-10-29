@@ -41,6 +41,11 @@ vinculado no ve lo clínico, cifrado en la base, Sentry sin datos de personas, C
   `router.onError`), toma la versión nueva y lleva a la pantalla que se quiso abrir (`main.js`). Y el código y las
   imágenes del service worker van en cajones distintos (`codigo-v1`, `imagenes-v1`): al cambiar de persona se borran
   las imágenes, no el código. Probado simulando un deploy con el portal abierto.
+- **(gn-3) Del recorrido completo por rol (7 roles, compu y teléfono, 14 pruebas de punta a punta)**: la miga de pan de
+  cultivador/dispensador/supervisor/manicura linkeaba tramos que no son pantalla (`/stocks` desde la etiqueta → el
+  comodín mandaba al inicio): ahora sólo es link si la ruta existe. «Más» de la barra del teléfono salía con el
+  recuadro gris del navegador (era el único `<button>` entre `<a>`). `e2e/portalEntrada` estaba vieja desde (gk)/(gl)
+  («Más» en la ficha, «Ver detalle», la puerta general).
 
 **Quedan (tandas 2–4, ver `SECURITY_AUDIT.md`):** segundo paso para super admin, freno por cuenta y clave
 mínima, comprobantes con link que vence, la IP real detrás de Cloudflare, cambiar la clave sin pedir la
