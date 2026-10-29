@@ -69,6 +69,25 @@ class Stock < ApplicationRecord
   # producción (manufacturar derivados), ambas, o ninguna (apartado / cuarentena / testeo).
   DISPONIBILIDADES = %w[dispensa produccion ambas ninguna].freeze
 
+  # CALIDAD DE LA FLOR (29-oct-2026, pedido de Javi). Sólo flor seca. Obligatoria en lo que se
+  # crea desde ahora (`exigir_calidad`, lo prenden las puertas de alta: el alta de stock y el frasco
+  # nuevo de una cosecha); los frascos viejos quedan sin calidad y se completa al editarlos. En uso
+  # personal no se pide. «Otro» lleva en la descripción qué es.
+  CALIDADES = {
+    'altos'  => 'Altos',
+    'medios' => 'Medios',
+    'bajos'  => 'Bajos',
+    'otro'   => 'Otro',
+  }.freeze
+
+  # De qué se puede elaborar (`POST /stocks/:id/producir`): la flor, de cualquier calidad, y lo
+  # cargado como «Otro» (flor de menor calidad, prerolls sobrantes que se abren para cocinar).
+  # Siempre en gramos: el origen que se consume se cuenta en gramos.
+  FORMAS_QUE_PRODUCEN = %w[flor_seca otro].freeze
+
+  # Las puertas de alta lo prenden; ver CALIDADES.
+  attr_accessor :exigir_calidad
+
   validates :origen,        inclusion: { in: ORIGENES }
   validates :forma_producto, inclusion: { in: FORMAS_PRODUCTO }
   validates :unidad,        inclusion: { in: UNIDADES }
@@ -80,9 +99,14 @@ class Stock < ApplicationRecord
 
   attr_accessor :es_split
 
+  validates :calidad, inclusion: { in: CALIDADES.keys, message: 'no es una calidad válida' }, allow_nil: true
+
   validate :validar_segun_origen
+  validate :validar_calidad
 
   before_validation :set_club_id, on: :create
+  # La calidad es de la flor: si el producto deja de ser flor seca (se corrige la forma), no la arrastra.
+  before_validation { self.calidad = nil if forma_producto != 'flor_seca' }
   before_create :set_cantidad_inicial
   before_create :generar_numero_lote_producto
   before_create :generar_codigo_qr
@@ -109,6 +133,15 @@ class Stock < ApplicationRecord
   def del_club?             = sede_id.nil?
   def apto_dispensa?        = %w[dispensa ambas].include?(disponibilidad)
   def apto_produccion?      = %w[produccion ambas].include?(disponibilidad)
+
+  def calidad_label = CALIDADES[calidad]
+
+  # Si de este stock se puede elaborar otro producto (ver FORMAS_QUE_PRODUCEN). La pantalla muestra
+  # «Producir» con esto; el endpoint rechaza con el mismo criterio.
+  def materia_prima? = FORMAS_QUE_PRODUCEN.include?(forma_producto) && unidad == 'g'
+
+  # La calidad se pide en flor seca de una organización (el uso personal no separa por calidad).
+  def self.calidad_obligatoria?(club) = !club&.personal?
 
   # Stock comprometido pero todavía no descontado: envíos de dispensaciones en curso
   # MÁS reservas pendientes de entrega. Al entregar una reserva se crea la Dispensacion
@@ -493,7 +526,10 @@ class Stock < ApplicationRecord
   def etiqueta
     base = descripcion.presence || (genetica || lote&.genetica)&.nombre
     forma = forma_producto.to_s.tr('_', ' ')
-    [base, base.present? ? "(#{forma})" : forma.capitalize].compact.join(' ')
+    forma = base.present? ? "(#{forma})" : forma.capitalize
+    # «Flor seca · Altos»: el frasco se distingue por su calidad.
+    forma = forma.sub(/\)?\z/) { "#{" · #{calidad_label}" if calidad_label}#{$~[0]}" }
+    [base, forma].compact.join(' ')
   end
 
   private
@@ -540,6 +576,16 @@ class Stock < ApplicationRecord
     cid = club_id || sede&.club_id || lote&.club_id
     return unless cid
     self.codigo_qr = "S-#{cid}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+  end
+
+  def validar_calidad
+    return unless forma_producto == 'flor_seca'
+
+    if calidad.blank?
+      errors.add(:base, 'Elegí la calidad de la flor (Altos, Medios, Bajos u Otro)') if exigir_calidad && Stock.calidad_obligatoria?(club)
+    elsif calidad == 'otro' && descripcion.blank? && (new_record? || will_save_change_to_calidad?)
+      errors.add(:base, 'Con calidad «Otro», contá en la descripción qué es')
+    end
   end
 
   def validar_segun_origen

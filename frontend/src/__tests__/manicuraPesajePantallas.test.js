@@ -89,7 +89,7 @@ describe('Confirmar pesajes (teléfono del admin)', () => {
     expect(api.confirmarPesajeManicura.mock.calls[0][2]).toEqual({
       peso_confirmado_g: 30,
       version:           'v1',
-      destinos: [{ stock_id: undefined, gramos: 20, descripcion: 'Copones' }, { stock_id: undefined, gramos: 10, descripcion: 'Bajos' }],
+      destinos: [{ stock_id: undefined, gramos: 20, descripcion: 'Copones', calidad: 'altos' }, { stock_id: undefined, gramos: 10, descripcion: 'Bajos', calidad: 'bajos' }],
     })
   })
 

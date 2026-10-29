@@ -9,6 +9,12 @@
       </select>
       <input v-if="!f.stock_id" class="rpf__input rpf__input--nombre" type="text" maxlength="40" placeholder="Nombre: copones, bajos…"
              :value="f.descripcion || ''" :aria-label="`Nombre del frasco ${i + 1}`" @input="cambiar(i, { descripcion: $event.target.value })" />
+      <!-- El frasco nuevo nace con la calidad de su flor (`Stock::CALIDADES`). -->
+      <select v-if="!f.stock_id && calidades.length" class="rpf__select rpf__select--calidad" :value="f.calidad || ''"
+              :aria-label="`Calidad del frasco ${i + 1}`" @change="cambiar(i, { calidad: $event.target.value })">
+        <option value="">Calidad…</option>
+        <option v-for="c in calidades" :key="c.value" :value="c.value">{{ c.label }}</option>
+      </select>
       <div class="rpf__gramos">
         <input class="rpf__input rpf__input--g" type="number" min="0" step="0.1" placeholder="0"
                :value="f.gramos ?? ''" :aria-label="`Gramos del frasco ${i + 1}`"
@@ -20,6 +26,7 @@
 
     <button v-if="modelValue.length < 10" type="button" class="rpf__link" @click="agregar">+ Otro frasco</button>
 
+    <div v-if="faltaEnFrascos && repartido > 0" class="rpf__falta">{{ faltaEnFrascos }}</div>
     <div class="rpf__total" :class="{ 'rpf__total--ok': cuadra, 'rpf__total--mal': !cuadra && repartido > 0 }">
       Repartido {{ num(repartido) }} de {{ num(pesoTotal) }} g
       <template v-if="!cuadra && falta > 0"> · faltan {{ num(falta) }} g</template>
@@ -34,6 +41,7 @@
 // (con nombre) o uno del lote— y sus gramos; la suma tiene que dar el peso confirmado. El backend
 // valida lo mismo (`PesajeManicura#normalizar_destinos`); acá sólo se arma y se muestra la cuenta.
 import { computed } from 'vue'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 
 const props = defineProps({
   // [{ stock_id: null | id, descripcion, gramos }]
@@ -42,11 +50,15 @@ const props = defineProps({
   pesoTotal:    { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
+const { calidades, faltaCalidad } = useCalidadFlor()
 
 const num = v => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
 const repartido = computed(() => +props.modelValue.reduce((s, f) => s + (Number(f.gramos) || 0), 0).toFixed(2))
 const falta     = computed(() => +(Number(props.pesoTotal || 0) - repartido.value).toFixed(2))
 const cuadra    = computed(() => Math.abs(falta.value) < 0.01 && props.modelValue.every(f => Number(f.gramos) > 0))
+
+// Lo que le falta a algún frasco nuevo (la calidad, o qué es si es «Otro»), o null.
+const faltaEnFrascos = computed(() => props.modelValue.filter(f => !f.stock_id).map(f => faltaCalidad(f)).find(Boolean) || null)
 
 // Un frasco existente no se elige dos veces.
 function disponiblesPara(i) {
@@ -54,10 +66,10 @@ function disponiblesPara(i) {
   return props.contenedores.filter(c => !usados.has(c.id))
 }
 function cambiar(i, cambios) { emit('update:modelValue', props.modelValue.map((f, j) => (j === i ? { ...f, ...cambios } : f))) }
-function agregar() { emit('update:modelValue', [...props.modelValue, { stock_id: null, descripcion: '', gramos: null }]) }
+function agregar() { emit('update:modelValue', [...props.modelValue, { stock_id: null, descripcion: '', calidad: '', gramos: null }]) }
 function quitar(i) { emit('update:modelValue', props.modelValue.filter((_, j) => j !== i)) }
 
-defineExpose({ cuadra })
+defineExpose({ cuadra, faltaEnFrascos })
 </script>
 
 <style scoped>
@@ -71,6 +83,8 @@ defineExpose({ cuadra })
 .rpf__unidad { font-size: .8rem; color: var(--c-ink-500); }
 .rpf__quitar { background: none; border: 0; color: var(--c-ink-500); font-size: 1.1rem; cursor: pointer; padding: 0 .3rem; }
 .rpf__link { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.rpf__select--calidad { flex: 0 1 120px; }
+.rpf__falta { font-size: .8rem; color: var(--c-amber-500); }
 .rpf__total { font-size: .82rem; font-weight: 600; color: var(--c-ink-700); }
 .rpf__total--ok { color: var(--c-leaf-700); }
 .rpf__total--mal { color: var(--c-amber-500); }

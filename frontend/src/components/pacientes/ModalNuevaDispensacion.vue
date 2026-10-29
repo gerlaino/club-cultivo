@@ -304,7 +304,7 @@ const stocksVisibles = computed(() => {
   const term = busquedaStock.value.trim().toLowerCase()
   const lista = term
     ? stocksDisponibles.value.filter(s => [
-        FORMA_LABEL[s.forma_producto] || s.forma_producto,
+        FORMA_LABEL[s.forma_producto] || s.forma_producto, s.calidad_label,
         generica(s), s.descripcion, s.lote?.codigo, s.numero_lote_producto,
       ].some(v => (v || '').toLowerCase().includes(term)))
     : [...stocksDisponibles.value]
@@ -494,7 +494,7 @@ const productosPosteriores = computed(() => {
   return enJuego.filter(s => s?.fecha_elaboracion && s.fecha_elaboracion > fecha)
     .map(s => ({
       id: s.id,
-      etiqueta: `${FORMA_LABEL[s.forma_producto] || s.forma_producto}${s.genetica?.nombre ? ` · ${s.genetica.nombre}` : ''}`,
+      etiqueta: `${FORMA_LABEL[s.forma_producto] || s.forma_producto}${s.calidad_label ? ` ${s.calidad_label}` : ''}${s.genetica?.nombre ? ` · ${s.genetica.nombre}` : ''}`,
       fecha_elaboracion: s.fecha_elaboracion,
     }))
 })
@@ -586,7 +586,7 @@ const puedeAgregar = computed(() =>
 const nombreSeleccionado = computed(() => {
   const s = stockSeleccionado.value
   if (!s) return ''
-  const forma = FORMA_LABEL[s.forma_producto] || s.forma_producto
+  const forma = [FORMA_LABEL[s.forma_producto] || s.forma_producto, s.calidad_label].filter(Boolean).join(' ')
   const gen = generica(s)
   return gen ? `${forma} · ${gen}` : forma
 })
@@ -1578,6 +1578,7 @@ async function handleSubmit() {
                     <td class="mnd__td-prod">
                       <span class="mnd__td-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
                       {{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}
+                      <span v-if="s.calidad_label" class="mnd__td-calidad">{{ s.calidad_label }}</span>
                       <!-- Administración dispensa del depósito entero, no sólo de la mesa — pero
                            si ESTE frasco está sobre alguna mesa, dispensarlo va a descontar de
                            ahí. Sólo para quien ve el depósito completo: al dispensador ya se le
@@ -2427,6 +2428,7 @@ async function handleSubmit() {
 /* Informativo ("va a descontar de la mesa"), con los tokens de info del DS: el azul estaba
    escrito a mano en dos lugares y no coincidía con ningún otro badge de la app. */
 .mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.mnd__td-calidad { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-leaf-700); background: var(--c-leaf-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 
 /* Debajo de 720px no hay ancho para cinco columnas: manda la tarjeta. */
 /* La altura, RELATIVA A LA PANTALLA y no 220px fijos: con cuatro productos el contenido mide

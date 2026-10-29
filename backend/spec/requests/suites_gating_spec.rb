@@ -59,7 +59,7 @@ RSpec.describe 'Suites — qué puede hacer cada club', type: :request do
       planta = create(:plant, lote: lote, club: club, state: 'cosechado')
 
       post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-           params: { resto: { plant_ids: [planta.id], peso_total_g: 200 } }, as: :json
+           params: { calidad: 'altos', resto: { plant_ids: [planta.id], peso_total_g: 200 } }, as: :json
 
       expect(response).to have_http_status(:created)
       expect(Stock.find(json['stock_id']).cantidad.to_f).to eq(200.0)

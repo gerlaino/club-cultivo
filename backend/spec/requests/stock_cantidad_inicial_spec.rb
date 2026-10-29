@@ -46,7 +46,7 @@ RSpec.describe 'Edición de cantidad inicial del stock', type: :request do
       )
       sign_in_as(admin)
       post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}/confirmar",
-           params: { peso_confirmado_g: 200 }, headers: auth_headers, as: :json
+           params: { calidad: 'altos', peso_confirmado_g: 200 }, headers: auth_headers, as: :json
       stock = Stock.last
       expect(stock.cantidad.to_f).to eq(200.0)
 

@@ -242,7 +242,7 @@
                 <div v-if="loadingDirecto" class="mnl-hint">Cargando contenedores…</div>
                 <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
                 <template v-else-if="repartirDirecto">
-                  <RepartoFrascos v-model="repartoDirecto" :contenedores="contenedores" :peso-total="totalDirecto" />
+                  <RepartoFrascos ref="repartoFrascosDirecto" v-model="repartoDirecto" :contenedores="contenedores" :peso-total="totalDirecto" />
                   <button type="button" class="mnl-link" @click="repartirDirecto = false">Mandar todo a un solo frasco</button>
                 </template>
                 <div v-else class="mnl-cont-list">
@@ -257,6 +257,8 @@
                     <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ formatG((s.cantidad || 0), 0) }} · {{ s.sede?.nombre || 'Sin asignar' }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
                   </button>
                 </div>
+                <CalidadFrascoNuevo v-if="!repartirDirecto && !loadingDirecto && !adminForm.stock_id"
+                                    v-model:calidad="adminForm.calidad" v-model:descripcion="adminForm.descripcion" />
                 <button v-if="!repartirDirecto && !loadingDirecto" type="button" class="mnl-link" @click="empezarRepartoDirecto">Repartir en varios frascos (copones, bajos…)</button>
               </div>
 
@@ -386,6 +388,8 @@ import {
 import { registrarPesajeManicuraOffline, registrarPesoPlantaOffline } from '../../lib/offlineApi.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
+import CalidadFrascoNuevo from '../../components/manicura/CalidadFrascoNuevo.vue'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 import { useToast } from '../../composables/useToast.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -627,6 +631,8 @@ const totalDirecto = computed(() => {
 })
 const repartirDirecto = ref(false)
 const repartoDirecto  = ref([])
+const repartoFrascosDirecto = ref(null)
+const { faltaCalidad } = useCalidadFlor()
 const repartoDirectoCuadra = computed(() => {
   const suma = repartoDirecto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
   return repartoDirecto.value.length > 1 && repartoDirecto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - totalDirecto.value) < 0.01
@@ -634,8 +640,8 @@ const repartoDirectoCuadra = computed(() => {
 function empezarRepartoDirecto() {
   repartirDirecto.value = true
   repartoDirecto.value = [
-    { stock_id: null, descripcion: 'Copones', gramos: null },
-    { stock_id: null, descripcion: 'Bajos', gramos: null },
+    { stock_id: null, descripcion: 'Copones', calidad: 'altos', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', calidad: 'bajos', gramos: null },
   ]
 }
 const hayPesoDirecto = computed(() =>
@@ -736,7 +742,7 @@ async function abrirModal() {
     // El admin pesa + confirma en un paso: precargamos contenedores (flor seca del lote) y sedes.
     adminForm.value = {
       pesos: Object.fromEntries(plantasSinPesar.value.map(p => [p.id, null])),
-      restoPeso: null, stock_id: null, sede_id: null,
+      restoPeso: null, stock_id: null, sede_id: null, calidad: '', descripcion: '',
     }
     repartirDirecto.value = false
     repartoDirecto.value  = []
@@ -762,6 +768,9 @@ async function abrirModal() {
 
 async function submitDirecto() {
   if (!hayPesoDirecto.value || savingBatch.value) return
+  // El frasco nuevo nace con su calidad; el backend lo rechaza igual, pero mejor decirlo antes.
+  const falta = repartirDirecto.value ? repartoFrascosDirecto.value?.faltaEnFrascos : (!adminForm.value.stock_id && faltaCalidad(adminForm.value))
+  if (falta) { modalError.value = falta; return }
   savingBatch.value = true
   modalError.value  = ''
   try {
@@ -774,8 +783,12 @@ async function submitDirecto() {
       payload.resto = { plantas_count: restoCount.value, peso_total_g: parseFloat(adminForm.value.restoPeso) }
     }
     if (repartirDirecto.value) {
-      payload.destinos = repartoDirecto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) }))
+      payload.destinos = repartoDirecto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined), calidad: f.stock_id ? undefined : (f.calidad || undefined) }))
     } else if (adminForm.value.stock_id) payload.stock_id = adminForm.value.stock_id
+    else {
+      if (adminForm.value.calidad) payload.calidad = adminForm.value.calidad
+      if (adminForm.value.descripcion?.trim()) payload.descripcion = adminForm.value.descripcion.trim()
+    }
     if (adminForm.value.sede_id)  payload.sede_id  = adminForm.value.sede_id
 
     const { data } = await registrarDirectoManicura(id, payload)

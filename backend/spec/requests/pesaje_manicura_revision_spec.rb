@@ -34,7 +34,7 @@ RSpec.describe 'Pesaje de manicura · en revisión por el admin', type: :request
 
   def confirmar_como(user, version:)
     como(user)
-    post "#{base}/confirmar", params: { peso_confirmado_g: 120, version: version }, headers: auth_headers, as: :json
+    post "#{base}/confirmar", params: { calidad: 'altos', peso_confirmado_g: 120, version: version }, headers: auth_headers, as: :json
   end
 
   it 'mientras el admin lo revisa, la manicura no lo puede reabrir ni borrar, y ve quién lo tiene' do

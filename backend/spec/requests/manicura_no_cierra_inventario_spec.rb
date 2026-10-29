@@ -65,7 +65,7 @@ RSpec.describe 'El manicura no cierra inventario', type: :request do
       pesaje.enviar!
 
       expect {
-        pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 100)
+        pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 100)
       }.to change(Stock, :count).by(1)
     end
   end

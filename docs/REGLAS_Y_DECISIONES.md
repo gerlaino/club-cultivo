@@ -2,6 +2,25 @@
 
 > Archivo de referencia extraído de `CLAUDE.md` el 18-sep-2026 para que el briefing de sesión sea liviano. Es HISTORIA: refleja decisiones tomadas hasta esa fecha. Si contradice al código, el código manda. Se consulta cuando hace falta (grep por módulo o palabra clave), no se carga en cada sesión.
 
+## Regla: la flor seca tiene calidad, y se elabora desde flor u «Otro» (29-oct-2026, bloque (gp))
+
+Pedido de Javi; Germán: «obligatorio a partir de ahora, poder agregarlo al editar el stock» y «SOLO
+desde Otro quiero que se pueda producir además de flor_seca (cualquiera de su calidad)».
+
+- `stocks.calidad`: Altos / Medios / Bajos / Otro (`Stock::CALIDADES`). **Sólo flor seca**: si la
+  forma deja de ser flor seca, la calidad se borra. «Otro» lleva en la descripción qué es.
+- **Obligatoria en lo NUEVO**: el alta de stock y el frasco nuevo de una cosecha (confirmar, registrar
+  directo, repartido: cada frasco nuevo la suya). No es una validación de todo `Stock`: la prenden esas
+  puertas (`exigir_calidad`). Los frascos viejos siguen editándose sin ella y se les agrega al editar;
+  sumar a un frasco viejo no la pide. **En uso personal no se pide ni se ofrece** (`/me` manda
+  `reglas_stock.calidades` vacío).
+- Separar o trasladar parte de un frasco conserva la calidad. La etiqueta la dice («Flor seca · Altos»,
+  `Stock#etiqueta`), así la mesa, el carrito y los comprobantes la muestran sin tocar cada pantalla.
+- **Producir** (`POST /stocks/:id/producir`): desde flor seca de cualquier calidad y desde la forma
+  «Otro» (flor de menor calidad, prerolls sobrantes que se abren para cocinar), **siempre en gramos**
+  (`Stock#materia_prima?`, `FORMAS_QUE_PRODUCEN`). La pantalla muestra «Producir» con
+  `materia_prima` del backend. Desde preroll, hash u «Otro» en unidades, no.
+
 ## Regla: el total es depósito + mesa, y se cuenta cada lugar (22-oct-2026, bloque (fz))
 
 - `Stock#cantidad` es el TOTAL (depósito + mesa). El depósito no se guarda: es la resta

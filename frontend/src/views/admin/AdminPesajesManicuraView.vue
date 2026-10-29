@@ -205,7 +205,7 @@
                 <div v-if="loadingStocks" class="apm-hint">Cargando contenedores…</div>
                 <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
                 <template v-else-if="repartir">
-                  <RepartoFrascos v-model="reparto" :contenedores="contenedores" :peso-total="Number(form.peso_confirmado_g) || 0" />
+                  <RepartoFrascos ref="repartoFrascos" v-model="reparto" :contenedores="contenedores" :peso-total="Number(form.peso_confirmado_g) || 0" />
                   <button type="button" class="apm-link" @click="repartir = false">Mandar todo a un solo frasco</button>
                 </template>
                 <div v-else class="apm-cont-list">
@@ -251,6 +251,7 @@
                     <template v-if="form.stock_id">Se sumará el peso al contenedor seleccionado.</template>
                     <template v-else>Se creará un contenedor nuevo de flor seca para este lote.</template>
                   </span>
+                  <CalidadFrascoNuevo v-if="!form.stock_id" v-model:calidad="form.calidad" v-model:descripcion="form.descripcion" />
                   <button type="button" class="apm-link" @click="empezarReparto">Repartir en varios frascos (copones, bajos…)</button>
                 </template>
               </div>
@@ -288,6 +289,8 @@ import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, Messag
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, enviarPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
+import CalidadFrascoNuevo from '../../components/manicura/CalidadFrascoNuevo.vue'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 import CompletarManicuraModal from '../../components/lotes/CompletarManicuraModal.vue'
@@ -353,6 +356,8 @@ const form = ref({ peso_confirmado_g: null, stock_id: null })
 // Reparto en varios frascos (copones, bajos…): filas { stock_id | null = nuevo, descripcion, gramos }.
 const repartir = ref(false)
 const reparto  = ref([])
+const repartoFrascos = ref(null)
+const { faltaCalidad } = useCalidadFlor()
 const repartoCuadra = computed(() => {
   const suma = reparto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
   return reparto.value.length > 1 && reparto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - Number(form.value.peso_confirmado_g || 0)) < 0.01
@@ -360,8 +365,8 @@ const repartoCuadra = computed(() => {
 function empezarReparto() {
   repartir.value = true
   reparto.value = [
-    { stock_id: null, descripcion: 'Copones', gramos: null },
-    { stock_id: null, descripcion: 'Bajos', gramos: null },
+    { stock_id: null, descripcion: 'Copones', calidad: 'altos', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', calidad: 'bajos', gramos: null },
   ]
 }
 
@@ -408,6 +413,8 @@ async function abrirConfirmacion(p) {
   form.value = {
     peso_confirmado_g: p.peso_total_g || p.peso_calculado_g || null,
     stock_id: null,
+    calidad: '',
+    descripcion: '',
   }
   repartir.value = false
   reparto.value  = []
@@ -478,6 +485,9 @@ async function eliminar(p) {
 
 async function confirmar() {
   if (saving.value || !form.value.peso_confirmado_g || form.value.peso_confirmado_g <= 0) return
+  // El frasco nuevo nace con su calidad; el backend lo rechaza igual, pero mejor decirlo antes.
+  const falta = repartir.value ? repartoFrascos.value?.faltaEnFrascos : (!form.value.stock_id && faltaCalidad(form.value))
+  if (falta) { modalError.value = falta; return }
   saving.value     = true
   modalError.value = ''
   try {
@@ -488,8 +498,10 @@ async function confirmar() {
         peso_confirmado_g: form.value.peso_confirmado_g,
         version:           revision.version(),
         ...(repartir.value
-          ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
-          : { stock_id: form.value.stock_id || undefined }),
+          ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined), calidad: f.stock_id ? undefined : (f.calidad || undefined) })) }
+          : form.value.stock_id
+            ? { stock_id: form.value.stock_id }
+            : { calidad: form.value.calidad || undefined, descripcion: form.value.descripcion?.trim() || undefined }),
       }
     )
     const stockLabel = repartir.value

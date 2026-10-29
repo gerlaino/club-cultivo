@@ -29,7 +29,7 @@ RSpec.describe 'GET /stocks/:id/trazabilidad — de qué plantas salió', type: 
     pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
     plantas.each { |pl| pesaje.pesadas_plantas.create!(plant: pl, peso_seco_g: peso_c_u) }
     pesaje.enviar!
-    pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: peso_c_u * plantas.size)
+    pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: peso_c_u * plantas.size)
     pesaje.reload.stock
   end
 
@@ -79,7 +79,7 @@ RSpec.describe 'GET /stocks/:id/trazabilidad — de qué plantas salió', type: 
                                              fecha_pesaje: Date.current, peso_total_g: 300,
                                              plantas_count: 7)
       pesaje.enviar!
-      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 300)
+      pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 300)
       pesaje.reload.stock
     end
 

@@ -20,7 +20,7 @@ RSpec.describe 'Manicura registrada por admin', type: :request do
     ps = plantas!(3)
 
     post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-         params: { resto: { plant_ids: ps.map(&:id), peso_total_g: 300 } }, as: :json
+         params: { calidad: 'altos', resto: { plant_ids: ps.map(&:id), peso_total_g: 300 } }, as: :json
 
     expect(response).to have_http_status(:created)
     pesaje = lote.pesajes_manicura.last
@@ -33,7 +33,7 @@ RSpec.describe 'Manicura registrada por admin', type: :request do
     elegidas = ps.first(2)
 
     post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-         params: { resto: { plant_ids: elegidas.map(&:id), peso_total_g: 200 } }, as: :json
+         params: { calidad: 'altos', resto: { plant_ids: elegidas.map(&:id), peso_total_g: 200 } }, as: :json
 
     expect(response).to have_http_status(:created)
     expect(elegidas.map { |p| p.reload.peso_seco.to_f }).to all(eq(100.0))
@@ -47,7 +47,7 @@ RSpec.describe 'Manicura registrada por admin', type: :request do
     lote.update!(manicurador: create(:user, :manicura, club: club))
 
     post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-         params: { resto: { peso_total_g: 100 } }, as: :json
+         params: { calidad: 'altos', resto: { peso_total_g: 100 } }, as: :json
 
     expect(response).to have_http_status(:created)
   end

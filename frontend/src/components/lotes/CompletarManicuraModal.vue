@@ -59,6 +59,9 @@
             </div>
           </div>
 
+          <!-- Va a un frasco nuevo: nace con la calidad de su flor. -->
+          <CalidadFrascoNuevo v-if="confirmaSolo" v-model:calidad="form.calidad" v-model:descripcion="form.descripcion" />
+
           <!-- Notas -->
           <div class="cmm__field">
             <label class="cmm__label">
@@ -100,6 +103,8 @@ import { createPesajeManicura, registrarDirectoManicura, listPlants } from '../.
 import { useManicuraJornada } from '../../composables/useManicuraJornada'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useAuthStore } from '../../stores/auth.js'
+import CalidadFrascoNuevo from '../manicura/CalidadFrascoNuevo.vue'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -107,7 +112,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'completado'])
 
-const form = ref({ peso_seco_g: null, notas: '' })
+const form = ref({ peso_seco_g: null, notas: '', calidad: '', descripcion: '' })
 const error  = ref(null)
 const saving = ref(false)
 
@@ -116,6 +121,7 @@ const saving = ref(false)
 // un lote asignado a una manicura (27-oct-2026, `Lote#pesa_manicura?`): pesa lo que ella no pesó.
 const auth = useAuthStore()
 const confirmaSolo = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+const { faltaCalidad } = useCalidadFlor()
 
 // Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
 const { registrarConJornada } = useManicuraJornada()
@@ -135,7 +141,7 @@ watch(() => props.modelValue, (visible) => {
 })
 
 function resetForm() {
-  form.value = { peso_seco_g: null, notas: '' }
+  form.value = { peso_seco_g: null, notas: '', calidad: '', descripcion: '' }
   pendientes.value = []
   selectedIds.value = []
   error.value = null
@@ -166,9 +172,13 @@ async function confirmar() {
   try {
     let data
     if (confirmaSolo.value) {
+      const falta = faltaCalidad(form.value)
+      if (falta) { error.value = falta; return }
       // El peso declarado se reparte como promedio entre las plantas elegidas.
       const { data: d } = await registrarDirectoManicura(props.lote.id, {
         resto: { plant_ids: selectedIds.value, peso_total_g: form.value.peso_seco_g },
+        calidad: form.value.calidad || undefined,
+        descripcion: form.value.descripcion?.trim() || undefined,
       })
       data = d
     } else {

@@ -144,7 +144,7 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     sign_in_as(admin)
     expect {
       post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje.id}/confirmar",
-           params: { peso_confirmado_g: 200 }, headers: auth_headers
+           params: { calidad: 'altos', peso_confirmado_g: 200 }, headers: auth_headers
     }.to change(Stock, :count).by(1)
     expect(response).to have_http_status(:ok), "confirm falló: #{response.status} #{response.body}"
     stock = Stock.last
@@ -273,10 +273,10 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_qr.id}/confirmar",
-         params: { peso_confirmado_g: 10 }, headers: auth_headers
+         params: { calidad: 'altos', peso_confirmado_g: 10 }, headers: auth_headers
     expect(lote.reload.estado).to eq('en_manicura') # 1 de 3, todavía no finaliza
     post "/lotes/#{lote.id}/pesajes_manicura/#{pesaje_batch.id}/confirmar",
-         params: { peso_confirmado_g: 20 }, headers: auth_headers
+         params: { calidad: 'altos', peso_confirmado_g: 20 }, headers: auth_headers
 
     lote.reload
     expect(lote.estado).to eq('curado')
@@ -300,7 +300,7 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
            params: {
              pesos: [{ plant_id: p1.id, peso_seco_g: 10 }],
              resto: { peso_total_g: 20 },   # 2 restantes → 10g c/u (promedio)
-             sede_id: sede.id,
+             sede_id: sede.id, calidad: 'altos',
            }, headers: auth_headers, as: :json
     }.to change(Stock, :count).by(1)
     expect(response).to have_http_status(:created), response.body
@@ -324,7 +324,7 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-         params: { resto: { plantas_count: 1, peso_total_g: 10 } },
+         params: { calidad: 'altos', resto: { plantas_count: 1, peso_total_g: 10 } },
          headers: auth_headers, as: :json
     expect(response).to have_http_status(:created), response.body
   end
@@ -345,7 +345,7 @@ RSpec.describe 'Flujo de pesajes de manicura', type: :request do
     delete '/api/users/sign_out'
     sign_in_as(admin)
     post "/lotes/#{lote2.id}/pesajes_manicura/#{pesaje.id}/confirmar",
-         params: { peso_confirmado_g: 100 }, headers: auth_headers
+         params: { calidad: 'altos', peso_confirmado_g: 100 }, headers: auth_headers
     expect(response).to have_http_status(:ok), response.body
     stock = Stock.where(lote_id: lote2.id).last
     expect(stock.estado).to eq('pendiente_asignacion')

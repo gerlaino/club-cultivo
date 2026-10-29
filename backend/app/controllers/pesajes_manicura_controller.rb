@@ -170,6 +170,8 @@ class PesajesManicuraController < ApplicationController
     end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta o contenedor no encontrado' }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e # p. ej. el frasco nuevo sin su calidad
+    render json: { error: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
   rescue ArgumentError, RuntimeError => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
@@ -325,6 +327,8 @@ class PesajesManicuraController < ApplicationController
       stock_id:          params[:stock_id],
       # Repartido en varios frascos (copones, bajos): [{ stock_id | nada = nuevo, gramos, descripcion }].
       destinos:          params[:destinos].presence,
+      calidad:           params[:calidad], # la del frasco nuevo, si va todo a uno
+      descripcion:       params[:descripcion],
       # La versión que vio en pantalla (`enviado_at`): si se reabrió y reenvió en el medio, se rechaza.
       version:           params[:version],
     )
@@ -416,6 +420,7 @@ class PesajesManicuraController < ApplicationController
       current_user.club.stocks.create!(
         lote: @lote, genetica: @lote.genetica, origen: 'lote',
         forma_producto: 'flor_seca', estado: 'pendiente_asignacion', cantidad: 0, unidad: 'g',
+        calidad: params[:calidad].presence, descripcion: params[:descripcion].presence, exigir_calidad: true,
       )
     end
     asignar_sede_si_falta!(stock)

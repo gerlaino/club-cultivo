@@ -50,6 +50,12 @@ class MeController < ApplicationController
     #
     # Va en /me a propósito: el router espera este request antes de montar cualquier pantalla,
     # así que la regla siempre está antes de que se pueda abrir un formulario.
+    # La calidad de la flor seca (29-oct-2026): las opciones (ninguna en uso personal: no separa por
+    # calidad y no se le ofrece), si es obligatoria, y de qué formas se puede elaborar otro producto.
+    calidad_obligatoria = Stock.calidad_obligatoria?(current_user.club)
+    data['reglas_stock'] = { 'calidades'           => calidad_obligatoria ? Stock::CALIDADES : {},
+                             'calidad_obligatoria' => calidad_obligatoria,
+                             'formas_que_producen' => Stock::FORMAS_QUE_PRODUCEN }
     data['reglas_cultivo'] = { 'kinds_sala_por_estado' => Lote::KINDS_SALA_POR_ESTADO,
                                # La misma tabla para una genética automática (en floración
                                # sigue valiendo la sala de vege). La pantalla elige cuál usar

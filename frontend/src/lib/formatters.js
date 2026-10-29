@@ -17,6 +17,12 @@ export function formaLabel(f) {
   return FORMA_LABELS[f] || f || '—'
 }
 
+// «Flor seca · Altos»: la forma con la calidad de la flor, si la tiene (`calidad_label` del backend).
+export function productoLabel(s) {
+  const forma = formaLabel(s?.forma_producto)
+  return s?.calidad_label ? `${forma} · ${s.calidad_label}` : forma
+}
+
 // En qué se cuenta cada forma de producto. Un preroll o una cápsula se cuentan por UNIDAD; un
 // aceite o una tintura, en mililitros. El alta de stock mandaba siempre `g`, así que crear 100
 // prerolls dejaba "100 g de preroll" — la lista tenía la opción y el registro salía inservible.

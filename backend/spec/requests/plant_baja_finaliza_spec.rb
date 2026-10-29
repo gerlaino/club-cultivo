@@ -15,7 +15,7 @@ RSpec.describe 'Baja/descarte de plantas y finalización del lote', type: :reque
     pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicura, fecha_pesaje: Date.current)
     plantas.each { |pl| pesaje.pesadas_plantas.create!(plant: pl, peso_seco_g: peso_cu) }
     pesaje.enviar!
-    pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: peso_cu * plantas.size)
+    pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: peso_cu * plantas.size)
   end
 
   it 'descartar TODAS las plantas finaliza el lote (sin producción)' do

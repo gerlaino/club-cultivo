@@ -49,7 +49,7 @@ RSpec.describe 'Cultivo — el ciclo completo', type: :request do
 
       # 6. Se pesa y se confirma en un paso (admin): genera el stock y cierra la manicura.
       post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-           params: { resto: { plant_ids: lote.plants.pluck(:id), peso_total_g: 240 } }, as: :json
+           params: { calidad: 'altos', resto: { plant_ids: lote.plants.pluck(:id), peso_total_g: 240 } }, as: :json
       expect(response).to have_http_status(:created), "no se pesó: #{error_msg}"
 
       # 7. Hay stock, y sale del lote.
@@ -113,14 +113,14 @@ RSpec.describe 'Cultivo — el ciclo completo', type: :request do
 
       sign_in_as(admin)
       post "/api/lotes/#{l1.id}/pesajes_manicura/#{pesaje.id}/confirmar",
-           params: { peso_confirmado_g: 100 }, as: :json
+           params: { calidad: 'altos', peso_confirmado_g: 100 }, as: :json
       expect(response).to have_http_status(:success), error_msg
 
       # Camino corto: el admin pesa y confirma de una.
       l2 = create(:lote, club: club, sala: mixta, estado: 'en_manicura')
       p2 = create(:plant, lote: l2, club: club, state: 'cosechado')
       post "/api/lotes/#{l2.id}/pesajes_manicura/registrar_directo",
-           params: { resto: { plant_ids: [p2.id], peso_total_g: 100 } }, as: :json
+           params: { calidad: 'altos', resto: { plant_ids: [p2.id], peso_total_g: 100 } }, as: :json
       expect(response).to have_http_status(:created), error_msg
 
       # Los dos caminos: pesaje confirmado y stock creado.

@@ -8,7 +8,7 @@
 // No pide nada: recibe la página de filas y el orden, y avisa cuando se toca un cabezal
 // (`update:orden`) o una fila (`abrir`). Ordenar y paginar lo hace el servidor.
 import { computed } from 'vue'
-import { formaLabel, formatARS } from '../../lib/formatters.js'
+import { formaLabel, productoLabel, formatARS } from '../../lib/formatters.js'
 
 const props = defineProps({
   stocks:     { type: Array, required: true },
@@ -114,7 +114,7 @@ const cant = (n, u) => `${Number(n || 0).toLocaleString('es-AR', { maximumFracti
           @click="abrible && emit('abrir', s)"
         >
           <td class="stk__inv-td-cod">{{ s.numero_lote_producto || '—' }}</td>
-          <td class="stk__inv-td-tipo">{{ formaLabel(s.forma_producto) }}</td>
+          <td class="stk__inv-td-tipo">{{ productoLabel(s) }}</td>
           <td v-if="!esPersonal">
             <span class="stk__chip" :class="s.regulatorio ? 'stk__chip--propio' : 'stk__chip--ext'">
               {{ s.regulatorio ? 'Propio' : 'Externo' }}

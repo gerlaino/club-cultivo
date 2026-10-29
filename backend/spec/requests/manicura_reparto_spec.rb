@@ -27,12 +27,12 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
     j
   end
   def confirmar(j, peso, destinos) =
-    post("/lotes/#{lote.id}/pesajes_manicura/#{j.id}/confirmar", params: { peso_confirmado_g: peso, destinos: destinos }, headers: auth_headers, as: :json)
+    post("/lotes/#{lote.id}/pesajes_manicura/#{j.id}/confirmar", params: { calidad: 'altos', peso_confirmado_g: peso, destinos: destinos }, headers: auth_headers, as: :json)
   def frascos = t { Stock.where(lote_id: lote.id).order(:id).to_a }
 
   it 'copones y bajos en dos frascos nuevos, cada uno con lo suyo y su nombre' do
     j = jornada_enviada!
-    confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones' }, { gramos: 30, descripcion: 'Bajos' }])
+    confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones', calidad: 'altos' }, { gramos: 30, descripcion: 'Bajos', calidad: 'bajos' }])
     expect(response).to have_http_status(:ok), response.body
     expect(frascos.map { |s| [s.descripcion, s.cantidad.to_f, s.cantidad_inicial.to_f] }).to eq([['Copones', 70.0, 70.0], ['Bajos', 30.0, 30.0]])
     expect(json['destinos'].map { |d| [d['descripcion'], d['gramos']] }).to eq([['Copones', 70.0], ['Bajos', 30.0]])
@@ -43,7 +43,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
   it 'uno existente y uno nuevo' do
     viejo = t { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 5) }
     j = jornada_enviada!
-    confirmar(j, 100, [{ stock_id: viejo.id, gramos: 80 }, { gramos: 20, descripcion: 'Bajos' }])
+    confirmar(j, 100, [{ stock_id: viejo.id, gramos: 80 }, { gramos: 20, descripcion: 'Bajos', calidad: 'bajos' }])
     expect(response).to have_http_status(:ok), response.body
     expect(viejo.reload.cantidad.to_f).to eq(85.0)
     expect(frascos.last.cantidad.to_f).to eq(20.0)
@@ -51,7 +51,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
 
   it 'la trazabilidad de cada frasco nombra las plantas y cierra' do
     j = jornada_enviada!
-    confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones' }, { gramos: 30, descripcion: 'Bajos' }])
+    confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones', calidad: 'altos' }, { gramos: 30, descripcion: 'Bajos', calidad: 'bajos' }])
     frascos.each do |f|
       tr = t { Stocks::Trazabilidad.new(stock: f).call }
       expect(tr[:totales]).to include(gramos_producidos: f.cantidad_inicial.to_f, sin_explicar_g: 0.0)
@@ -68,14 +68,14 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
 
     it 'un reparto que no suma el peso confirmado, y lo dice con números' do
       j = jornada_enviada!
-      confirmar(j, 100, [{ gramos: 70 }, { gramos: 20 }])
+      confirmar(j, 100, [{ gramos: 70, calidad: 'altos' }, { gramos: 20, calidad: 'altos' }])
       expect(json['error']).to include('suma 90.0 g', '100.0 g')
       nada_tocado(j)
     end
 
     it 'un frasco sin gramos' do
       j = jornada_enviada!
-      confirmar(j, 100, [{ gramos: 100 }, { gramos: 0 }])
+      confirmar(j, 100, [{ gramos: 100, calidad: 'altos' }, { gramos: 0, calidad: 'altos' }])
       nada_tocado(j)
     end
 
@@ -90,7 +90,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
     it 'un frasco de otro lote' do
       otro = t { Stock.create!(sede: sede, lote: create(:lote, club: club, sala: sala), origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 5) }
       j = jornada_enviada!
-      confirmar(j, 100, [{ stock_id: otro.id, gramos: 50 }, { gramos: 50 }])
+      confirmar(j, 100, [{ stock_id: otro.id, gramos: 50 }, { gramos: 50, calidad: 'altos' }])
       expect(response.status).to be_in([404, 422])
       expect(otro.reload.cantidad.to_f).to eq(5.0)
       expect(t { j.reload.estado }).to eq('enviado')
@@ -105,7 +105,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
 
     it 'pide qué frasco, y corrige ése, el total del pesaje y el rendimiento del lote' do
       j = jornada_enviada!
-      confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones' }, { gramos: 30, descripcion: 'Bajos' }])
+      confirmar(j, 100, [{ gramos: 70, descripcion: 'Copones', calidad: 'altos' }, { gramos: 30, descripcion: 'Bajos', calidad: 'bajos' }])
       bajos = frascos.last
       reajustar(j, 35)
       expect(response).to have_http_status(:unprocessable_entity)
@@ -134,7 +134,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
 
     it 'pesa las plantas y reparte lo pesado en copones y bajos, con la sede elegida' do
       directo(pesos: [{ plant_id: p1.id, peso_seco_g: 60 }, { plant_id: p2.id, peso_seco_g: 40 }],
-              destinos: [{ gramos: 75, descripcion: 'Copones' }, { gramos: 25, descripcion: 'Bajos' }], sede_id: sede.id)
+              destinos: [{ gramos: 75, descripcion: 'Copones', calidad: 'altos' }, { gramos: 25, descripcion: 'Bajos', calidad: 'bajos' }], sede_id: sede.id)
       expect(response).to have_http_status(:created), response.body
       expect(json['stock_ids'].size).to eq(2)
       expect(frascos.map { |f| [f.descripcion, f.cantidad.to_f, f.sede_id, f.estado] })
@@ -144,7 +144,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
 
     it 'un reparto que no suma lo pesado no guarda nada (ni los pesos de las plantas)' do
       directo(pesos: [{ plant_id: p1.id, peso_seco_g: 60 }, { plant_id: p2.id, peso_seco_g: 40 }],
-              destinos: [{ gramos: 70 }, { gramos: 20 }])
+              destinos: [{ gramos: 70, calidad: 'altos' }, { gramos: 20, calidad: 'altos' }])
       expect(response).to have_http_status(:unprocessable_entity)
       expect(json['error']).to include('suma 90.0 g', '100.0 g')
       expect(frascos).to be_empty
@@ -152,7 +152,7 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
     end
 
     it 'sin reparto, como siempre: un solo frasco' do
-      directo(pesos: [{ plant_id: p1.id, peso_seco_g: 60 }, { plant_id: p2.id, peso_seco_g: 40 }])
+      directo(pesos: [{ plant_id: p1.id, peso_seco_g: 60 }, { plant_id: p2.id, peso_seco_g: 40 }], calidad: 'altos')
       expect(response).to have_http_status(:created), response.body
       expect(frascos.map { |f| f.cantidad.to_f }).to eq([100.0])
     end

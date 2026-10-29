@@ -19,7 +19,7 @@
             <i :class="['bi', formaIco(stock.forma_producto)]" aria-hidden="true"></i>
           </div>
           <div class="sd__hero-info">
-            <h1 class="sd__hero-forma">{{ formaLabel(stock.forma_producto) }}</h1>
+            <h1 class="sd__hero-forma">{{ formaLabel(stock.forma_producto) }}<span v-if="stock.calidad_label" class="sd__hero-calidad"> · {{ stock.calidad_label }}</span></h1>
             <div class="sd__hero-lote">{{ stock.numero_lote_producto }}</div>
             <div class="sd__hero-chips">
               <span v-if="eliminado" class="sd__badge sd__badge--eliminado">Eliminado</span>
@@ -231,6 +231,14 @@
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
                   </select>
                 </div>
+                <!-- La calidad de la flor: los frascos viejos nacieron sin ella y acá se completa. -->
+                <div v-if="editForm.forma_producto === 'flor_seca' && calidades.length" class="sd__field">
+                  <label class="sd__label">Calidad</label>
+                  <select class="sd__input" v-model="editForm.calidad" aria-label="Calidad de la flor">
+                    <option value="" :disabled="!!stock.calidad">— Sin calidad —</option>
+                    <option v-for="c in calidades" :key="c.value" :value="c.value">{{ c.label }}</option>
+                  </select>
+                </div>
                 <div v-if="!esPersonal" class="sd__field">
                   <label class="sd__label">Disponible para</label>
                   <select class="sd__input" v-model="editForm.disponibilidad">
@@ -338,7 +346,7 @@
                 </div>
               </button>
               <button
-                v-if="stock.forma_producto === 'flor_seca'"
+                v-if="stock.materia_prima"
                 class="sd__action sd__action--amber"
                 @click="openProcesar"
                 :disabled="stock.agotado || !['produccion','ambas'].includes(stock.disponibilidad)"
@@ -759,7 +767,7 @@
               <div class="sd__modal-ico sd__modal-ico--amber"><i class="bi bi-arrow-right-square"></i></div>
               <div>
                 <h2 class="sd__modal-title">Producir derivado</h2>
-                <p class="sd__modal-sub">{{ stock?.cantidad }}g de flor seca · {{ stock?.lote?.codigo }}</p>
+                <p class="sd__modal-sub">{{ stock?.cantidad }}g de {{ productoLabel(stock).toLowerCase() }}{{ stock?.lote?.codigo ? ` · ${stock.lote.codigo}` : '' }}</p>
               </div>
               <button class="sd__modal-close" @click="showProcesar = false"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -877,6 +885,8 @@ import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinaliz
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useQRCode } from '../../composables/useQRCode.js'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
+import { productoLabel } from '../../lib/formatters.js'
 import { consumirStock } from '../../lib/api.js'
 import ConsumoForm from '../../components/personal/ConsumoForm.vue'
 
@@ -884,6 +894,7 @@ const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
 const { esPersonal } = useUsoPersonal()
+const { calidades } = useCalidadFlor()
 
 // ── Consumí (uso personal) ────────────────────────────────────────────────────
 // La única salida de un frasco cuando no hay a quién dispensar. Mismo formulario que la solapa
@@ -1071,6 +1082,7 @@ function startEdit() {
     descripcion: stock.value.descripcion || '',
     disponibilidad: stock.value.disponibilidad || 'ambas',
     genetica_id: stock.value.genetica?.id || null,
+    calidad:     stock.value.calidad || '',
     forma_producto: stock.value.forma_producto,
     unidad:         stock.value.unidad || 'g',
   }
@@ -1093,6 +1105,7 @@ async function guardarEdit() {
     if (f.descripcion)                 payload.descripcion         = f.descripcion
     if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
     if (f.genetica_id)                 payload.genetica_id         = Number(f.genetica_id)
+    if (f.calidad && f.calidad !== stock.value.calidad) payload.calidad = f.calidad
     // Sólo si CAMBIÓ: mandarlo siempre haría que el backend evalúe la regla del período cerrado
     // en cada guardado, y una corrección de precio rebotaría por algo que nadie tocó.
     if (f.forma_producto && f.forma_producto !== stock.value.forma_producto) {
@@ -1480,6 +1493,7 @@ function badgeVencLabel(s) {
 .sd__forma-ico--compra_externa, .sd__forma-ico--externo { background: var(--c-slate-50); }
 
 .sd__hero-forma { font-size: 1.35rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; letter-spacing: -.03em; }
+.sd__hero-calidad { color: var(--c-leaf-700); }
 .sd__hero-lote  { font-size: .78rem; font-weight: 700; color: var(--c-slate-400); font-family: monospace; margin-bottom: .5rem; letter-spacing: .05em; }
 .sd__hero-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 

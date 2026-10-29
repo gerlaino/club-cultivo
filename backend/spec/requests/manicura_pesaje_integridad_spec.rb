@@ -28,7 +28,7 @@ RSpec.describe 'Manicura: integridad del pesaje', type: :request do
   def pesar(p, g, extra = {}) = post("/plants/#{p.id}/registrar_peso", params: { peso_seco_g: g }.merge(extra), headers: auth_headers, as: :json)
   def jornada = t { lote.pesajes_manicura.order(:id).last }
   def enviar(j) = post("/lotes/#{lote.id}/pesajes_manicura/#{j.id}/enviar", headers: auth_headers, as: :json)
-  def confirmar(j, g, extra = {}) = post("/lotes/#{lote.id}/pesajes_manicura/#{j.id}/confirmar", params: { peso_confirmado_g: g }.merge(extra), headers: auth_headers, as: :json)
+  def confirmar(j, g, extra = {}) = post("/lotes/#{lote.id}/pesajes_manicura/#{j.id}/confirmar", params: { calidad: 'altos', peso_confirmado_g: g }.merge(extra), headers: auth_headers, as: :json)
   def resto(g, extra = {}) = post("/lotes/#{lote.id}/pesajes_manicura", params: { peso_total_g: g, enviar: true, force_new: true }.merge(extra), headers: auth_headers, as: :json)
 
   describe 'confirmar dos veces' do
@@ -36,8 +36,8 @@ RSpec.describe 'Manicura: integridad del pesaje', type: :request do
       pesar(p1, 10); j = jornada; enviar(j)
       a = t { PesajeManicura.find(j.id) }
       b = t { PesajeManicura.find(j.id) } # la copia vieja de la segunda request
-      t { a.confirmar!(confirmado_por: admin, peso_confirmado_g: 10) }
-      expect { t { b.confirmar!(confirmado_por: admin, peso_confirmado_g: 10) } }.to raise_error(RuntimeError, /ya fue confirmado/)
+      t { a.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 10) }
+      expect { t { b.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 10) } }.to raise_error(RuntimeError, /ya fue confirmado/)
       expect(stock_total).to eq(10.0)
     end
 
@@ -95,7 +95,7 @@ RSpec.describe 'Manicura: integridad del pesaje', type: :request do
 
     it '«registrar directo» del admin con una planta ya pesada se rechaza y no guarda nada' do
       pesar(p1, 10); j = jornada; enviar(j); confirmar(j, 10)
-      post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo", params: { pesos: [{ plant_id: p1.id, peso_seco_g: 10 }, { plant_id: p2.id, peso_seco_g: 9 }] },
+      post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo", params: { calidad: 'altos', pesos: [{ plant_id: p1.id, peso_seco_g: 10 }, { plant_id: p2.id, peso_seco_g: 9 }] },
                                                                   headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
       expect(json['error']).to include('P1 ya está pesada')
@@ -277,7 +277,7 @@ RSpec.describe 'Manicura: integridad del pesaje', type: :request do
     it 'registrar directo a un frasco que se vació, también: se reabre' do
       f = frasco!
       t { f.update_columns(estado: 'agotado', cantidad: 0) }
-      post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo", params: { pesos: [{ plant_id: p1.id, peso_seco_g: 10 }], stock_id: f.id },
+      post "/lotes/#{lote.id}/pesajes_manicura/registrar_directo", params: { calidad: 'altos', pesos: [{ plant_id: p1.id, peso_seco_g: 10 }], stock_id: f.id },
                                                                   headers: auth_headers, as: :json
       expect(response).to have_http_status(:created), response.body
       expect([f.reload.cantidad.to_f, f.estado]).to eq([10.0, 'asignado'])
@@ -338,7 +338,7 @@ RSpec.describe 'Manicura: integridad del pesaje', type: :request do
       l2.update_columns(estado: 'en_manicura', sala_id: nil)
       l2.pesajes_manicura.create!(manicurador: a, club: otro, fecha_pesaje: Time.zone.today, estado: 'enviado', peso_total_g: 10)
     end
-    post "/lotes/#{ajeno.lote_id}/pesajes_manicura/#{ajeno.id}/confirmar", params: { peso_confirmado_g: 10 }, headers: auth_headers, as: :json
+    post "/lotes/#{ajeno.lote_id}/pesajes_manicura/#{ajeno.id}/confirmar", params: { calidad: 'altos', peso_confirmado_g: 10 }, headers: auth_headers, as: :json
     expect(response.status).to be_in([403, 404])
     expect(ActsAsTenant.with_tenant(otro) { ajeno.reload.estado }).to eq('enviado')
   end

@@ -1,5 +1,25 @@
 # Changelog
 
+## Octubre 2026 (gp) — Calidad de la flor seca y producir desde «Otro» (29-oct)
+
+Pedido de Javi. Germán: «1 sí; 2 obligatorio a partir de ahora, poder agregarlo al editar el stock;
+3 SOLO desde Otro quiero que se pueda producir además de flor_seca (cualquiera de su calidad)».
+
+- **Calidad de la flor seca**: Altos, Medios, Bajos u Otro (migración `CalidadDeLaFlorEnStock`,
+  `Stock::CALIDADES`). Se pide al crear stock externo de flor y al confirmar una cosecha a un frasco
+  nuevo (compu, teléfono, «Registrar pesaje» y registrar directo; repartida, cada frasco nuevo la suya:
+  los «Copones» arrancan en Altos y los «Bajos» en Bajos). Hasta ahora la calidad iba como texto libre en
+  la descripción. «Otro» pide qué es. Los frascos viejos quedan sin calidad y se completa al editarlos
+  (lista de stock y ficha). En uso personal no aparece.
+- Se ve como «Flor seca · Altos» en el inventario, la ficha, el carrito de la dispensa y todo lo que usa
+  `Stock#etiqueta` (la mesa del mostrador).
+- **Producir desde «Otro»**: además de la flor seca de cualquier calidad, se elabora desde lo cargado
+  con la forma «Otro» en gramos (restos de prerolls que se abren para una comida, flor de descarte). El
+  elaborado hereda lote y genética como siempre. La ficha muestra «Producir» según `materia_prima`.
+- `/me` → `reglas_stock` (calidades, si es obligatoria, de qué formas se produce). Specs:
+  `stock_calidad_spec.rb` (AC), y los de manicura/pesaje ahora confirman a frasco nuevo con calidad.
+  Vitest: `calidadFlor.test.js`.
+
 ## Octubre 2026 (go) — SEGURIDAD, tanda 2: segundo paso del super admin, frenos por cuenta, clave actual, links que vencen (29-oct)
 
 Germán (29-oct): «sí, pusheá, arrancá» (la tanda 2, con la columna del segundo paso).

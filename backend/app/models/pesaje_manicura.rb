@@ -190,10 +190,10 @@ class PesajeManicura < ApplicationRecord
   # tiene que ser el peso confirmado. Sin `destinos`, todo va a `stock_id` (o a un frasco nuevo).
   MAX_DESTINOS = 10
 
-  def confirmar!(confirmado_por:, peso_confirmado_g:, stock_id: nil, destinos: nil, version: nil)
+  def confirmar!(confirmado_por:, peso_confirmado_g:, stock_id: nil, destinos: nil, version: nil, calidad: nil, descripcion: nil)
     peso = peso_confirmado_g.to_d
     raise ArgumentError, "El peso confirmado debe ser mayor a 0" unless peso > 0
-    reparto = normalizar_destinos(destinos, peso, stock_id)
+    reparto = normalizar_destinos(destinos, peso, stock_id, calidad, descripcion)
 
     with_lock do
       raise "Este pesaje ya fue confirmado" if confirmado?
@@ -204,7 +204,7 @@ class PesajeManicura < ApplicationRecord
       end
 
       frascos = reparto.map do |d|
-        st = d[:stock_id].present? ? contenedor_elegido!(d[:stock_id]) : crear_stock_contenedor!(descripcion: d[:descripcion])
+        st = d[:stock_id].present? ? contenedor_elegido!(d[:stock_id]) : crear_stock_contenedor!(descripcion: d[:descripcion], calidad: d[:calidad])
         aplicar_a_stock!(st, d[:gramos], confirmado_por)
         st
       end
@@ -313,8 +313,8 @@ class PesajeManicura < ApplicationRecord
     raise ArgumentError, "Registrá al menos una planta o una carga antes de confirmar" if peso.zero?
 
     if destinos.present?
-      frascos = normalizar_destinos(destinos, peso, nil).map do |d|
-        st = d[:stock_id].present? ? contenedor_elegido!(d[:stock_id]) : crear_stock_contenedor!(descripcion: d[:descripcion])
+      frascos = normalizar_destinos(destinos, peso, nil, nil, nil).map do |d|
+        st = d[:stock_id].present? ? contenedor_elegido!(d[:stock_id]) : crear_stock_contenedor!(descripcion: d[:descripcion], calidad: d[:calidad])
         aplicar_a_stock!(st, d[:gramos], confirmado_por)
         st
       end
@@ -348,8 +348,8 @@ class PesajeManicura < ApplicationRecord
   end
 
   # Contenedor nuevo de flor_seca para este lote (sin sede: se asigna aparte). `descripcion` lo
-  # nombra cuando el pesaje se reparte («copones», «bajos»).
-  def crear_stock_contenedor!(descripcion: nil)
+  # nombra cuando el pesaje se reparte («copones», «bajos»). Nace con su calidad (`Stock::CALIDADES`).
+  def crear_stock_contenedor!(descripcion: nil, calidad: nil)
     club.stocks.create!(
       lote:           lote,
       genetica:       lote.genetica,
@@ -359,6 +359,8 @@ class PesajeManicura < ApplicationRecord
       cantidad:       0,
       unidad:         'g',
       descripcion:    descripcion.presence,
+      calidad:        calidad.presence,
+      exigir_calidad: true,
     )
   end
 
@@ -376,12 +378,14 @@ class PesajeManicura < ApplicationRecord
 
   # El reparto pedido, validado ANTES de tocar nada: cada destino con gramos, sin repetir frasco, y
   # la suma igual al peso confirmado (al centésimo). Sin reparto, un único destino.
-  def normalizar_destinos(destinos, peso, stock_id)
+  # `calidad` y `descripcion` son las del frasco nuevo cuando todo va a uno solo; repartido, cada
+  # destino trae las suyas.
+  def normalizar_destinos(destinos, peso, stock_id, calidad, descripcion)
     lista = Array(destinos).map { |d| d.respond_to?(:to_unsafe_h) ? d.to_unsafe_h : d.to_h }.map(&:symbolize_keys)
-    return [{ stock_id: stock_id.presence, gramos: peso }] if lista.empty?
+    return [{ stock_id: stock_id.presence, gramos: peso, calidad: calidad, descripcion: descripcion }] if lista.empty?
 
     raise ArgumentError, "Se puede repartir en hasta #{MAX_DESTINOS} frascos" if lista.size > MAX_DESTINOS
-    lista = lista.map { |d| { stock_id: d[:stock_id].presence, gramos: d[:gramos].to_d, descripcion: d[:descripcion].to_s.strip } }
+    lista = lista.map { |d| { stock_id: d[:stock_id].presence, gramos: d[:gramos].to_d, descripcion: d[:descripcion].to_s.strip, calidad: d[:calidad].to_s.strip } }
     raise ArgumentError, 'Cada frasco lleva sus gramos' if lista.any? { |d| d[:gramos] <= 0 }
     ids = lista.filter_map { |d| d[:stock_id]&.to_i }
     raise ArgumentError, 'El mismo frasco está dos veces en el reparto' if ids.uniq.size != ids.size

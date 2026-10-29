@@ -69,7 +69,7 @@
         <div v-else class="stk__pa-list">
           <div v-for="s in pendientes" :key="s.id" class="stk__pa-card">
             <div class="stk__pa-left">
-              <div class="stk__pa-forma">{{ formaLabel(s.forma_producto) }}</div>
+              <div class="stk__pa-forma">{{ productoLabel(s) }}</div>
               <div class="stk__pa-chips">
                 <span class="stk__chip stk__chip--g">{{ s.cantidad }}g</span>
                 <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
@@ -163,7 +163,7 @@
         <div class="stk__pa-list">
           <div v-for="s in vacios" :key="s.id" class="stk__pa-card">
             <div class="stk__pa-left">
-              <div class="stk__pa-forma">{{ s.numero_lote_producto || `Frasco #${s.id}` }} · {{ formaLabel(s.forma_producto) }}</div>
+              <div class="stk__pa-forma">{{ s.numero_lote_producto || `Frasco #${s.id}` }} · {{ productoLabel(s) }}</div>
               <div class="stk__pa-chips">
                 <span v-if="s.lote_codigo && !esPersonal" class="stk__chip stk__chip--lote">{{ s.lote_codigo }}</span>
                 <span v-if="s.genetica_nombre" class="stk__chip stk__chip--gen">{{ s.genetica_nombre }}</span>
@@ -264,6 +264,14 @@
                   <select class="stk__input" v-model="crearForm.forma_producto" required>
                     <option v-for="f in FORMAS" :key="f.value" :value="f.value">{{ f.label }}</option>
                   </select>
+                </div>
+                <div v-if="crearForm.forma_producto === 'flor_seca' && calidades.length" class="stk__field stk__field--full">
+                  <label class="stk__label">Calidad <span v-if="calidadObligatoria" class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="crearForm.calidad" :required="calidadObligatoria" aria-label="Calidad de la flor">
+                    <option value="">— Elegir calidad —</option>
+                    <option v-for="c in calidades" :key="c.value" :value="c.value">{{ c.label }}</option>
+                  </select>
+                  <span v-if="crearForm.calidad === 'otro'" class="stk__hint">Contá en las notas qué es.</span>
                 </div>
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Disponible para</label>
@@ -381,6 +389,14 @@
                   <select class="stk__input" v-model="editarForm.genetica_id">
                     <option :value="null">— Sin especificar —</option>
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                  </select>
+                </div>
+                <!-- Los frascos viejos nacieron sin calidad: acá se les completa. -->
+                <div v-if="editandoStock?.forma_producto === 'flor_seca' && calidades.length" class="stk__field">
+                  <label class="stk__label">Calidad</label>
+                  <select class="stk__input" v-model="editarForm.calidad" aria-label="Calidad de la flor">
+                    <option value="" :disabled="!!editandoStock?.calidad">— Sin calidad —</option>
+                    <option v-for="c in calidades" :key="c.value" :value="c.value">{{ c.label }}</option>
                   </select>
                 </div>
                 <div class="stk__field stk__field--full">
@@ -733,6 +749,7 @@ import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 
 const toast = useToast()
 
@@ -782,6 +799,7 @@ const procesando     = ref(false)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 const { esPersonal } = useUsoPersonal()
+const { calidades, obligatoria: calidadObligatoria, faltaCalidad } = useCalidadFlor()
 // Arranca en lo que tiene sentido ver: en uso personal no existe «por asignar».
 const tabActiva = ref(esPersonal.value ? 'inventario' : 'por_asignar')
 // Las preferencias pueden llegar después del primer render: si resulta personal, la solapa
@@ -1012,6 +1030,7 @@ async function abrirEditar(s) {
     proveedor:           s.proveedor   || '',
     disponibilidad:      s.disponibilidad || 'ambas',
     genetica_id:         s.genetica?.id || null,
+    calidad:             s.calidad || '',
   }
   editarError.value = null
   showEditarModal.value = true
@@ -1030,6 +1049,7 @@ async function guardarEditar() {
     if (f.proveedor)                   payload.proveedor           = f.proveedor
     if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
     if (f.genetica_id)                 payload.genetica_id         = Number(f.genetica_id)
+    if (f.calidad)                     payload.calidad             = f.calidad
     await updateStock(editandoStock.value.id, payload)
     showEditarModal.value = false
     await cargarInventario()
@@ -1058,7 +1078,7 @@ const DISPONIBILIDADES = [
 const emptyForm = () => ({
   forma_producto: 'flor_seca', cantidad: '', sede_id: '',
   genetica_id: null, precio_sugerido_ars: '', costo_unitario_ars: '',
-  proveedor: '', descripcion: '', disponibilidad: 'ambas',
+  proveedor: '', descripcion: '', disponibilidad: 'ambas', calidad: '',
 })
 const crearForm = ref(emptyForm())
 
@@ -1092,6 +1112,10 @@ async function guardarStock() {
   if (!crearForm.value.genetica_id) {
     crearError.value = 'Elegí la variedad / genética del stock'; return
   }
+  if (crearForm.value.forma_producto === 'flor_seca') {
+    const falta = faltaCalidad(crearForm.value)
+    if (falta) { crearError.value = falta; return }
+  }
   creando.value = true
   try {
     const p = {
@@ -1108,6 +1132,7 @@ async function guardarStock() {
     if (crearForm.value.costo_unitario_ars)  p.costo_unitario_ars  = Number(crearForm.value.costo_unitario_ars)
     if (crearForm.value.genetica_id)         p.genetica_id         = Number(crearForm.value.genetica_id)
     if (crearForm.value.descripcion?.trim()) p.descripcion         = crearForm.value.descripcion.trim()
+    if (crearForm.value.forma_producto === 'flor_seca' && crearForm.value.calidad) p.calidad = crearForm.value.calidad
 
     await createStock(p)
     toast.success('Stock externo creado')
@@ -1403,6 +1428,7 @@ watch(() => crearForm.value.disponibilidad, () => {
   if (id && !sedesParaCrear.value.some(s => String(s.id) === String(id))) crearForm.value.sede_id = ''
 })
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
+function productoLabel(s) { return s?.calidad_label ? `${formaLabel(s.forma_producto)} · ${s.calidad_label}` : formaLabel(s?.forma_producto) }
 
 function estadoLabel(e) {
   return { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado', cerrado: 'Cerrado', eliminado: 'Eliminado' }[e] || e

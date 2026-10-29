@@ -198,7 +198,7 @@ RSpec.describe Lote, type: :model do
       pesaje = lote.pesajes_manicura.create!(club: club, manicurador: manicurador, fecha_pesaje: Date.current)
       pesaje.pesadas_plantas.create!(plant: lote.plants.first, peso_seco_g: 100)
       pesaje.enviar!
-      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 100)
+      pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 100)
       # confirmar! sobre todas las plantas puede pasar el lote a curado; forzamos el estado
       # para probar la guarda de "pesaje confirmado" de devolver_a_cosecha! aisladamente.
       lote.update_column(:estado, 'en_manicura')
@@ -231,7 +231,7 @@ RSpec.describe Lote, type: :model do
       pesaje = pesaje_por_qr(lote, lote.plants.to_a, 100)
       pesaje.enviar!
       expect {
-        pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+        pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       }.to change(Stock, :count).by(1)
       stock = Stock.last
       expect(stock.estado).to eq('pendiente_asignacion')
@@ -245,7 +245,7 @@ RSpec.describe Lote, type: :model do
       lote = lote_con_plantas(2)
       pesaje = pesaje_por_qr(lote, lote.plants.to_a, 100)
       pesaje.enviar!
-      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       expect(lote.reload.estado).to eq('curado')
     end
 
@@ -257,7 +257,7 @@ RSpec.describe Lote, type: :model do
       vivas  = lote.plants.where.not(state: 'descartada').to_a
       pesaje = pesaje_por_qr(lote, vivas, 100)
       pesaje.enviar!
-      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       expect(lote.reload.estado).to eq('curado')
     end
 
@@ -265,18 +265,18 @@ RSpec.describe Lote, type: :model do
       lote = lote_con_plantas(4)
       pesaje = pesaje_por_qr(lote, lote.plants.first(2), 100)
       pesaje.enviar!
-      pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       expect(lote.reload.estado).to eq('en_manicura')
     end
 
     it 'dos pesajes parciales que cubren todo dejan el lote en curado' do
       lote = lote_con_plantas(4)
       p1 = pesaje_por_qr(lote, lote.plants.first(2), 100); p1.enviar!
-      p1.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      p1.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       expect(lote.reload.estado).to eq('en_manicura')
 
       p2 = pesaje_por_qr(lote, lote.plants.last(2), 100); p2.enviar!
-      p2.confirmar!(confirmado_por: admin, peso_confirmado_g: 200)
+      p2.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 200)
       expect(lote.reload.estado).to eq('curado')
     end
 
@@ -288,7 +288,7 @@ RSpec.describe Lote, type: :model do
       expect(pesaje.reload.estado).to eq('enviado')
       expect(pesaje.peso_total_g.to_f).to eq(300.0)
       expect {
-        pesaje.confirmar!(confirmado_por: admin, peso_confirmado_g: 300)
+        pesaje.confirmar!(confirmado_por: admin, calidad: 'altos', peso_confirmado_g: 300)
       }.to change(Stock, :count).by(1)
       expect(lote.reload.estado).to eq('curado')
     end

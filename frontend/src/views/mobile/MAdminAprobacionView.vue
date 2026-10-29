@@ -83,7 +83,7 @@
               <div v-if="cargandoContenedores" class="maa__hint">Buscando frascos de este lote…</div>
               <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
               <template v-else-if="repartir">
-                <RepartoFrascos v-model="reparto" :contenedores="contenedores" :peso-total="Number(pesoConfirmado) || 0" />
+                <RepartoFrascos ref="repartoFrascos" v-model="reparto" :contenedores="contenedores" :peso-total="Number(pesoConfirmado) || 0" />
                 <button type="button" class="maa__link" @click="repartir = false">Mandar todo a un solo frasco</button>
               </template>
               <div v-else class="maa__cont-list">
@@ -105,6 +105,7 @@
               </div>
               <template v-if="!repartir && !cargandoContenedores">
                 <span class="maa__hint">{{ stockDestino ? 'El peso se suma al frasco elegido.' : 'Se crea un frasco nuevo de flor seca para este lote.' }}</span>
+                <CalidadFrascoNuevo v-if="!stockDestino" v-model:calidad="frascoNuevo.calidad" v-model:descripcion="frascoNuevo.descripcion" />
                 <button type="button" class="maa__link" @click="empezarReparto">Repartir en varios frascos (copones, bajos…)</button>
               </template>
             </div>
@@ -132,6 +133,8 @@ import { ref, computed, onMounted } from 'vue'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura, listStocks } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
+import CalidadFrascoNuevo from '../../components/manicura/CalidadFrascoNuevo.vue'
+import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRevisionPesaje } from '../../composables/useRevisionPesaje.js'
 
@@ -150,6 +153,9 @@ const errorMsg       = ref('')
 const contenedores        = ref([])
 const cargandoContenedores = ref(false)
 const stockDestino        = ref(null)   // null = frasco nuevo
+const frascoNuevo         = ref({ calidad: '', descripcion: '' })
+const repartoFrascos      = ref(null)
+const { faltaCalidad } = useCalidadFlor()
 // Reparto en varios frascos (copones, bajos…): filas { stock_id | null = nuevo, descripcion, gramos }.
 const repartir = ref(false)
 const reparto  = ref([])
@@ -160,8 +166,8 @@ const repartoCuadra = computed(() => {
 function empezarReparto() {
   repartir.value = true
   reparto.value = [
-    { stock_id: null, descripcion: 'Copones', gramos: null },
-    { stock_id: null, descripcion: 'Bajos', gramos: null },
+    { stock_id: null, descripcion: 'Copones', calidad: 'altos', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', calidad: 'bajos', gramos: null },
   ]
 }
 
@@ -170,6 +176,7 @@ const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digi
 async function cargarContenedores(loteId) {
   cargandoContenedores.value = true
   stockDestino.value = null
+  frascoNuevo.value = { calidad: '', descripcion: '' }
   repartir.value = false
   reparto.value = []
   try {
@@ -222,6 +229,9 @@ async function confirmar() {
     errorMsg.value = 'El peso debe ser mayor a 0'; return
   }
   if (confirmando.value) return
+  // El frasco nuevo nace con su calidad; el backend lo rechaza igual, pero mejor decirlo antes.
+  const falta = repartir.value ? repartoFrascos.value?.faltaEnFrascos : (!stockDestino.value && faltaCalidad(frascoNuevo.value))
+  if (falta) { errorMsg.value = falta; return }
   confirmando.value = true
   errorMsg.value    = ''
   try {
@@ -229,8 +239,10 @@ async function confirmar() {
       peso_confirmado_g: pesoConfirmado.value,
       version:           revision.version(),
       ...(repartir.value
-        ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
-        : { stock_id: stockDestino.value || undefined }),
+        ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined), calidad: f.stock_id ? undefined : (f.calidad || undefined) })) }
+        : stockDestino.value
+          ? { stock_id: stockDestino.value }
+          : { calidad: frascoNuevo.value.calidad || undefined, descripcion: frascoNuevo.value.descripcion?.trim() || undefined }),
     })
     const destino = repartir.value
       ? `repartido en ${reparto.value.length} frascos`

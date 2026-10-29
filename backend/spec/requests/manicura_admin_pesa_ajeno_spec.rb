@@ -40,7 +40,7 @@ RSpec.describe 'Admin y supervisor pesan un lote asignado a una manicura', type:
 
       it 'registra directo en el lote de ella y queda confirmado' do
         post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-             params: { resto: { peso_total_g: 90 } }, as: :json
+             params: { calidad: 'altos', resto: { peso_total_g: 90 } }, as: :json
 
         expect(response).to have_http_status(:created), response.body
         expect(lote.pesajes_manicura.confirmados.where(manicurador_id: send(rol).id)).to exist
@@ -53,7 +53,7 @@ RSpec.describe 'Admin y supervisor pesan un lote asignado a una manicura', type:
     sign_in_as(admin)
 
     post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
-         params: { resto: { peso_total_g: 100 } }, as: :json
+         params: { calidad: 'altos', resto: { peso_total_g: 100 } }, as: :json
 
     expect(response).to have_http_status(:created), response.body
     expect(jornada_de_ella.reload.pesadas_plantas.pluck(:plant_id)).to eq([plantas.first.id])

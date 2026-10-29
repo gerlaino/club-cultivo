@@ -51,7 +51,7 @@ RSpec.describe 'Stock — variedad obligatoria al crear, editable después', typ
 
       expect {
         post '/stocks', headers: auth_headers, as: :json, params: {
-          stock: { forma_producto: 'flor_seca', cantidad: 100, origen: 'lote',
+          stock: { forma_producto: 'flor_seca', cantidad: 100, origen: 'lote', calidad: 'altos',
                    lote_id: lote.id, sede_id: sede.id }
         }
       }.to change { Stock.count }.by(1)

@@ -73,6 +73,7 @@ module Stocks
         costo_unitario_ars: @stock.costo_unitario_ars,
         precio_sugerido_ars: f[:precio] || @stock.precio_sugerido_ars,
         genetica_id: @stock.genetica_id, descripcion: f[:descripcion], proveedor: @stock.proveedor,
+        calidad: @stock.calidad, # separar no cambia qué flor es
         disponibilidad: @stock.disponibilidad, fecha_elaboracion: @stock.fecha_elaboracion,
         fecha_vencimiento_est: @stock.fecha_vencimiento_est, lote_origen_consumido_g: consumido,
       )

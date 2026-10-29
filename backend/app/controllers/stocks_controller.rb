@@ -290,6 +290,7 @@ class StocksController < ApplicationController
     @stock = Stock.new(stock_params)
     @stock.sede  = sede_for_stock
     @stock.club  = current_user.club
+    @stock.exigir_calidad = true # lo nuevo de flor seca nace con su calidad (`Stock::CALIDADES`)
 
     # Cuando el stock sale de un lote la variedad ya la sabemos: se completa sola en vez de
     # hacerle elegir de nuevo algo que el lote ya dice.
@@ -453,8 +454,9 @@ class StocksController < ApplicationController
   # flor lo hace el modelo (before_create de derivado_lote).
   # Body: { gramos_usados, forma_producto, cantidad_producida, unidad, precio_sugerido_ars? }
   def producir
-    unless @stock.forma_producto == 'flor_seca'
-      return render json: { error: 'Solo se puede producir desde flor seca' }, status: :unprocessable_entity
+    # Flor seca de cualquier calidad, o lo cargado como «Otro» (29-oct-2026), siempre en gramos.
+    unless @stock.materia_prima?
+      return render json: { error: 'Solo se puede producir desde flor seca o desde «Otro», en gramos' }, status: :unprocessable_entity
     end
     unless @stock.apto_produccion?
       return render json: { error: 'Este stock no está habilitado para producción' }, status: :unprocessable_entity
@@ -737,6 +739,7 @@ class StocksController < ApplicationController
           precio_sugerido_ars:     @stock.precio_sugerido_ars,
           genetica_id:             @stock.genetica_id,
           descripcion:             @stock.descripcion,
+          calidad:                 @stock.calidad,
           proveedor:               @stock.proveedor,
           disponibilidad:          @stock.disponibilidad,
           lote_origen_consumido_g: consumido_proporcional,
@@ -832,7 +835,7 @@ class StocksController < ApplicationController
   def stock_update_params
     params.require(:stock).permit(
       :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor,
-      :disponibilidad, :genetica_id, :forma_producto, :unidad
+      :disponibilidad, :genetica_id, :forma_producto, :unidad, :calidad
     )
   end
 
@@ -897,7 +900,7 @@ class StocksController < ApplicationController
       :origen, :lote_id, :lote_origen_consumido_g,
       :forma_producto, :unidad, :cantidad,
       :costo_unitario_ars, :precio_sugerido_ars,
-      :proveedor, :descripcion, :genetica_id, :categoria, :sede_id, :estado, :disponibilidad
+      :proveedor, :descripcion, :genetica_id, :categoria, :sede_id, :estado, :disponibilidad, :calidad
     )
   end
 
@@ -1113,6 +1116,9 @@ class StocksController < ApplicationController
       proveedor:               s.proveedor,
       descripcion:             s.descripcion,
       categoria:               s.categoria,
+      calidad:                 s.calidad,
+      calidad_label:           s.calidad_label,
+      materia_prima:           s.materia_prima?,
       disponibilidad:          s.disponibilidad,
       regulatorio:             s.regulatorio?,
       del_club:                s.del_club?,
