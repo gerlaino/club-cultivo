@@ -63,17 +63,38 @@ registerRoute(new NavigationRoute(async (opciones) => {
 // primera vez que se usa y queda. Son archivos con hash en el nombre: si cambia el contenido
 // cambia la URL, así que se pueden guardar sin fecha de vencimiento corta. Sin esto, cada deploy
 // era bajar la app entera al teléfono.
+// EL CÓDIGO Y LAS IMÁGENES VAN EN CAJONES DISTINTOS (29-oct-2026). Estaban juntos en `assets-cache`,
+// y al cambiar de persona hay que borrar las imágenes (fotos subidas, documentos de pacientes) pero
+// NO el código: sin él, una pestaña que todavía corre la versión anterior pide sus pantallas a un
+// servidor que ya no las tiene (404 → «Unable to preload CSS», la app rota). `lib/cachesSesion.js`
+// borra todo menos `workbox-precache-*` y `codigo-*`.
+const CODIGO = 'codigo-v1'
+const IMAGENES = 'imagenes-v1'
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.origin === self.location.origin &&
-                        (url.pathname.startsWith('/assets/') || request.destination === 'image' || request.destination === 'font'),
+                        (url.pathname.startsWith('/assets/') || request.destination === 'font'),
   new CacheFirst({
-    cacheName: 'assets-cache',
+    cacheName: CODIGO,
     plugins: [
       new ExpirationPlugin({ maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   })
 )
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.origin === self.location.origin && request.destination === 'image',
+  new CacheFirst({
+    cacheName: IMAGENES,
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true }),
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+    ],
+  })
+)
+// El cajón viejo mezclaba los dos: se tira al activar (lo que haga falta se vuelve a bajar).
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.delete('assets-cache'))
+})
 
 const API_ORIGIN = (() => {
   const v = import.meta.env.VITE_API_URL

@@ -16,10 +16,10 @@ function conCaches(keys, { borrar = () => Promise.resolve(true) } = {}) {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('borrar lo guardado de la sesión', () => {
-  it('borra la API y las imágenes, conserva la cáscara', async () => {
-    const borrados = conCaches(['api-cache', 'assets-cache', 'workbox-precache-v2-https://x/'])
+  it('borra la API y las imágenes, conserva el código de la app', async () => {
+    const borrados = conCaches(['api-cache', 'imagenes-v1', 'assets-cache', 'codigo-v1', 'workbox-precache-v2-https://x/'])
     await borrarCachesDeSesion()
-    expect(borrados.sort()).toEqual(['api-cache', 'assets-cache'])
+    expect(borrados.sort()).toEqual(['api-cache', 'assets-cache', 'imagenes-v1'])
   })
 
   it('si el caché no contesta, sigue a los 1,5 s', async () => {

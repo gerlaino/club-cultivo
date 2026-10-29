@@ -7,21 +7,23 @@
 // lo del anterior. Ahora se borran en los tres momentos en que cambia la persona: al cerrar
 // sesión, cuando la sesión se vence (el 401) y al entrar.
 //
-// `assets-cache` se borra también: además del código con hash guarda las IMÁGENES (fotos subidas,
-// documentos de pacientes). Lo que NO se borra es la cáscara (`workbox-precache-*`): borrarla con
-// el service worker activo lo dejaba sin nada que servir y la app instalada ya no abría sin señal
-// (26-oct-2026). La cáscara no tiene nada de nadie.
+// Se borran los datos (`api-cache`) y las imágenes (`imagenes-*`: fotos subidas, documentos de
+// pacientes). NO se borra el código: la cáscara (`workbox-precache-*`; borrarla con el service worker
+// activo dejaba la app instalada sin abrir sin señal, 26-oct-2026) ni las pantallas (`codigo-*`):
+// sin ellas, una pestaña con la versión anterior pide archivos que el deploy ya sacó del servidor y
+// se rompe (29-oct-2026). El código no tiene nada de nadie.
 //
 // Con techo de tiempo al entrar: un login no puede quedar esperando al caché. Al cerrar sesión se
 // espera entero (`techoMs: null`): la página se recarga después y no hay apuro.
 const TECHO_MS = 1500
+const CODIGO = ['workbox-precache', 'codigo-']
 
 export async function borrarCachesDeSesion({ techoMs = TECHO_MS } = {}) {
   if (typeof caches === 'undefined') return
   const borrar = (async () => {
     try {
       const keys = await caches.keys()
-      await Promise.all(keys.filter((k) => !k.startsWith('workbox-precache')).map((k) => caches.delete(k)))
+      await Promise.all(keys.filter((k) => !CODIGO.some((c) => k.startsWith(c))).map((k) => caches.delete(k)))
     } catch { /* sin Cache Storage: no hay nada que borrar */ }
   })()
   if (techoMs == null) return borrar

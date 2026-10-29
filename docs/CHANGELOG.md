@@ -33,6 +33,15 @@ vinculado no ve lo clínico, cifrado en la base, Sentry sin datos de personas, C
   dice por dónde entrar (su puerta, con DNI) en vez de mostrar el usuario interno `…@<org>.paciente`.
 - Test del chat que fallaba entre las 0 y las 2 (dependía de la hora): fijado.
 
+- **(gn-1) El paciente no podía recargar su portal**: la barrera de (gm) dejaba afuera la página de la app
+  (`application#spa_fallback`) y Ctrl+Shift+R, un link o el ícono instalado le contestaban 403 en JSON. Test que
+  pide las páginas como el navegador (el barrido de /api no lo veía).
+- **(gn-2) Una pestaña abierta durante un deploy se rompía** («Unable to preload CSS», 404 de `/assets/…`): cada
+  deploy saca del servidor los archivos de la versión anterior. Ahora la app lo detecta (`vite:preloadError`,
+  `router.onError`), toma la versión nueva y lleva a la pantalla que se quiso abrir (`main.js`). Y el código y las
+  imágenes del service worker van en cajones distintos (`codigo-v1`, `imagenes-v1`): al cambiar de persona se borran
+  las imágenes, no el código. Probado simulando un deploy con el portal abierto.
+
 **Quedan (tandas 2–4, ver `SECURITY_AUDIT.md`):** segundo paso para super admin, freno por cuenta y clave
 mínima, comprobantes con link que vence, la IP real detrás de Cloudflare, cambiar la clave sin pedir la
 actual (decisión del 25-sep, a revisar), Rails 8 + Ruby 3.4, y lo legal (acceso/supresión, registro de

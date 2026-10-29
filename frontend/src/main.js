@@ -96,6 +96,49 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
   window.location.reload()
 })
 
+// UNA PANTALLA QUE NO ENCUENTRA SUS ARCHIVOS = HUBO UN DEPLOY (29-oct-2026).
+//
+// La pestaña corre la versión anterior y pide una pantalla (un archivo con hash) que el servidor
+// nuevo ya no tiene: 404, «Unable to preload CSS», la pantalla en blanco. Se arregla tomando la
+// versión nueva: si hay un service worker esperando se lo activa (controllerchange recarga, arriba);
+// si no, se recarga. Una sola vez por pestaña cada 30 s, para no quedar en un bucle si el problema
+// fuera otro.
+// Adónde iba la persona: la pantalla que no cargó. Después de recargar se la lleva ahí, no a la
+// anterior (`ce_ir_a`, abajo).
+let destinoPendiente = null
+router.beforeEach((to) => { destinoPendiente = to.fullPath })
+
+function recuperarDeployNuevo(motivo, destino = destinoPendiente) {
+  try {
+    const ultima = Number(sessionStorage.getItem('ce_recupero_deploy') || 0)
+    if (Date.now() - ultima < 30_000) return false
+    sessionStorage.setItem('ce_recupero_deploy', String(Date.now()))
+    if (destino) sessionStorage.setItem('ce_ir_a', destino)
+  } catch { /* sin storage: se intenta igual */ }
+  anotarReload('deploy-nuevo', { motivo })
+  navigator.serviceWorker?.getRegistration()
+    .then((r) => {
+      if (r?.waiting) { r.waiting.postMessage({ type: 'SKIP_WAITING' }); return }
+      if (destino) window.location.assign(destino); else window.location.reload()
+    })
+    .catch(() => window.location.reload())
+  return true
+}
+window.addEventListener('vite:preloadError', (e) => { if (recuperarDeployNuevo('preload')) e.preventDefault() })
+router.onError((err, to) => {
+  if (/dynamically imported module|Importing a module script failed|Unable to preload|Loading chunk/i.test(err?.message || '')) {
+    recuperarDeployNuevo('import', to?.fullPath)
+  }
+})
+// Ya con la versión nueva: a la pantalla que se quiso abrir.
+try {
+  const irA = sessionStorage.getItem('ce_ir_a')
+  if (irA) {
+    sessionStorage.removeItem('ce_ir_a')
+    router.isReady().then(() => { if (router.currentRoute.value.fullPath !== irA) router.replace(irA) })
+  }
+} catch { /* sin storage: queda donde está */ }
+
 const app = createApp(App);
 
 app.use(createPinia());

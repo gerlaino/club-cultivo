@@ -23,7 +23,7 @@ describe('cerrar sesión', () => {
     borrados = []
     replace = vi.fn()
     vi.stubGlobal('caches', {
-      keys: () => Promise.resolve(['workbox-precache-v2-https://cultivoespacial.com/', 'api-cache', 'assets-cache']),
+      keys: () => Promise.resolve(['workbox-precache-v2-https://cultivoespacial.com/', 'codigo-v1', 'api-cache', 'imagenes-v1']),
       delete: (k) => { borrados.push(k); return Promise.resolve(true) },
     })
     vi.stubGlobal('location', { replace })
@@ -33,12 +33,12 @@ describe('cerrar sesión', () => {
   beforeEach(() => setActivePinia(createPinia()))
   afterEach(() => vi.unstubAllGlobals())
 
-  it('borra lo de la sesión (API e imágenes) y conserva la cáscara de la app', async () => {
+  it('borra lo de la sesión (API e imágenes) y conserva el código de la app', async () => {
     montar({ instalada: false })
     await useAuthStore().logOut()
 
-    expect(borrados).toEqual(expect.arrayContaining(['api-cache', 'assets-cache']))
-    expect(borrados.some((k) => k.startsWith('workbox-precache'))).toBe(false)
+    expect(borrados).toEqual(expect.arrayContaining(['api-cache', 'imagenes-v1']))
+    expect(borrados.some((k) => k.startsWith('workbox-precache') || k.startsWith('codigo-'))).toBe(false)
   })
 
   it('en la web va a la portada', async () => {
