@@ -151,6 +151,30 @@ RSpec.describe 'Manicura: repartir un pesaje en varios frascos', type: :request 
       expect(t { p1.reload.peso_seco }).to be_nil
     end
 
+    # AC (Germán, 30-oct-2026): «el admin, al registrar el pesaje, tiene que poder dividir esa
+    # planta en uno o más frascos, existentes o nuevos». Es lo que manda «Registrar pesaje» de la
+    # ficha del lote: las plantas elegidas con su peso conjunto (`resto.plant_ids`) y el destino.
+    it 'una sola planta, repartida en un frasco existente y uno nuevo' do
+      viejo = t { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 5) }
+      directo(resto: { plant_ids: [p1.id], peso_total_g: 30 },
+              destinos: [{ stock_id: viejo.id, gramos: 20 }, { gramos: 10, descripcion: 'Bajos', calidad: 'bajos' }])
+      expect(response).to have_http_status(:created), response.body
+      expect(viejo.reload.cantidad.to_f).to eq(25.0)
+      expect(frascos.last.attributes.values_at('descripcion', 'calidad')).to eq(%w[Bajos bajos])
+      expect(frascos.last.cantidad.to_f).to eq(10.0)
+      expect(t { p1.reload.peso_seco.to_f }).to eq(30.0)
+      expect(t { p2.reload.peso_seco }).to be_nil
+      expect(t { lote.reload.estado }).to eq('en_manicura') # falta P2
+    end
+
+    it 'una sola planta a un frasco existente, sin reparto' do
+      viejo = t { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 5) }
+      directo(resto: { plant_ids: [p1.id], peso_total_g: 30 }, stock_id: viejo.id)
+      expect(response).to have_http_status(:created), response.body
+      expect(viejo.reload.cantidad.to_f).to eq(35.0)
+      expect(frascos.size).to eq(1)
+    end
+
     it 'sin reparto, como siempre: un solo frasco' do
       directo(pesos: [{ plant_id: p1.id, peso_seco_g: 60 }, { plant_id: p2.id, peso_seco_g: 40 }], calidad: 'altos')
       expect(response).to have_http_status(:created), response.body

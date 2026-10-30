@@ -977,6 +977,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **UN PESAJE SE PUEDE REPARTIR EN VARIOS FRASCOS** (copones/bajos, 1-oct-2026): la suma es el
   peso confirmado; todo del mismo lote; el reajuste es por frasco. `pesaje_destinos` es la fuente;
   `pesajes_manicura.stock_id` queda como el primero por compatibilidad.
+- **EL ADMIN ELIGE EL FRASCO AL PESAR** (Germán, 30-oct-2026): toda pantalla donde el admin o el
+  supervisor pesa y confirma en un paso (ficha del lote, Producción → Manicura, pantalla de la
+  manicura) ofrece lo mismo: frasco nuevo, uno de flor seca del lote, o repartido en varios
+  (`RepartoFrascos`). Una pantalla de pesaje del admin que mande siempre a un frasco nuevo es un bug.
 - **UN FRASCO SE PUEDE SEPARAR EN VARIOS** (1-oct-2026): sólo lo guardado y libre (lo de la mesa,
   reservado o apartado se queda), algo queda en el original, y es un traslado (transferencia en
   las dos puntas): no sale nada del inventario y la trazabilidad no se corta.

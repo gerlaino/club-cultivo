@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (gq) — El admin reparte el pesaje en uno o más frascos desde la ficha del lote (30-oct)
+
+Germán: «el admin, al momento de registrar el pesaje, tiene que poder dividir esa planta en uno o más
+frascos, existentes o nuevos». Mitocondria va a pesar sin usuarios de manicura (todo el admin) y el
+«Registrar pesaje» de la ficha del lote (también «Pesar» en Producción → Manicura) mandaba siempre a UN
+frasco nuevo: el reparto sólo estaba en la pantalla de la manicura, sin camino desde el menú del admin.
+`CompletarManicuraModal`, para admin y supervisor: «Frasco» (nuevo o uno de flor seca del lote, también
+los vacíos), «Repartir en varios frascos (copones, bajos…)» con `RepartoFrascos` (el botón espera a que
+el reparto sume el peso; cada frasco nuevo con su calidad) y la sede del frasco nuevo. Sin cambios de
+backend: `registrar_directo` ya aceptaba `stock_id`, `destinos` y `sede_id`. «Notas» ya no se le ofrece
+al admin (el registro directo no las guardaba). La manicura sigue igual: manda a confirmar.
+`manicuraAdminFrascosFicha.test.js` y dos casos en `manicura_reparto_spec.rb` (una planta repartida en
+un frasco existente y uno nuevo; una planta a un frasco existente).
+
 ## Octubre 2026 (gp-3) — El paciente ve «Cerrar sesión» en la compu (30-oct)
 
 Germán: «no está por ningún lado». En la compu (desde 860px) el ícono de «Mi cuenta» se escondía y la

@@ -10,7 +10,7 @@ const api = {
   listPesajesManicuraAdmin: vi.fn(), confirmarPesajeManicura: vi.fn(), reabrirPesajeManicura: vi.fn(),
   enviarPesajeManicura: vi.fn(() => Promise.resolve({ data: {} })), deletePesajeManicura: vi.fn(),
   revisarPesajeManicura: vi.fn(), soltarRevisionPesajeManicura: vi.fn(),
-  listStocks: vi.fn(() => Promise.resolve({ data: [] })), listLotes: vi.fn(),
+  listStocks: vi.fn(() => Promise.resolve({ data: [] })), listSedes: vi.fn(() => Promise.resolve({ data: [] })), listLotes: vi.fn(),
   createPesajeManicura: vi.fn(), registrarDirectoManicura: vi.fn(() => Promise.resolve({ data: {} })), listPlants: vi.fn(),
 }
 vi.mock('../lib/api.js', () => api)
