@@ -20,6 +20,11 @@
                   @click="abierto = false">
         <CircleUserRound :size="22" :stroke-width="1.75" />
       </RouterLink>
+      <!-- En la compu, la salida a la vista en la barra (Germán, 30-oct-2026: «no está por ningún
+           lado»): sólo estaba en el pie, debajo de todo el inicio, y el ícono se escondía. -->
+      <button type="button" class="pnb__salir" data-testid="portal-salir" @click="salir">
+        <LogOut :size="16" :stroke-width="1.75" /> Cerrar sesión
+      </button>
       <button class="pnb__ham" :aria-expanded="abierto" aria-label="Menú" @click="abierto = !abierto">
         <Menu v-if="!abierto" :size="20" :stroke-width="1.75" />
         <X v-else :size="20" :stroke-width="1.75" />
@@ -55,7 +60,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { Menu, X, CircleUserRound } from 'lucide-vue-next'
+import { Menu, X, CircleUserRound, LogOut } from 'lucide-vue-next'
 import LeafSeal from '@/design-system/icons/LeafSeal.vue'
 import { usePortalClubStore } from '@/stores/portalClub'
 import { useAuthStore } from '@/stores/auth'
@@ -149,6 +154,12 @@ async function salir() {
   margin-left: auto; color: rgb(255 255 255 / .8); display: flex; align-items: center; padding: var(--sp-1);
 }
 .pnb__cuenta.router-link-exact-active { color: var(--p-papel); }
+.pnb__salir {
+  display: none; align-items: center; gap: .35rem; margin-left: var(--sp-2);
+  background: none; border: 1px solid rgb(255 255 255 / .3); border-radius: var(--r-md);
+  color: rgb(255 255 255 / .85); font-size: var(--fs-13); padding: .3rem .7rem; cursor: pointer;
+}
+.pnb__salir:hover { color: var(--p-papel); border-color: rgb(255 255 255 / .6); }
 .pnb__ham {
   margin-left: var(--sp-2); background: none; border: 0; color: rgb(255 255 255 / .8);
   display: flex; align-items: center; cursor: pointer; padding: var(--sp-1);
@@ -167,7 +178,8 @@ async function salir() {
 }
 
 @media (min-width: 860px) {
-  .pnb__cuenta { display: none; }
+  .pnb__cuenta { margin-left: var(--sp-2); }
+  .pnb__salir { display: flex; }
   .pnb__nav { display: flex; }
   .pnb__ham { display: none; }
   .pnb__movil { display: none; }

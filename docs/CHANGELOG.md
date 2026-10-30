@@ -1,5 +1,12 @@
 # Changelog
 
+## Octubre 2026 (gp-3) — El paciente ve «Cerrar sesión» en la compu (30-oct)
+
+Germán: «no está por ningún lado». En la compu (desde 860px) el ícono de «Mi cuenta» se escondía y la
+única salida era el pie, debajo de todo el inicio. `PortalNavBar` ahora muestra en escritorio el ícono y
+un botón «Cerrar sesión» en la barra de arriba; en el teléfono sigue el ícono → Mi cuenta → Cerrar sesión.
+`e2e/portalSalir.spec.js`: sale desde los dos y `/portal` ya no lo deja entrar (falla sin el arreglo).
+
 ## Octubre 2026 (gp-1) — El buscador abre al paciente aunque ya estés en otra ficha (29-oct)
 
 Javi: «cuando clickeás en el paciente no te lleva al paciente». Desde la ficha de un paciente, elegir
