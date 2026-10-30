@@ -70,7 +70,7 @@ const props = defineProps({
   modelValue: { type: Object, required: true },
 })
 const emit = defineEmits(['update:modelValue'])
-const { faltaCalidad, etiquetaFrasco } = useCalidadFlor()
+const { calidades, faltaCalidad, etiquetaFrasco } = useCalidadFlor()
 const uid = `dfr-${Math.random().toString(36).slice(2, 8)}`
 
 const contenedores = ref([])
@@ -136,7 +136,8 @@ function resumen() {
   const d = props.modelValue
   const nombre = id => { const c = contenedores.value.find(x => x.id === id); return c ? etiquetaFrasco(c) : `frasco #${id}` }
   if (d.repartir) return d.reparto.map(f => `${fmtG(f.gramos)} g a ${f.stock_id ? nombre(f.stock_id) : `un frasco nuevo${f.descripcion ? ` («${f.descripcion.trim()}»)` : ''}`}`).join(' · ')
-  return d.stock_id ? `al frasco ${nombre(d.stock_id)}` : 'a un frasco nuevo'
+  const cal = calidades.value.find(c => c.value === d.calidad)?.label
+  return d.stock_id ? `al frasco ${nombre(d.stock_id)}` : `a un frasco nuevo${cal ? ` de ${cal}` : ''}`
 }
 
 defineExpose({ falta, payload, resumen })

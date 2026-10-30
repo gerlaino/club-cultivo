@@ -22,7 +22,9 @@ export function useCalidadFlor() {
   // Cómo se nombra un frasco al elegirlo: su número, su calidad y su nombre («ST-26-0005 · Altos ·
   // Copones»). Sin la calidad, dos frascos del mismo lote no se distinguían en la lista.
   function etiquetaFrasco(c) {
-    return [c?.numero_lote_producto || `Frasco #${c?.id}`, c?.calidad_label, c?.descripcion].filter(Boolean).join(' · ')
+    // El nombre que repite la calidad («Bajos» de calidad Bajos) va una sola vez.
+    const nombre = c?.descripcion && c.descripcion.trim().toLowerCase() !== String(c?.calidad_label || '').toLowerCase() ? c.descripcion : null
+    return [c?.numero_lote_producto || `Frasco #${c?.id}`, c?.calidad_label, nombre].filter(Boolean).join(' · ')
   }
 
   return { calidades, obligatoria, faltaCalidad, etiquetaFrasco }
