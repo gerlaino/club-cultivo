@@ -461,6 +461,8 @@ const canManicura = computed(() =>
   planta.value?.state !== 'descartada'
 )
 const jornadaConfirmada = computed(() => planta.value?.jornada_pesaje?.estado === 'confirmado')
+// Admin y supervisor pesan desde el QR de la planta (`/p/:codigo`): eligen el frasco y queda confirmado.
+const pesaDirecto = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && !!planta.value?.codigo_qr)
 const jornadaAbiertaMia = computed(() => planta.value?.jornada_pesaje?.estado === 'borrador' && planta.value?.jornada_pesaje?.mia)
 const quitandoManicura  = ref(false)
 async function quitarDeJornada() {
@@ -685,7 +687,9 @@ onMounted(async () => {
           <span class="pd__mnc-done-val">{{ parseFloat(planta.peso_seco).toFixed(1) }}<small>g</small></span>
           <span class="pd__mnc-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso guardado</span>
           <!-- Jornada confirmada: el peso ya está en el stock; lo corrige administración. -->
-          <span v-if="jornadaConfirmada" class="pd__mnc-nota">Jornada confirmada: si está mal, lo corrige administración desde el pesaje.</span>
+          <span v-if="jornadaConfirmada" class="pd__mnc-nota">Jornada confirmada: si está mal, se corrige desde el frasco en Stock (Editar pesaje del lote).</span>
+          <!-- La pesó la manicura en su jornada: es de ella hasta que el admin la confirme. -->
+          <span v-else-if="pesaDirecto && !jornadaAbiertaMia" class="pd__mnc-nota">La pesó {{ planta.jornada_pesaje?.de || 'la manicura' }} en su jornada: se confirma en Producción → Manicura.</span>
           <template v-else>
             <button class="pd__mnc-edit" @click="editarManicura"><i class="bi bi-pencil"></i> Editar</button>
             <!-- Se pesó la que no era: sacarla de la jornada abierta sin borrar todo lo demás. -->
@@ -693,6 +697,13 @@ onMounted(async () => {
               <i class="bi bi-x-circle"></i> Quitar de la jornada
             </button>
           </template>
+        </div>
+
+        <!-- Admin/supervisor: el peso se confirma en el frasco que elija, en la misma pantalla del QR. -->
+        <div v-else-if="pesaDirecto && !jornadaAbiertaMia" class="pd__mnc-row">
+          <RouterLink :to="`/p/${planta.codigo_qr}`" class="pd__mnc-btn pd__mnc-btn--link" data-testid="pd-pesar-planta">
+            <i class="bi bi-scale"></i> Pesar y elegir frasco
+          </RouterLink>
         </div>
 
         <!-- Sin pesar o editando: input + Guardar -->
@@ -1482,6 +1493,7 @@ onMounted(async () => {
 }
 .pd__mnc-btn:hover:not(:disabled) { background: #15803d; }
 .pd__mnc-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pd__mnc-btn--link { text-decoration: none; display: inline-flex; align-items: center; gap: .35rem; }
 .pd__mnc-saved {
   font-size: .75rem; color: #15803d; font-weight: 600;
   display: flex; align-items: center; gap: .3rem;

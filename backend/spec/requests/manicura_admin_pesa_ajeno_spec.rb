@@ -26,6 +26,29 @@ RSpec.describe 'Admin y supervisor pesan un lote asignado a una manicura', type:
     lote.pesajes_manicura.borradores.find_by!(manicurador_id: ella.id)
   end
 
+  # AC (Germán, 30-oct-2026): el admin escanea una planta del lote de ella. Si ya la pesó ella, la
+  # ficha dice de quién es (la pantalla no la vuelve a ofrecer); si no, el admin la pesa directo, con
+  # su peso bruto al corte, y queda confirmada.
+  describe 'el QR del admin sobre el lote de ella' do
+    it 'la ficha de la planta dice quién la pesó' do
+      ella.update!(first_name: 'Mica')
+      ella_pesa_la_primera!
+      sign_in_as(admin)
+      get "/api/plants/#{plantas.first.id}", as: :json
+      expect(json['jornada_pesaje']).to include('estado' => 'borrador', 'mia' => false, 'de' => 'Mica')
+    end
+
+    it 'pesa directo una planta que ella no pesó, con el bruto al corte, y queda confirmada' do
+      sign_in_as(admin)
+      post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
+           params: { pesos: [{ plant_id: plantas.last.id, peso_seco_g: 30, peso_humedo_g: 55 }], calidad: 'altos' }, as: :json
+      expect(response).to have_http_status(:created), response.body
+      expect(plantas.last.reload.attributes.values_at('peso_seco', 'peso_humedo').map(&:to_f)).to eq([30.0, 55.0])
+      pp = PesadaPlanta.find_by!(plant_id: plantas.last.id)
+      expect([pp.peso_humedo_g.to_f, pp.pesaje_manicura.estado]).to eq([55.0, 'confirmado'])
+    end
+  end
+
   [:admin, :supervisor].each do |rol|
     context "como #{rol}" do
       before { sign_in_as(send(rol)) }

@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (gr) — El admin pesa con el QR de la planta y elige el frasco (30-oct)
+
+Germán: «javi va a usar el qr para registrar el peso de la planta… si es un lote en manicura que tenés
+asignado, no hay otra cosa que puedas hacer con la planta más que registrarle el peso». Antes, el QR
+llevaba al admin a la ficha de la planta; en la compu el peso caía en una jornada borrador suya que
+nadie le confirmaba, y en el teléfono la ficha no tenía dónde cargarlo.
+- **QR (`PlantaQrView`)**: admin y supervisor, con el lote en manicura y la planta sin descartar, van
+  directo al pesaje: peso seco, bruto al corte (opcional) y el frasco (`DestinoFrascos`: nuevo, uno del
+  lote o repartido, y la sede del nuevo); queda confirmado y en stock (`registrar_directo` con
+  `pesos`). Al terminar dice adónde fue cada gramo, «Escanear otra planta» en el teléfono y, si era la
+  última, que el lote pasó a Curado. Una planta que pesó la manicura dice «La pesó X en su jornada» y
+  no se vuelve a pesar; una ya confirmada dice dónde se corrige. La manicura sigue igual (su jornada).
+- **`DestinoFrascos`**: el bloque de frasco, una sola pieza para el QR y el «Registrar pesaje» del lote
+  (antes duplicado en el modal). Los frascos se nombran con su calidad («ST-26-0005 · Altos ·
+  Copones», `calidad_label` del backend), también en `RepartoFrascos`.
+- **Ficha de la planta**: en la compu, «Pesar y elegir frasco» lleva al pesaje del QR; en el teléfono,
+  «Pesar esta planta». **Ficha del lote en el teléfono**: «Registrar pesaje» (el mismo modal).
+- **Backend**: `registrar_directo` guarda el bruto al corte por planta; la ficha de una planta dice
+  quién la pesó (`jornada_pesaje.de`).
+- Arreglos chicos: «Falta 1 planta», «el peso seco queda en esa planta» con una sola marcada.
+`pesajePorQrAdmin.test.js` (10), `manicuraAdminFrascosFicha.test.js` al día, dos casos en
+`manicura_admin_pesa_ajeno_spec.rb`. Recorrido completo en la app (compu y teléfono, QR leído con
+cámara simulada): guía con simulador en claude.ai/artifact/3gk25RhFuA2brUD4s7NDjV.
+
 ## Octubre 2026 (gq) — El admin reparte el pesaje en uno o más frascos desde la ficha del lote (30-oct)
 
 Germán: «el admin, al momento de registrar el pesaje, tiene que poder dividir esa planta en uno o más

@@ -43,6 +43,19 @@
       </div>
     </div>
 
+    <!-- Lote en manicura: el admin y el supervisor pesan acá (varias plantas juntas) o con el QR de
+         cada planta. Es la misma ventana que «Registrar pesaje» en la compu: eligen el frasco. -->
+    <div v-if="puedePesar" class="mlot__cta-wrap">
+      <button class="mlot__cta" data-testid="mlot-registrar-pesaje" @click="showPesaje = true">
+        <i class="bi bi-scale"></i>
+        <div class="mlot__cta-txt">
+          <span class="mlot__cta-title">Registrar pesaje</span>
+          <span class="mlot__cta-sub">Varias plantas juntas · o escaneá el QR de cada una</span>
+        </div>
+        <i class="bi bi-chevron-right mlot__cta-arr"></i>
+      </button>
+    </div>
+
     <!-- CTA principal: diario del lote -->
     <div class="mlot__cta-wrap">
       <button class="mlot__cta" @click="abrirDiario()">
@@ -220,6 +233,7 @@
       @actualizado="loadHistorial(); recargarLote()"
     />
     <DesprenderLoteModal v-model="showDesprender" :lote="lote" @desprendido="recargarLote" />
+    <CompletarManicuraModal v-if="puedePesar" v-model="showPesaje" :lote="lote" @completado="recargarLote" />
 
     <SheetBottom v-model="showMover" :title="esPersonal ? 'Mover a otro espacio' : 'Mover a otra sala'">
       <div class="mlot__sheet-body">
@@ -329,6 +343,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 import LoteHistorialModal  from '../../components/lotes/LoteHistorialModal.vue'
 import DesprenderLoteModal from '../../components/lotes/DesprenderLoteModal.vue'
+import CompletarManicuraModal from '../../components/lotes/CompletarManicuraModal.vue'
 import { useHistorialLote } from '../../composables/useHistorialLote.js'
 import { useMoverLotes }    from '../../composables/useMoverLotes.js'
 import { useAuthStore }     from '../../stores/auth'
@@ -432,6 +447,8 @@ const plantasPagina = computed(() => {
 // ── Historial, separar y mover (antes sólo en la compu) ──
 const auth = useAuthStore()
 const esAdmin = computed(() => auth.user?.role === 'admin')
+const showPesaje = ref(false)
+const puedePesar = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && lote.value?.estado === 'en_manicura')
 const puedeOperar = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role))
 const showHistorial  = ref(false)
 const showDesprender = ref(false)

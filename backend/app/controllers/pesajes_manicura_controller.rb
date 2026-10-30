@@ -146,8 +146,11 @@ class PesajesManicuraController < ApplicationController
         if (motivo = PesajeManicura.motivo_no_se_pesa(plant, salvo: pesaje))
           raise ArgumentError, motivo
         end
-        plant.update!(peso_seco: peso)
-        pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: false)
+        # El bruto al corte es opcional (lo pide el pesaje por QR, igual que el de la manicura).
+        humedo = pp[:peso_humedo_g].to_d
+        plant.update!({ peso_seco: peso }.merge(humedo.positive? ? { peso_humedo: humedo } : {}))
+        pesaje.pesadas_plantas.create!({ plant: plant, peso_seco_g: peso, es_promedio: false }
+                                         .merge(humedo.positive? ? { peso_humedo_g: humedo } : {}))
         individuales_ids << plant.id
       end
 

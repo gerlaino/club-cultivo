@@ -165,7 +165,7 @@
         </div>
         <div>
           <div class="qr__header-club">{{ clubNombre || 'Cultivo Espacial' }}</div>
-          <div class="qr__header-sub">Pesaje de manicura</div>
+          <div class="qr__header-sub">{{ directo ? 'Pesaje · se confirma al registrar' : 'Pesaje de manicura' }}</div>
         </div>
       </div>
 
@@ -204,7 +204,7 @@
           </div>
           <div class="qr__progreso-label" :class="{ 'qr__progreso-label--ok': progreso.completado }">
             <template v-if="progreso.completado"><i class="bi bi-check-circle-fill"></i> Todas las plantas pesadas</template>
-            <template v-else>Faltan {{ progreso.total - progreso.pesadas }} plantas</template>
+            <template v-else>{{ progreso.total - progreso.pesadas === 1 ? 'Falta 1 planta' : `Faltan ${progreso.total - progreso.pesadas} plantas` }}</template>
           </div>
         </div>
 
@@ -213,14 +213,34 @@
           <div class="qr__peso-done-lbl"><i class="bi bi-slash-circle"></i> Esta planta está descartada: no se pesa.</div>
         </div>
 
+        <!-- Recién registrada por el admin: queda confirmada y en el frasco. -->
+        <div v-else-if="registrado" class="qr__peso-done qr__peso-done--registrado" data-testid="qr-registrado">
+          <div class="qr__peso-done-val">{{ Number(registrado.peso).toFixed(1) }}<small>g</small></div>
+          <div class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Registrado y en stock</div>
+          <p class="qr__peso-done-nota">{{ registrado.resumen }}</p>
+          <p v-if="registrado.loteCurado" class="qr__peso-done-nota qr__peso-done-nota--ok">
+            Era la última planta: el lote pasó a Curado.
+          </p>
+          <RouterLink v-if="puedeEscanear && !registrado.loteCurado" to="/m/scan" class="qr__btn-primary qr__btn-link" data-testid="qr-escanear-otra">
+            <i class="bi bi-qr-code-scan"></i> Escanear otra planta
+          </RouterLink>
+        </div>
+
         <!-- Ya pesada: lectura + Editar (no se pisa el peso sin querer). Si su jornada ya se
              confirmó, el peso está en el stock: lo corrige administración reajustando el pesaje. -->
         <div v-else-if="pesoAnterior && !editando" class="qr__peso-done">
           <div class="qr__peso-done-val">{{ Number(pesoAnterior).toFixed(1) }}<small>g</small></div>
           <div v-if="sinEnviar" class="qr__peso-done-lbl qr__peso-done-lbl--pendiente"><i class="bi bi-cloud-slash"></i> Sin señal: guardado en el teléfono, se manda solo</div>
           <div v-else class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso seco guardado</div>
-          <p v-if="jornadaConfirmada" class="qr__peso-done-nota">
+          <p v-if="jornadaConfirmada && directo" class="qr__peso-done-nota">
+            Ya está en el frasco. Si el peso está mal: Producción → Stock → el frasco → Editar pesaje del lote.
+          </p>
+          <p v-else-if="jornadaConfirmada" class="qr__peso-done-nota">
             La jornada ya se confirmó. Si el peso está mal, avisale a administración: lo corrige desde el pesaje.
+          </p>
+          <!-- La pesó la manicura en su jornada: es de ella hasta que se confirme. -->
+          <p v-else-if="directo && !jornadaAbiertaMia" class="qr__peso-done-nota" data-testid="qr-pesada-por-otra">
+            La pesó {{ plantaDetalle?.jornada_pesaje?.de || 'la manicura' }} en su jornada. Se confirma en Producción → Manicura.
           </p>
           <template v-else>
             <button class="qr__btn-editar" @click="editando = true"><i class="bi bi-pencil"></i> Editar</button>
@@ -249,6 +269,11 @@
             </div>
           </div>
 
+          <!-- Admin/supervisor: su peso se confirma acá mismo, así que elige el frasco (nuevo, uno del
+               lote o repartido en varios). La manicura no: el suyo va a la jornada y lo confirma el admin. -->
+          <DestinoFrascos v-if="directo" ref="destinoRef" v-model="destino" class="qr__destino"
+                          :lote-id="plantaDetalle.lote.id" :peso-total="Number(pesoInput) || 0" />
+
           <div v-if="registroError" class="qr__err-inline">
             <i class="bi bi-exclamation-triangle"></i> {{ registroError }}
           </div>
@@ -256,16 +281,19 @@
             <i class="bi bi-check-circle-fill"></i> Peso registrado correctamente
           </div>
 
-          <button class="qr__btn-primary" @click="registrarPeso" :disabled="registrando || !pesoInput">
+          <button class="qr__btn-primary" @click="registrarPeso" :disabled="registrando || !pesoInput || (directo && !destinoListo(destino, pesoInput))">
             <DsSpinner v-if="registrando" :size="16" />
             <i v-else class="bi bi-check2-circle"></i>
-            {{ pesoAnterior ? 'Actualizar peso' : 'Registrar peso' }}
+            {{ textoBoton }}
           </button>
           <button v-if="pesoAnterior" class="qr__btn-cancelar" @click="editando = false">Cancelar</button>
         </div>
 
-        <RouterLink :to="`/mnc/lotes/${plantaDetalle?.lote?.id}`" class="qr__btn-volver">
+        <RouterLink :to="directo ? `/lotes/${plantaDetalle?.lote?.id}` : `/mnc/lotes/${plantaDetalle?.lote?.id}`" class="qr__btn-volver">
           <i class="bi bi-arrow-left"></i> Volver al lote
+        </RouterLink>
+        <RouterLink v-if="directo" :to="`/plantas/${plantaDetalle?.id}`" class="qr__btn-volver qr__btn-volver--sec">
+          Ver la ficha de la planta
         </RouterLink>
 
       </div>
@@ -284,12 +312,13 @@ import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
 import { usePWA } from '../composables/usePWA'
-import { getPlant, listPlants, getPlantaPorQR, quitarPlantaPesajeManicura } from '../lib/api'
+import { getPlant, listPlants, getPlantaPorQR, quitarPlantaPesajeManicura, registrarDirectoManicura } from '../lib/api'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
 import { useConfirm } from '../composables/useConfirm'
 import { registrarPesoPlantaOffline } from '../lib/offlineApi.js'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import DestinoFrascos, { destinoVacio, destinoListo } from '../components/manicura/DestinoFrascos.vue'
 
 const route  = useRoute()
 const { registrarConJornada } = useManicuraJornada()
@@ -319,6 +348,21 @@ const registroError   = ref(null)
 const registroOk      = ref(false)
 const pesoInputRef    = ref(null)
 const progreso        = ref({ pesadas: 0, total: 0, peso_total_g: 0, completado: false })
+
+// Admin y supervisor pesan y confirman en un paso (Germán, 30-oct-2026: «si es un lote en manicura
+// no hay otra cosa que puedas hacer con la planta más que registrarle el peso»): el QR los trae acá,
+// eligen el frasco y el peso queda confirmado y en stock (`registrar_directo`). La manicura sigue con
+// su jornada, que confirma el admin.
+const directo    = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+const destino    = ref(destinoVacio())
+const destinoRef = ref(null)
+const registrado = ref(null) // { peso, resumen, loteCurado } tras registrar el admin
+// Escanear la siguiente: en el teléfono (la compu no tiene cámara para esto).
+const puedeEscanear = computed(() => isPWA() || (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 900px)').matches))
+const textoBoton = computed(() => {
+  if (!directo.value) return pesoAnterior.value ? 'Actualizar peso' : 'Registrar peso'
+  return destino.value.repartir ? `Registrar en ${destino.value.reparto.length} frascos` : 'Registrar y generar stock'
+})
 
 const progresoPorc = computed(() => {
   if (!progreso.value.total) return 0
@@ -395,8 +439,13 @@ async function resolverEstado() {
     return irADetalle()
   }
 
-  // Admin / supervisor: siempre al detalle.
+  // Admin / supervisor: con el lote en manicura, lo único que se le hace a la planta es pesarla —el
+  // QR lleva directo al pesaje—; en cualquier otra fase (o descartada), a la ficha.
   if (role === 'admin' || role === 'supervisor') {
+    if (LOTE_EN_MANICURA.includes(loteEstado) && plantState !== 'descartada') {
+      await iniciarPesaje()
+      return
+    }
     return irADetalle()
   }
 
@@ -494,10 +543,37 @@ async function cargarProgreso(detalle) {
   }
 }
 
+// Admin/supervisor: pesa esta planta y la confirma en el frasco elegido, en un paso.
+async function registrarDirecto(peso, pesoHumedo) {
+  const falta = destinoRef.value?.falta()
+  if (falta) { registroError.value = falta; return }
+  registrando.value   = true
+  registroError.value = null
+  const resumen = destinoRef.value?.resumen()
+  try {
+    const pesoPlanta = { plant_id: plantaDetalle.value.id, peso_seco_g: peso }
+    if (pesoHumedo > 0) pesoPlanta.peso_humedo_g = pesoHumedo
+    const { data } = await registrarDirectoManicura(plantaDetalle.value.lote.id, { pesos: [pesoPlanta], ...destinoRef.value?.payload() })
+    plantaDetalle.value = { ...plantaDetalle.value, peso_seco: peso,
+      jornada_pesaje: { estado: 'confirmado', mia: true } }
+    pesoAnterior.value = peso
+    editando.value     = false
+    registrado.value   = { peso, resumen: `${plantaDetalle.value.nombre}: ${resumen}.`, loteCurado: data?.lote_estado === 'curado' }
+    await cargarProgreso(plantaDetalle.value)
+  } catch (e) {
+    registroError.value = e?.response?.data?.error
+      || (e?.response ? 'No se pudo registrar el peso' : 'Sin señal: el pesaje del admin genera stock y necesita conexión. Probá de nuevo cuando vuelva.')
+  } finally {
+    registrando.value = false
+  }
+}
+
 async function registrarPeso() {
   const peso       = parseFloat(pesoInput.value)
   const pesoHumedo = parseFloat(pesoHumedoInput.value)
   if (!peso || peso <= 0) return
+  // Una planta en la jornada abierta del propio admin (de antes) se corrige en esa jornada.
+  if (directo.value && !jornadaAbiertaMia.value) return registrarDirecto(peso, pesoHumedo)
   registrando.value   = true
   registroError.value = null
   const payload = { peso_seco_g: peso }
@@ -684,6 +760,11 @@ function irAlDashboard() { router.push('/') }
 .qr__btn-quitar { margin-top: .5rem; background: none; border: 0; color: var(--c-ink-500); font-size: .82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; }
 .qr__btn-quitar:hover:not(:disabled) { color: var(--c-rust-600, #b91c1c); }
 .qr__peso-done-lbl--pendiente { color: var(--c-amber-500); }
+.qr__peso-done--registrado { border-color: var(--c-leaf-700); }
+.qr__peso-done-nota.qr__peso-done-nota--ok { color: var(--c-leaf-700); font-weight: 600; }
+.qr__destino { margin-top: .25rem; }
+.qr__btn-link { text-decoration: none; justify-content: center; margin-top: .5rem; }
+.qr__btn-volver--sec { margin-top: .25rem; opacity: .8; }
 .qr__peso-done-nota { font-size: .8rem; color: var(--c-ink-700); margin: .5rem 0 0; text-align: center; }
 /* Descartada: es un aviso, no un éxito — gris, no el verde de «guardado». */
 .qr__peso-done--bloqueada { background: var(--c-ink-100); border-color: var(--c-ink-300); color: var(--c-ink-700); }

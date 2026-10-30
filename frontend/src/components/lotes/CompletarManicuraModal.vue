@@ -61,33 +61,8 @@
 
           <!-- Admin/supervisor: el pesaje se confirma acá mismo, así que elige a qué frasco va —uno
                nuevo, uno del lote, o repartido en varios (copones en uno, bajos en otro)—. -->
-          <div v-if="confirmaSolo" class="cmm__field">
-            <label class="cmm__label" for="cmm-frasco">Frasco</label>
-            <div v-if="loadingFrascos" class="cmm__plantas-msg"><DsSpinner :size="15" /> Cargando frascos…</div>
-            <template v-else-if="repartir">
-              <RepartoFrascos ref="repartoRef" v-model="reparto" :contenedores="contenedores" :peso-total="Number(form.peso_seco_g) || 0" />
-              <button type="button" class="cmm__link" @click="repartir = false">Mandar todo a un solo frasco</button>
-            </template>
-            <template v-else>
-              <select id="cmm-frasco" v-model="form.stock_id" class="cmm__select">
-                <option :value="null">Frasco nuevo</option>
-                <option v-for="c in contenedores" :key="c.id" :value="c.id">
-                  {{ c.numero_lote_producto || `Frasco #${c.id}` }}{{ c.descripcion ? ` · ${c.descripcion}` : '' }} · {{ fmtG(c.cantidad) }} g{{ c.estado === 'agotado' || Number(c.cantidad) <= 0 ? ' · vacío, se vuelve a usar' : '' }}
-                </option>
-              </select>
-              <!-- Va a un frasco nuevo: nace con la calidad de su flor. -->
-              <CalidadFrascoNuevo v-if="!form.stock_id" v-model:calidad="form.calidad" v-model:descripcion="form.descripcion" />
-              <button type="button" class="cmm__link" @click="empezarReparto">Repartir en varios frascos (copones, bajos…)</button>
-            </template>
-          </div>
-
-          <div v-if="confirmaSolo && sedes.length" class="cmm__field">
-            <label class="cmm__label" for="cmm-sede">Sede del frasco nuevo <span class="cmm__optional">opcional</span></label>
-            <select id="cmm-sede" v-model="form.sede_id" class="cmm__select">
-              <option :value="null">— Sin asignar (se elige después en Stock) —</option>
-              <option v-for="se in sedes" :key="se.id" :value="se.id">{{ se.nombre }}</option>
-            </select>
-          </div>
+          <DestinoFrascos v-if="confirmaSolo && lote" ref="destinoRef" v-model="destino"
+                          :lote-id="lote.id" :peso-total="Number(form.peso_seco_g) || 0" />
 
           <!-- Notas: van con el pesaje que se manda a confirmar; el registro directo no las guarda. -->
           <div v-if="!confirmaSolo" class="cmm__field">
@@ -103,7 +78,8 @@
           </div>
 
           <div class="cmm__info">
-            El peso seco se reparte como promedio entre las {{ selectedIds.length || '—' }} plantas seleccionadas.
+            <template v-if="selectedIds.length === 1">El peso seco queda en esa planta.</template>
+            <template v-else>El peso seco se reparte como promedio entre las {{ selectedIds.length || '—' }} plantas seleccionadas.</template>
             <template v-if="confirmaSolo">
               El pesaje queda confirmado y el frasco aparece en Stock.
               Para el peso exacto de una planta, marcá sólo esa.
@@ -120,7 +96,7 @@
           <button class="cmm__btn-primary" :disabled="saving || !canSubmit" @click="confirmar">
             <DsSpinner v-if="saving" :size="14" />
             <CheckCheck v-else :size="14" :stroke-width="2" />
-            {{ !confirmaSolo ? 'Enviar a confirmar' : repartir ? `Registrar en ${reparto.length} frascos` : 'Registrar y generar stock' }}
+            {{ !confirmaSolo ? 'Enviar a confirmar' : destino.repartir ? `Registrar en ${destino.reparto.length} frascos` : 'Registrar y generar stock' }}
           </button>
         </div>
 
@@ -132,13 +108,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
-import { createPesajeManicura, registrarDirectoManicura, listPlants, listStocks, listSedes } from '../../lib/api.js'
+import { createPesajeManicura, registrarDirectoManicura, listPlants } from '../../lib/api.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useAuthStore } from '../../stores/auth.js'
-import CalidadFrascoNuevo from '../manicura/CalidadFrascoNuevo.vue'
-import RepartoFrascos from '../manicura/RepartoFrascos.vue'
-import { useCalidadFlor } from '../../composables/useCalidadFlor.js'
+import DestinoFrascos, { destinoVacio, destinoListo } from '../manicura/DestinoFrascos.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -146,7 +120,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'completado'])
 
-const FORM_VACIO = () => ({ peso_seco_g: null, notas: '', calidad: '', descripcion: '', stock_id: null, sede_id: null })
+const FORM_VACIO = () => ({ peso_seco_g: null, notas: '' })
 const form = ref(FORM_VACIO())
 const error  = ref(null)
 const saving = ref(false)
@@ -156,7 +130,6 @@ const saving = ref(false)
 // un lote asignado a una manicura (27-oct-2026, `Lote#pesa_manicura?`): pesa lo que ella no pesó.
 const auth = useAuthStore()
 const confirmaSolo = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
-const { faltaCalidad } = useCalidadFlor()
 
 // Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
 const { registrarConJornada } = useManicuraJornada()
@@ -164,65 +137,28 @@ const pendientes    = ref([])
 const selectedIds   = ref([])
 const loadingPlantas = ref(false)
 
-// Destino del admin (30-oct-2026, Germán: «el admin, al registrar el pesaje, tiene que poder
-// dividir esa planta en uno o más frascos, existentes o nuevos»): los frascos de flor seca del lote
-// —también los vacíos, que se reabren— y las sedes para el nuevo. Lo mismo que ofrece la pantalla
-// de la manicura (`MncLoteDetailView`); el backend valida igual (`PesajeManicura#normalizar_destinos`).
-const contenedores   = ref([])
-const sedes          = ref([])
-const loadingFrascos = ref(false)
-const repartir   = ref(false)
-const reparto    = ref([])
-const repartoRef = ref(null)
-const fmtG = v => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
-
-function empezarReparto() {
-  repartir.value = true
-  reparto.value = [
-    { stock_id: null, descripcion: 'Copones', calidad: 'altos', gramos: null },
-    { stock_id: null, descripcion: 'Bajos',   calidad: 'bajos', gramos: null },
-  ]
-}
-const repartoCuadra = computed(() => {
-  const suma = reparto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
-  return reparto.value.length > 1 && reparto.value.every(f => Number(f.gramos) > 0) &&
-    Math.abs(suma - (Number(form.value.peso_seco_g) || 0)) < 0.01
-})
+// Destino del admin (30-oct-2026): frasco nuevo, uno del lote o repartido (`DestinoFrascos`).
+const destino    = ref(destinoVacio())
+const destinoRef = ref(null)
 
 const todasSel  = computed(() => pendientes.value.length > 0 && selectedIds.value.length === pendientes.value.length)
 const canSubmit = computed(() => form.value.peso_seco_g > 0 && selectedIds.value.length > 0 &&
-  !(confirmaSolo.value && repartir.value && !repartoCuadra.value))
+  !(confirmaSolo.value && !destinoListo(destino.value, form.value.peso_seco_g)))
 
 function toggleTodas() {
   selectedIds.value = todasSel.value ? [] : pendientes.value.map(p => p.id)
 }
 
 watch(() => props.modelValue, (visible) => {
-  if (visible) { resetForm(); cargarPlantas(); if (confirmaSolo.value) cargarFrascos() }
+  if (visible) { resetForm(); cargarPlantas() }
 })
 
 function resetForm() {
   form.value = FORM_VACIO()
   pendientes.value = []
   selectedIds.value = []
-  repartir.value = false
-  reparto.value = []
+  destino.value = destinoVacio()
   error.value = null
-}
-
-async function cargarFrascos() {
-  if (!props.lote) return
-  loadingFrascos.value = true
-  try {
-    const [cs, ss] = await Promise.all([listStocks({ lote_id: props.lote.id, incluir_vacios: 1 }), listSedes()])
-    contenedores.value = (cs.data || []).filter(s => s.forma_producto === 'flor_seca')
-    sedes.value = ss.data || []
-  } catch {
-    contenedores.value = []
-    sedes.value = []
-  } finally {
-    loadingFrascos.value = false
-  }
 }
 
 async function cargarPlantas() {
@@ -251,23 +187,10 @@ async function confirmar() {
     let data
     if (confirmaSolo.value) {
       // Un frasco nuevo nace con su calidad; el backend lo rechaza igual, pero mejor decirlo antes.
-      const falta = repartir.value ? repartoRef.value?.faltaEnFrascos : (!form.value.stock_id && faltaCalidad(form.value))
+      const falta = destinoRef.value?.falta()
       if (falta) { error.value = falta; return }
       // El peso declarado se reparte como promedio entre las plantas elegidas.
-      const payload = { resto: { plant_ids: selectedIds.value, peso_total_g: form.value.peso_seco_g } }
-      if (repartir.value) {
-        payload.destinos = reparto.value.map(f => ({
-          stock_id: f.stock_id || undefined, gramos: f.gramos,
-          descripcion: f.stock_id ? undefined : (f.descripcion?.trim() || undefined),
-          calidad: f.stock_id ? undefined : (f.calidad || undefined),
-        }))
-      } else if (form.value.stock_id) {
-        payload.stock_id = form.value.stock_id
-      } else {
-        if (form.value.calidad) payload.calidad = form.value.calidad
-        if (form.value.descripcion?.trim()) payload.descripcion = form.value.descripcion.trim()
-      }
-      if (form.value.sede_id) payload.sede_id = form.value.sede_id
+      const payload = { resto: { plant_ids: selectedIds.value, peso_total_g: form.value.peso_seco_g }, ...destinoRef.value?.payload() }
       const { data: d } = await registrarDirectoManicura(props.lote.id, payload)
       data = d
     } else {
@@ -340,7 +263,6 @@ function cerrar() {
 
 /* Body */
 .cmm__body { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; overflow-y: auto; }
-.cmm__link { align-self: flex-start; background: none; border: 0; padding: 0; margin-top: .25rem; color: var(--brand-primary); font-size: var(--fs-13); font-weight: 600; cursor: pointer; text-decoration: underline; }
 
 .cmm__alert {
   padding: .6rem .875rem; border-radius: var(--r-md);

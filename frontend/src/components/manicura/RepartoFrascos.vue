@@ -4,7 +4,7 @@
       <select class="rpf__select" :value="f.stock_id ?? ''" :aria-label="`Frasco ${i + 1}`" @change="cambiar(i, { stock_id: $event.target.value ? Number($event.target.value) : null })">
         <option value="">Frasco nuevo</option>
         <option v-for="c in disponiblesPara(i)" :key="c.id" :value="c.id">
-          {{ c.numero_lote_producto || `Frasco #${c.id}` }}{{ c.descripcion ? ` · ${c.descripcion}` : '' }} · {{ num(c.cantidad) }} g{{ c.estado === 'agotado' || Number(c.cantidad) <= 0 ? ' (vacío)' : '' }}
+          {{ etiquetaFrasco(c) }} · {{ num(c.cantidad) }} g{{ c.estado === 'agotado' || Number(c.cantidad) <= 0 ? ' (vacío)' : '' }}
         </option>
       </select>
       <input v-if="!f.stock_id" class="rpf__input rpf__input--nombre" type="text" maxlength="40" placeholder="Nombre: copones, bajos…"
@@ -50,7 +50,7 @@ const props = defineProps({
   pesoTotal:    { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
-const { calidades, faltaCalidad } = useCalidadFlor()
+const { calidades, faltaCalidad, etiquetaFrasco } = useCalidadFlor()
 
 const num = v => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
 const repartido = computed(() => +props.modelValue.reduce((s, f) => s + (Number(f.gramos) || 0), 0).toFixed(2))

@@ -978,9 +978,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   peso confirmado; todo del mismo lote; el reajuste es por frasco. `pesaje_destinos` es la fuente;
   `pesajes_manicura.stock_id` queda como el primero por compatibilidad.
 - **EL ADMIN ELIGE EL FRASCO AL PESAR** (Germán, 30-oct-2026): toda pantalla donde el admin o el
-  supervisor pesa y confirma en un paso (ficha del lote, Producción → Manicura, pantalla de la
-  manicura) ofrece lo mismo: frasco nuevo, uno de flor seca del lote, o repartido en varios
-  (`RepartoFrascos`). Una pantalla de pesaje del admin que mande siempre a un frasco nuevo es un bug.
+  supervisor pesa y confirma en un paso (QR de la planta, ficha del lote, Producción → Manicura,
+  pantalla de la manicura) ofrece lo mismo: frasco nuevo, uno de flor seca del lote, o repartido en
+  varios (`DestinoFrascos`). Una pantalla de pesaje del admin que mande siempre a un frasco nuevo es un bug.
+- **EL QR DEL ADMIN ES EL PESAJE** (Germán, 30-oct-2026): con el lote en manicura, el admin y el
+  supervisor que escanean una planta van directo a pesarla (no a la ficha) y su peso queda confirmado
+  (`registrar_directo`), nunca en una jornada borrador suya. La manicura sigue con su jornada.
 - **UN FRASCO SE PUEDE SEPARAR EN VARIOS** (1-oct-2026): sólo lo guardado y libre (lo de la mesa,
   reservado o apartado se queda), algo queda en el original, y es un traslado (transferencia en
   las dos puntas): no sale nada del inventario y la trazabilidad no se corta.

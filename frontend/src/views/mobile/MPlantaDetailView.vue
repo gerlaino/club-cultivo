@@ -41,6 +41,15 @@
       </div>
     </div>
 
+    <!-- Lote en manicura: lo único que se le hace a la planta es pesarla. El admin y el supervisor
+         pesan y eligen el frasco en la pantalla del QR (queda confirmado y en stock). -->
+    <RouterLink v-if="puedePesar" :to="`/p/${planta.codigo_qr}`" class="mpd__btn-pesar" data-testid="mpd-pesar-planta">
+      <i class="bi bi-scale" aria-hidden="true"></i> Pesar esta planta
+    </RouterLink>
+    <p v-else-if="pesadaEnManicura" class="mpd__pesada">
+      <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Pesada: {{ Number(planta.peso_seco).toFixed(1) }} g
+    </p>
+
     <!-- Autocultivo: lo de todos los días, a un toque. Regar dice cuánto y con qué. -->
     <div v-if="esPersonal" class="mpd__rapidas">
       <button type="button" class="mpd__rapida mpd__rapida--principal" @click="showRiegoLote = true">
@@ -232,6 +241,7 @@ import { getPlant, getPlantActivities, getLote, addPlantFoto, updatePlant, desca
 import { estadoPlantaLabel, textoProximoPaso } from '../../lib/loteHelpers'
 import { achicarImagen } from '../../lib/imagenes.js'
 import { useToast }          from '../../composables/useToast'
+import { useAuthStore }      from '../../stores/auth'
 import { useUsoPersonal }    from '../../composables/useUsoPersonal.js'
 import { useEtiquetaPlanta } from '../../composables/useEtiquetaPlanta.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
@@ -256,6 +266,11 @@ const saludLabel = (s) => SALUD_LABEL[s] || s || '—'
 
 const planta     = ref(null)
 const lote       = ref(null)
+const auth       = useAuthStore()
+const enManicura = computed(() => planta.value?.lote?.estado === 'en_manicura' && planta.value?.state !== 'descartada')
+const pesadaEnManicura = computed(() => enManicura.value && parseFloat(planta.value?.peso_seco) > 0)
+const puedePesar = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && enManicura.value &&
+  !pesadaEnManicura.value && !!planta.value?.codigo_qr)
 const activities = ref([])
 // El diario entero: los 8 últimos de entrada, y todo lo aplicado a la planta con un toque.
 const verTodo = ref(false)
@@ -459,6 +474,8 @@ async function cosechar(conEtiqueta) {
 .mpd__rapida--principal i { color: var(--c-sky-600); }
 
 .mpd__actions { display: flex; gap: 8px; padding: 14px 16px 4px; }
+.mpd__btn-pesar { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; margin: 14px 16px 0; border-radius: 12px; background: var(--c-leaf-700); color: var(--c-slate-50); font-weight: 700; text-decoration: none; }
+.mpd__pesada { display: flex; align-items: center; gap: 6px; margin: 14px 16px 0; color: var(--c-leaf-700); font-weight: 600; }
 .mpd__btn-registrar { flex: 1; min-height: 48px; border-radius: 12px; border: 0; background: var(--c-leaf-700); color: var(--c-slate-50); font: inherit; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .mpd__btn-acciones { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--c-ink-300); background: var(--c-slate-50); font: inherit; font-weight: 600; display: flex; align-items: center; gap: 6px; }
 

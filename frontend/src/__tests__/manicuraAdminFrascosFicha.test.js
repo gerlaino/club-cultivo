@@ -38,20 +38,20 @@ async function montar(role, { calidadObligatoria = true } = {}) {
   useAuthStore().user = { id: 1, role, reglas_stock: { calidades: CALIDADES, calidad_obligatoria: calidadObligatoria } }
   const { default: M } = await import('../components/lotes/CompletarManicuraModal.vue')
   const w = mount(M, { props: { modelValue: false, lote: LOTE },
-    global: { stubs: { Teleport: true, DsSpinner: true }, directives: { modal: {} } } })
+    global: { stubs: { Teleport: { template: '<div><slot /></div>' }, DsSpinner: true }, directives: { modal: {} } } })
   await w.setProps({ modelValue: true }); await flushPromises()
-  await w.find('input[type="number"]').setValue(30)
+  await w.find('input[type="number"]').setValue(30); await flushPromises()
   return w
 }
 const enviar = w => w.find('.cmm__btn-primary')
 const fila = (w, i) => w.findAll('.rpf__fila')[i]
-const linkRepartir = w => w.findAll('.cmm__link').find(b => b.text().includes('Repartir'))
+const linkRepartir = w => w.findAll('.dfr__link').find(b => b.text().includes('Repartir'))
 
 describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
   it('ofrece frasco nuevo y los frascos de flor seca del lote, también los vacíos', async () => {
     const w = await montar('admin')
     expect(api.listStocks).toHaveBeenCalledWith({ lote_id: 5, incluir_vacios: 1 })
-    const opciones = w.find('#cmm-frasco').findAll('option').map(o => o.text())
+    const opciones = w.find('.dfr__select--frasco').findAll('option').map(o => o.text())
     expect(opciones[0]).toBe('Frasco nuevo')
     expect(opciones.some(t => t.includes('ST-70') && t.includes('Copones'))).toBe(true)
     expect(opciones.some(t => t.includes('ST-71') && t.includes('vacío, se vuelve a usar'))).toBe(true)
@@ -60,7 +60,7 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
 
   it('a un frasco existente: manda ese frasco y no pide calidad', async () => {
     const w = await montar('admin')
-    await w.find('#cmm-frasco').setValue(70)
+    await w.find('.dfr__select--frasco').setValue(70); await flushPromises()
     expect(w.find('.cfn').exists()).toBe(false)
     await enviar(w).trigger('click'); await flushPromises()
     expect(api.registrarDirectoManicura).toHaveBeenCalledWith(5, { resto: { plant_ids: [1], peso_total_g: 30 }, stock_id: 70 })
@@ -71,8 +71,8 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
     await enviar(w).trigger('click'); await flushPromises()
     expect(api.registrarDirectoManicura).not.toHaveBeenCalled()
     expect(w.find('.cmm__alert').text()).toContain('calidad')
-    await w.find('.cfn select').setValue('medios')
-    await w.find('#cmm-sede').setValue(3)
+    await w.find('.cfn select').setValue('medios'); await flushPromises()
+    await w.find('.dfr__select--sede').setValue(3); await flushPromises()
     await enviar(w).trigger('click'); await flushPromises()
     expect(api.registrarDirectoManicura).toHaveBeenCalledWith(5, { resto: { plant_ids: [1], peso_total_g: 30 }, calidad: 'medios', sede_id: 3 })
   })
@@ -80,13 +80,13 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
   for (const role of ['admin', 'supervisor']) {
     it(`como ${role}: reparte en un frasco existente y uno nuevo; el botón espera a que sume el peso`, async () => {
       const w = await montar(role)
-      await linkRepartir(w).trigger('click')
+      await linkRepartir(w).trigger('click'); await flushPromises()
       expect(w.findAll('.rpf__fila')).toHaveLength(2)
-      await fila(w, 0).find('select').setValue(70)
-      await fila(w, 0).find('.rpf__input--g').setValue(20)
+      await fila(w, 0).find('select').setValue(70); await flushPromises()
+      await fila(w, 0).find('.rpf__input--g').setValue(20); await flushPromises()
       expect(enviar(w).attributes('disabled')).toBeDefined() // 20 de 30
       expect(w.find('.rpf__total').text()).toContain('faltan 10')
-      await fila(w, 1).find('.rpf__input--g').setValue(10)
+      await fila(w, 1).find('.rpf__input--g').setValue(10); await flushPromises()
       expect(enviar(w).attributes('disabled')).toBeUndefined()
       expect(enviar(w).text()).toContain('Registrar en 2 frascos')
       await enviar(w).trigger('click'); await flushPromises()
@@ -102,19 +102,19 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
 
   it('repartido de más tampoco se manda', async () => {
     const w = await montar('admin')
-    await linkRepartir(w).trigger('click')
-    await fila(w, 0).find('.rpf__input--g').setValue(25)
-    await fila(w, 1).find('.rpf__input--g').setValue(10)
+    await linkRepartir(w).trigger('click'); await flushPromises()
+    await fila(w, 0).find('.rpf__input--g').setValue(25); await flushPromises()
+    await fila(w, 1).find('.rpf__input--g').setValue(10); await flushPromises()
     expect(w.find('.rpf__total').text()).toContain('sobran 5')
     expect(enviar(w).attributes('disabled')).toBeDefined()
   })
 
   it('un frasco nuevo del reparto sin calidad no se manda', async () => {
     const w = await montar('admin')
-    await linkRepartir(w).trigger('click')
-    await fila(w, 0).find('.rpf__select--calidad').setValue('')
-    await fila(w, 0).find('.rpf__input--g').setValue(20)
-    await fila(w, 1).find('.rpf__input--g').setValue(10)
+    await linkRepartir(w).trigger('click'); await flushPromises()
+    await fila(w, 0).find('.rpf__select--calidad').setValue(''); await flushPromises()
+    await fila(w, 0).find('.rpf__input--g').setValue(20); await flushPromises()
+    await fila(w, 1).find('.rpf__input--g').setValue(10); await flushPromises()
     await enviar(w).trigger('click'); await flushPromises()
     expect(api.registrarDirectoManicura).not.toHaveBeenCalled()
     expect(w.find('.cmm__alert').text()).toContain('calidad')
@@ -122,10 +122,10 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
 
   it('«Mandar todo a un solo frasco» vuelve al frasco único', async () => {
     const w = await montar('admin')
-    await linkRepartir(w).trigger('click')
-    await w.findAll('.cmm__link').find(b => b.text().includes('un solo frasco')).trigger('click')
+    await linkRepartir(w).trigger('click'); await flushPromises()
+    await w.findAll('.dfr__link').find(b => b.text().includes('un solo frasco')).trigger('click'); await flushPromises()
     expect(w.find('.rpf__fila').exists()).toBe(false)
-    expect(w.find('#cmm-frasco').exists()).toBe(true)
+    expect(w.find('.dfr__select--frasco').exists()).toBe(true)
   })
 
   it('el admin no ve «Notas»: el registro directo no las guarda', async () => {
@@ -136,7 +136,7 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
   it('la manicura no elige frasco: su pesaje va a confirmar', async () => {
     const w = await montar('manicura')
     expect(w.find('textarea').exists()).toBe(true)
-    expect(w.find('#cmm-frasco').exists()).toBe(false)
+    expect(w.find('.dfr__select--frasco').exists()).toBe(false)
     expect(linkRepartir(w)).toBeUndefined()
     expect(api.listStocks).not.toHaveBeenCalled()
     expect(enviar(w).text()).toContain('Enviar a confirmar')

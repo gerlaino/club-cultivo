@@ -323,7 +323,9 @@ class PlantsController < ApplicationController
   def jornada_pesaje(plant)
     pp = PesajeManicura.pesada_en_otra_jornada(plant)
     pp && { id: pp.pesaje_manicura_id, estado: pp.pesaje_manicura.estado, fecha: pp.pesaje_manicura.fecha_pesaje,
-            mia: pp.pesaje_manicura.manicurador_id == current_user.id }
+            mia: pp.pesaje_manicura.manicurador_id == current_user.id,
+            # Quién la pesó: el admin que escanea una planta pesada por la manicura ve de quién es.
+            de: pp.pesaje_manicura.manicurador&.then { |u| u.first_name.presence || u.email } }
   end
 
 
