@@ -684,7 +684,7 @@ onMounted(async () => {
         </div>
         <!-- Ya pesada: modo lectura + Editar (no se pisa un peso sin querer) -->
         <div v-if="pesoGuardado && !editandoManicura" class="pd__mnc-done">
-          <span class="pd__mnc-done-val">{{ parseFloat(planta.peso_seco).toFixed(1) }}<small>g</small></span>
+          <span class="pd__mnc-done-val">{{ parseFloat(planta.peso_seco).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}<small> g</small></span>
           <span class="pd__mnc-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso guardado</span>
           <!-- Jornada confirmada: el peso ya está en el stock; lo corrige administración. -->
           <span v-if="jornadaConfirmada" class="pd__mnc-nota">Jornada confirmada: si está mal, se corrige desde el frasco en Stock (Editar pesaje del lote).</span>

@@ -250,6 +250,8 @@ Rails.application.routes.draw do
           post   :revisar
           delete :revisar, action: :soltar_revision
           patch :reajustar_peso
+          # El admin anula su pesaje directo recién registrado (mientras nada se apoyó en él).
+          post  :deshacer
           # Sacar una planta mal elegida de la jornada ABIERTA (vuelve a quedar sin pesar).
           delete 'plantas/:plant_id', action: :quitar_planta, as: :quitar_planta
         end

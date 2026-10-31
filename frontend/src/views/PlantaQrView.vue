@@ -186,7 +186,7 @@
             <div class="qr__pesaje-plant-cod">{{ codigoQr }}</div>
           </div>
           <div v-if="pesoAnterior" class="qr__pesaje-ya">
-            <i class="bi bi-check-circle-fill"></i> {{ pesoAnterior }}g
+            <i class="bi bi-check-circle-fill"></i> {{ gramos(pesoAnterior) }} g
           </div>
         </div>
 
@@ -215,7 +215,7 @@
 
         <!-- Recién registrada por el admin: queda confirmada y en el frasco. -->
         <div v-else-if="registrado" class="qr__peso-done qr__peso-done--registrado" data-testid="qr-registrado">
-          <div class="qr__peso-done-val">{{ Number(registrado.peso).toFixed(1) }}<small>g</small></div>
+          <div class="qr__peso-done-val">{{ gramos(registrado.peso) }}<small> g</small></div>
           <div class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Registrado y en stock</div>
           <p class="qr__peso-done-nota">{{ registrado.resumen }}</p>
           <p v-if="registrado.loteCurado" class="qr__peso-done-nota qr__peso-done-nota--ok">
@@ -224,12 +224,19 @@
           <RouterLink v-if="puedeEscanear && !registrado.loteCurado" to="/m/scan" class="qr__btn-primary qr__btn-link" data-testid="qr-escanear-otra">
             <i class="bi bi-qr-code-scan"></i> Escanear otra planta
           </RouterLink>
+          <!-- Escaneó la que no era o tipeó mal: se anula mientras nada se apoyó en ese frasco. -->
+          <button type="button" class="qr__btn-deshacer" :disabled="deshaciendo" data-testid="qr-deshacer" @click="deshacer">
+            <i class="bi bi-arrow-counterclockwise"></i> {{ deshaciendo ? 'Deshaciendo…' : 'Deshacer este pesaje' }}
+          </button>
+          <div v-if="registroError" class="qr__err-inline" data-testid="qr-deshacer-error">
+            <i class="bi bi-exclamation-triangle"></i> {{ registroError }}
+          </div>
         </div>
 
         <!-- Ya pesada: lectura + Editar (no se pisa el peso sin querer). Si su jornada ya se
              confirmó, el peso está en el stock: lo corrige administración reajustando el pesaje. -->
         <div v-else-if="pesoAnterior && !editando" class="qr__peso-done">
-          <div class="qr__peso-done-val">{{ Number(pesoAnterior).toFixed(1) }}<small>g</small></div>
+          <div class="qr__peso-done-val">{{ gramos(pesoAnterior) }}<small> g</small></div>
           <div v-if="sinEnviar" class="qr__peso-done-lbl qr__peso-done-lbl--pendiente"><i class="bi bi-cloud-slash"></i> Sin señal: guardado en el teléfono, se manda solo</div>
           <div v-else class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso seco guardado</div>
           <p v-if="jornadaConfirmada && directo" class="qr__peso-done-nota">
@@ -271,7 +278,7 @@
 
           <!-- Admin/supervisor: su peso se confirma acá mismo, así que elige el frasco (nuevo, uno del
                lote o repartido en varios). La manicura no: el suyo va a la jornada y lo confirma el admin. -->
-          <DestinoFrascos v-if="directo" ref="destinoRef" v-model="destino" class="qr__destino"
+          <DestinoFrascos v-if="directo" ref="destinoRef" v-model="destino" class="qr__destino" :key="destinoKey"
                           :lote-id="plantaDetalle.lote.id" :peso-total="Number(pesoInput) || 0" />
 
           <div v-if="registroError" class="qr__err-inline">
@@ -312,7 +319,8 @@ import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
 import { usePWA } from '../composables/usePWA'
-import { getPlant, listPlants, getPlantaPorQR, quitarPlantaPesajeManicura, registrarDirectoManicura } from '../lib/api'
+import { getPlant, listPlants, getPlantaPorQR, quitarPlantaPesajeManicura, registrarDirectoManicura, deshacerPesajeManicura } from '../lib/api'
+import { leerUltimoDestino, guardarUltimoDestino, restaurarUltimoDestino } from '../composables/useUltimoDestino.js'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
 import { useConfirm } from '../composables/useConfirm'
 import { registrarPesoPlantaOffline } from '../lib/offlineApi.js'
@@ -356,7 +364,11 @@ const progreso        = ref({ pesadas: 0, total: 0, peso_total_g: 0, completado:
 const directo    = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 const destino    = ref(destinoVacio())
 const destinoRef = ref(null)
-const registrado = ref(null) // { peso, resumen, loteCurado } tras registrar el admin
+const registrado = ref(null) // { peso, resumen, loteCurado, pesajeId, previo } tras registrar el admin
+const destinoKey = ref(0)     // vuelve a pedir los frascos (después de deshacer, el nuevo ya no está)
+const deshaciendo = ref(false)
+// Los gramos como en el resto de la app: «27,5», «34».
+const gramos = v => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 // Escanear la siguiente: en el teléfono (la compu no tiene cámara para esto).
 const puedeEscanear = computed(() => isPWA() || (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 900px)').matches))
 const textoBoton = computed(() => {
@@ -466,6 +478,8 @@ async function iniciarPesaje() {
   try {
     const { data } = await getPlant(plantaInfo.value.id)
     plantaDetalle.value = data
+    // Arranca donde fue la planta anterior de este lote (si ese frasco sigue ahí).
+    if (directo.value) destino.value = leerUltimoDestino(auth.user?.id, data.lote?.id) || destinoVacio()
     await cargarProgreso(data)
     estado.value = 'manicura_pesaje'
     editando.value = false
@@ -558,13 +572,44 @@ async function registrarDirecto(peso, pesoHumedo) {
       jornada_pesaje: { estado: 'confirmado', mia: true } }
     pesoAnterior.value = peso
     editando.value     = false
-    registrado.value   = { peso, resumen: `${plantaDetalle.value.nombre}: ${resumen}.`, loteCurado: data?.lote_estado === 'curado' }
+    const previo = guardarUltimoDestino(auth.user?.id, plantaDetalle.value.lote.id, destino.value, data?.stock_ids)
+    registrado.value   = { peso, resumen: `${plantaDetalle.value.nombre}: ${resumen}.`, loteCurado: data?.lote_estado === 'curado',
+                           pesajeId: data?.pesaje_id, previo }
     await cargarProgreso(plantaDetalle.value)
   } catch (e) {
     registroError.value = e?.response?.data?.error
       || (e?.response ? 'No se pudo registrar el peso' : 'Sin señal: el pesaje del admin genera stock y necesita conexión. Probá de nuevo cuando vuelva.')
   } finally {
     registrando.value = false
+  }
+}
+
+// Anula el pesaje recién registrado: los gramos salen del frasco (el frasco que nació con él
+// desaparece), la planta vuelve a quedar sin pesar y el formulario vuelve con lo que se había cargado,
+// para corregirlo. El backend lo rechaza si ese frasco ya se usó o pasó el rato.
+async function deshacer() {
+  const r = registrado.value
+  if (!r?.pesajeId || deshaciendo.value) return
+  const ok = await confirm({
+    title: 'Deshacer este pesaje',
+    message: `Los ${gramos(r.peso)} g de ${plantaDetalle.value.nombre} salen del frasco y la planta vuelve a quedar sin pesar.`,
+    confirmText: 'Deshacer', variant: 'danger',
+  })
+  if (!ok) return
+  deshaciendo.value = true
+  registroError.value = null
+  try {
+    await deshacerPesajeManicura(plantaDetalle.value.lote.id, r.pesajeId)
+    restaurarUltimoDestino(auth.user?.id, plantaDetalle.value.lote.id, r.previo)
+    plantaDetalle.value = { ...plantaDetalle.value, peso_seco: null, peso_humedo: null, jornada_pesaje: null }
+    pesoAnterior.value = null
+    registrado.value   = null
+    destinoKey.value++
+    await cargarProgreso(plantaDetalle.value)
+  } catch (e) {
+    registroError.value = e?.response?.data?.error || 'No se pudo deshacer'
+  } finally {
+    deshaciendo.value = false
   }
 }
 
@@ -761,6 +806,8 @@ function irAlDashboard() { router.push('/') }
 .qr__btn-quitar:hover:not(:disabled) { color: var(--c-rust-600, #b91c1c); }
 .qr__peso-done-lbl--pendiente { color: var(--c-amber-500); }
 .qr__peso-done--registrado { border-color: var(--c-leaf-700); }
+.qr__btn-deshacer { margin-top: .6rem; background: none; border: 0; color: var(--c-ink-500); font-size: .85rem; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.qr__btn-deshacer:disabled { opacity: .5; cursor: default; }
 .qr__peso-done-nota.qr__peso-done-nota--ok { color: var(--c-leaf-700); font-weight: 600; }
 .qr__destino { margin-top: .25rem; }
 .qr__btn-link { text-decoration: none; justify-content: center; margin-top: .5rem; }

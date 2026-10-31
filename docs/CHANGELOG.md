@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (gs) — Pesar con el QR, sin fricción: el último frasco, deshacer, frascos con fecha y sede (31-oct)
+
+Germán, después de mirar el pesaje del admin «como admin»: «implementá del 1 al 5».
+1. **El último frasco del lote** (`useUltimoDestino`, en el navegador, por persona y lote): la planta
+   siguiente arranca donde fue la anterior —el frasco que nació con ella pasa a ser «uno que ya
+   existe»; un reparto vuelve con sus frascos y sin los gramos— y lo dice («Igual que la planta
+   anterior de este lote»). Si ese frasco ya no está entre los del lote, vuelve a «Frasco nuevo».
+   Vale para el QR y para «Registrar pesaje». Antes cada escaneo arrancaba en «Frasco nuevo»: treinta
+   elecciones por lote, y un registrar distraído creaba un frasco por planta.
+2. **Deshacer el pesaje directo** (`POST …/pesajes_manicura/:id/deshacer`, `PesajeManicura#deshacer_directo!`):
+   quien lo registró, dentro de 30 minutos (`DESHACER_DURA`) y con el frasco intacto desde entonces
+   (sin movimientos posteriores, mesa, reservas ni eventos). Sale el movimiento de producción, el
+   frasco que nació con él se borra, la planta queda sin pesar y, si era la última, el lote vuelve de
+   curado a manicura con su evento. Si ya pasó algo, lo dice: se corrige desde el frasco.
+3. **Los frascos con fecha y sede**: «Frascos de este lote» en la lista, y debajo del elegido
+   «Ingresó 30/10 · Sede Centro» (`detalleFrasco`); igual en Confirmar (compu y teléfono) y en la
+   pantalla de la manicura. Un nombre que repite la calidad no se duplica.
+4. **En el teléfono no se corta**: en el reparto cada frasco ocupa su línea; la sede dice «Sin sede
+   por ahora» con la aclaración debajo.
+5. **Los gramos con coma** («27,5 g») en el pesaje por QR y en las fichas de planta.
+`registrar_directo` devuelve `pesaje_id`; los destinos salen en el orden del reparto.
+`manicura_deshacer_spec.rb` (8, con aislamiento de tenant), `pesajePorQrAdmin.test.js` (+8),
+`manicuraAdminFrascosFicha.test.js` (+1). Guía con 16 pasos del QR del admin (incluye deshacer).
+
 ## Octubre 2026 (gr) — El admin pesa con el QR de la planta y elige el frasco (30-oct)
 
 Germán: «javi va a usar el qr para registrar el peso de la planta… si es un lote en manicura que tenés

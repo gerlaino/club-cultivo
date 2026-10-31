@@ -254,7 +254,7 @@
                   <button v-for="s in contenedores" :key="s.id" type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === s.id }" @click="adminForm.stock_id = s.id">
                     <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === s.id" class="mnl-cont__dot" /></span>
                     <Package :size="15" :stroke-width="2" />
-                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ formatG((s.cantidad || 0), 0) }} · {{ s.sede?.nombre || 'Sin asignar' }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
+                    <span class="mnl-cont__txt">{{ etiquetaFrasco(s) }} · {{ formatG((s.cantidad || 0), 0) }} · {{ detalleFrasco(s) }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
                   </button>
                 </div>
                 <CalidadFrascoNuevo v-if="!repartirDirecto && !loadingDirecto && !adminForm.stock_id"
@@ -632,7 +632,7 @@ const totalDirecto = computed(() => {
 const repartirDirecto = ref(false)
 const repartoDirecto  = ref([])
 const repartoFrascosDirecto = ref(null)
-const { faltaCalidad } = useCalidadFlor()
+const { faltaCalidad, etiquetaFrasco, detalleFrasco } = useCalidadFlor()
 const repartoDirectoCuadra = computed(() => {
   const suma = repartoDirecto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
   return repartoDirecto.value.length > 1 && repartoDirecto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - totalDirecto.value) < 0.01

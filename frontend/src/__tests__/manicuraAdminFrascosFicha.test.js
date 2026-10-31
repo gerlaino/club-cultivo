@@ -28,6 +28,7 @@ const CALIDADES = { altos: 'Altos', medios: 'Medios', bajos: 'Bajos', otro: 'Otr
 
 beforeEach(() => {
   vi.clearAllMocks(); setActivePinia(createPinia())
+  localStorage.clear() // el último frasco del lote se recuerda entre pesajes (useUltimoDestino)
   api.listPlants.mockResolvedValue({ data: [PLANTA] })
   api.listStocks.mockResolvedValue({ data: FRASCOS })
   api.listSedes.mockResolvedValue({ data: [{ id: 3, nombre: 'Centro' }] })
@@ -54,7 +55,7 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
     const opciones = w.find('.dfr__select--frasco').findAll('option').map(o => o.text())
     expect(opciones[0]).toBe('Frasco nuevo')
     expect(opciones.some(t => t.includes('ST-70') && t.includes('Copones'))).toBe(true)
-    expect(opciones.some(t => t.includes('ST-71') && t.includes('vacío, se vuelve a usar'))).toBe(true)
+    expect(opciones.some(t => t.includes('ST-71') && t.includes('vacío'))).toBe(true)
     expect(opciones.some(t => t.includes('ST-72'))).toBe(false) // no es flor seca
   })
 
@@ -131,6 +132,17 @@ describe('Registrar pesaje desde la ficha del lote: a qué frasco va', () => {
   it('el admin no ve «Notas»: el registro directo no las guarda', async () => {
     const w = await montar('admin')
     expect(w.find('textarea').exists()).toBe(false)
+  })
+
+  // AC (30-oct-2026): el siguiente pesaje del lote arranca donde fue el anterior.
+  it('el siguiente pesaje del lote arranca en el frasco del anterior', async () => {
+    api.registrarDirectoManicura.mockResolvedValue({ data: { pesaje_id: 1, stock_ids: [70] } })
+    const w = await montar('admin')
+    await w.find('.dfr__select--frasco').setValue(70); await flushPromises()
+    await enviar(w).trigger('click'); await flushPromises()
+    await w.setProps({ modelValue: false }); await w.setProps({ modelValue: true }); await flushPromises(); await flushPromises()
+    expect(w.find('.dfr__select--frasco').element.value).toBe('70')
+    expect(w.find('[data-testid="dfr-recordado"]').exists()).toBe(true)
   })
 
   it('la manicura no elige frasco: su pesaje va a confirmar', async () => {

@@ -234,13 +234,13 @@
                     <span class="apm-cont__ico apm-cont__ico--stock"><Package :size="16" :stroke-width="2" /></span>
                     <span class="apm-cont__body">
                       <span class="apm-cont__title">
-                        {{ s.numero_lote_producto || `Contenedor #${s.id}` }}
+                        {{ etiquetaFrasco(s) }}
                         <span class="apm-cont__qty">{{ formatG((s.cantidad || 0), 0) }}</span>
                       </span>
                       <span class="apm-cont__tags">
                         <span class="apm-cont__tag apm-cont__tag--gen"><Leaf :size="11" :stroke-width="2" /> {{ s.genetica_nombre || '—' }}</span>
                         <span class="apm-cont__tag">Lote {{ s.lote_codigo || s.lote?.codigo || '—' }}</span>
-                        <span class="apm-cont__tag">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}</span>
+                        <span class="apm-cont__tag">{{ detalleFrasco(s) }}</span>
                         <span v-if="s.estado === 'agotado'" class="apm-cont__tag apm-cont__tag--vacio">Vacío · se vuelve a usar</span>
                       </span>
                     </span>
@@ -357,7 +357,7 @@ const form = ref({ peso_confirmado_g: null, stock_id: null })
 const repartir = ref(false)
 const reparto  = ref([])
 const repartoFrascos = ref(null)
-const { faltaCalidad } = useCalidadFlor()
+const { faltaCalidad, etiquetaFrasco, detalleFrasco } = useCalidadFlor()
 const repartoCuadra = computed(() => {
   const suma = reparto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
   return reparto.value.length > 1 && reparto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - Number(form.value.peso_confirmado_g || 0)) < 0.01

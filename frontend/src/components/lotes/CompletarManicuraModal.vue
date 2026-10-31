@@ -113,6 +113,7 @@ import { useManicuraJornada } from '../../composables/useManicuraJornada'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useAuthStore } from '../../stores/auth.js'
 import DestinoFrascos, { destinoVacio, destinoListo } from '../manicura/DestinoFrascos.vue'
+import { leerUltimoDestino, guardarUltimoDestino } from '../../composables/useUltimoDestino.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -157,7 +158,8 @@ function resetForm() {
   form.value = FORM_VACIO()
   pendientes.value = []
   selectedIds.value = []
-  destino.value = destinoVacio()
+  // Arranca donde fue el pesaje anterior de este lote (si ese frasco sigue ahí).
+  destino.value = (confirmaSolo.value && leerUltimoDestino(auth.user?.id, props.lote?.id)) || destinoVacio()
   error.value = null
 }
 
@@ -193,6 +195,7 @@ async function confirmar() {
       const payload = { resto: { plant_ids: selectedIds.value, peso_total_g: form.value.peso_seco_g }, ...destinoRef.value?.payload() }
       const { data: d } = await registrarDirectoManicura(props.lote.id, payload)
       data = d
+      guardarUltimoDestino(auth.user?.id, props.lote.id, destino.value, d?.stock_ids)
     } else {
       // Con una jornada enviada sin confirmar, pregunta si seguir esa o empezar otra (como el
       // resto de las pantallas de pesaje) en vez de mostrar un error.

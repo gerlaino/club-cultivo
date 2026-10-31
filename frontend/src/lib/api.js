@@ -1012,6 +1012,8 @@ export const listPesajesManicura      = (loteId)           => api.get(`/lotes/${
 export const getPesajeManicura        = (loteId, id)       => api.get(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const createPesajeManicura     = (loteId, payload = {}) => api.post(`/lotes/${loteId}/pesajes_manicura`, payload)
 export const registrarDirectoManicura = (loteId, payload = {}) => api.post(`/lotes/${loteId}/pesajes_manicura/registrar_directo`, payload)
+// El admin anula su pesaje directo recién registrado (mientras nada se apoyó en él).
+export const deshacerPesajeManicura = (loteId, id) => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/deshacer`)
 export const enviarPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/enviar`)
 export const deletePesajeManicura      = (loteId, id)       => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const reabrirPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/reabrir`)

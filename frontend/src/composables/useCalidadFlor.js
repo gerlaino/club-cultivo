@@ -27,5 +27,12 @@ export function useCalidadFlor() {
     return [c?.numero_lote_producto || `Frasco #${c?.id}`, c?.calidad_label, nombre].filter(Boolean).join(' · ')
   }
 
-  return { calidades, obligatoria, faltaCalidad, etiquetaFrasco }
+  // Lo que no entra en la línea del selector: cuándo nació y dónde está («Ingresó 30/10 · Sede Centro»).
+  function detalleFrasco(c) {
+    const f = c?.created_at ? new Date(c.created_at) : null
+    const fecha = f && !isNaN(f) ? `Ingresó ${f.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}` : null
+    return [fecha, c?.sede?.nombre || 'Sin sede'].filter(Boolean).join(' · ')
+  }
+
+  return { calidades, obligatoria, faltaCalidad, etiquetaFrasco, detalleFrasco }
 }

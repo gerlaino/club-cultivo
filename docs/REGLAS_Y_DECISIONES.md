@@ -984,6 +984,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **EL QR DEL ADMIN ES EL PESAJE** (Germán, 30-oct-2026): con el lote en manicura, el admin y el
   supervisor que escanean una planta van directo a pesarla (no a la ficha) y su peso queda confirmado
   (`registrar_directo`), nunca en una jornada borrador suya. La manicura sigue con su jornada.
+- **DESHACER SÓLO LO INTACTO** (Germán, 31-oct-2026): el pesaje directo se deshace (como si no hubiera
+  existido) sólo por quien lo registró, dentro de `PesajeManicura::DESHACER_DURA` y si el frasco no se
+  movió desde entonces. Todo lo demás se corrige desde el frasco (Editar pesaje del lote), que deja rastro.
+- **EL ÚLTIMO FRASCO SE RECUERDA, Y SE DICE**: el pesaje siguiente del lote arranca donde fue el
+  anterior (`useUltimoDestino`), siempre con el aviso a la vista; un frasco recordado que ya no está
+  vuelve a «Frasco nuevo».
 - **UN FRASCO SE PUEDE SEPARAR EN VARIOS** (1-oct-2026): sólo lo guardado y libre (lo de la mesa,
   reservado o apartado se queda), algo queda en el original, y es un traslado (transferencia en
   las dos puntas): no sale nada del inventario y la trazabilidad no se corta.

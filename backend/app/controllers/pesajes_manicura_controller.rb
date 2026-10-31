@@ -14,7 +14,7 @@ class PesajesManicuraController < ApplicationController
 
   before_action -> { require_feature!(:cultivo) }
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso, :quitar_planta, :revisar, :soltar_revision]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso, :quitar_planta, :revisar, :soltar_revision, :deshacer]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Trabajo de equipo: todos los que pueden ver el lote ven TODOS los pesajes (para
@@ -114,6 +114,19 @@ class PesajesManicuraController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # POST /lotes/:lote_id/pesajes_manicura/:id/deshacer
+  # El admin/supervisor anula el pesaje directo que acaba de registrar (planta equivocada, peso mal
+  # tipeado), mientras nada se apoyó en él (`PesajeManicura#motivo_no_se_deshace`).
+  def deshacer
+    unless current_user.admin? || current_user.supervisor?
+      return render json: { error: 'Solo admin o supervisor' }, status: :forbidden
+    end
+    @pesaje.deshacer_directo!(usuario: current_user)
+    render json: { ok: true, lote_estado: @lote.reload.estado }
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   # POST /lotes/:lote_id/pesajes_manicura/registrar_directo
   # Atajo del admin/supervisor (última palabra): pesa Y confirma en un solo paso, sin pasar
   # por la cola de aprobación. Acepta pesos individuales por planta y/o una carga conjunta
@@ -169,7 +182,7 @@ class PesajesManicuraController < ApplicationController
       # con un solo frasco (`resolver_stock_destino!`).
       frascos.each { |st| asignar_sede_si_falta!(st) } if destinos
       @lote.reload.check_and_finalize_manicura!(finalizador: current_user)
-      render json: { stock_id: frascos.first&.id, stock_ids: frascos.map(&:id), lote_estado: @lote.reload.estado }, status: :created
+      render json: { pesaje_id: pesaje.id, stock_id: frascos.first&.id, stock_ids: frascos.map(&:id), lote_estado: @lote.reload.estado }, status: :created
     end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta o contenedor no encontrado' }, status: :not_found

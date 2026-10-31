@@ -3,10 +3,13 @@
     <div v-for="(f, i) in modelValue" :key="i" class="rpf__fila">
       <select class="rpf__select" :value="f.stock_id ?? ''" :aria-label="`Frasco ${i + 1}`" @change="cambiar(i, { stock_id: $event.target.value ? Number($event.target.value) : null })">
         <option value="">Frasco nuevo</option>
-        <option v-for="c in disponiblesPara(i)" :key="c.id" :value="c.id">
-          {{ etiquetaFrasco(c) }} · {{ num(c.cantidad) }} g{{ c.estado === 'agotado' || Number(c.cantidad) <= 0 ? ' (vacío)' : '' }}
-        </option>
+        <optgroup v-if="disponiblesPara(i).length" label="Frascos de este lote">
+          <option v-for="c in disponiblesPara(i)" :key="c.id" :value="c.id">
+            {{ etiquetaFrasco(c) }} · {{ num(c.cantidad) }} g{{ c.estado === 'agotado' || Number(c.cantidad) <= 0 ? ' · vacío' : '' }}
+          </option>
+        </optgroup>
       </select>
+      <span v-if="f.stock_id && frasco(f.stock_id)" class="rpf__det">{{ detalleFrasco(frasco(f.stock_id)) }}</span>
       <input v-if="!f.stock_id" class="rpf__input rpf__input--nombre" type="text" maxlength="40" placeholder="Nombre: copones, bajos…"
              :value="f.descripcion || ''" :aria-label="`Nombre del frasco ${i + 1}`" @input="cambiar(i, { descripcion: $event.target.value })" />
       <!-- El frasco nuevo nace con la calidad de su flor (`Stock::CALIDADES`). -->
@@ -50,7 +53,8 @@ const props = defineProps({
   pesoTotal:    { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
-const { calidades, faltaCalidad, etiquetaFrasco } = useCalidadFlor()
+const { calidades, faltaCalidad, etiquetaFrasco, detalleFrasco } = useCalidadFlor()
+const frasco = id => props.contenedores.find(c => c.id === id)
 
 const num = v => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
 const repartido = computed(() => +props.modelValue.reduce((s, f) => s + (Number(f.gramos) || 0), 0).toFixed(2))
@@ -84,6 +88,11 @@ defineExpose({ cuadra, faltaEnFrascos })
 .rpf__quitar { background: none; border: 0; color: var(--c-ink-500); font-size: 1.1rem; cursor: pointer; padding: 0 .3rem; }
 .rpf__link { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
 .rpf__select--calidad { flex: 0 1 120px; }
+.rpf__det { flex: 1 1 100%; order: 1; font-size: .75rem; color: var(--c-ink-500); }
+/* En el teléfono el frasco ocupa su línea entera: cortado no se sabía cuánto tenía. */
+@media (max-width: 600px) {
+  .rpf__select:not(.rpf__select--calidad) { flex-basis: 100%; }
+}
 .rpf__falta { font-size: .8rem; color: var(--c-amber-500); }
 .rpf__total { font-size: .82rem; font-weight: 600; color: var(--c-ink-700); }
 .rpf__total--ok { color: var(--c-leaf-700); }

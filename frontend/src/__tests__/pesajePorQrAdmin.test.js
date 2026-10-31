@@ -10,7 +10,7 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const api = {
   getPlantaPorQR: vi.fn(), getPlant: vi.fn(), listPlants: vi.fn(), quitarPlantaPesajeManicura: vi.fn(),
-  registrarDirectoManicura: vi.fn(), listStocks: vi.fn(), listSedes: vi.fn(),
+  registrarDirectoManicura: vi.fn(), listStocks: vi.fn(), listSedes: vi.fn(), deshacerPesajeManicura: vi.fn(),
 }
 vi.mock('../lib/api', () => api)
 vi.mock('../lib/api.js', () => api)
@@ -29,10 +29,12 @@ vi.mock('vue-router', () => ({
 
 const LOTE = { id: 5, codigo: 'L-26-101', estado: 'en_manicura' }
 const PLANTA = { id: 11, nombre: '101-P1', codigo_qr: 'QR-P1', state: 'secado', peso_seco: null, lote: LOTE, genetica: { nombre: 'Gorilla Glue' } }
-const FRASCOS = [{ id: 70, forma_producto: 'flor_seca', cantidad: 52, numero_lote_producto: 'ST-26-0005', calidad: 'altos', calidad_label: 'Altos' }]
+const FRASCOS = [{ id: 70, forma_producto: 'flor_seca', cantidad: 52, numero_lote_producto: 'ST-26-0005', calidad: 'altos', calidad_label: 'Altos',
+                  created_at: '2026-10-30T15:00:00-03:00', sede: { id: 3, nombre: 'Sede Centro' } }]
 
 beforeEach(() => {
   vi.clearAllMocks(); setActivePinia(createPinia())
+  localStorage.clear() // el último frasco del lote se recuerda entre pesajes (useUltimoDestino)
   // jsdom no trae matchMedia (la compu, sin PWA).
   window.matchMedia = q => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })
   api.getPlantaPorQR.mockResolvedValue({ data: { id: 11, nombre: '101-P1', estado: 'secado', lote: LOTE } })
@@ -40,7 +42,7 @@ beforeEach(() => {
   api.listPlants.mockResolvedValue({ data: [PLANTA, { id: 12, nombre: '101-P2', state: 'secado', peso_seco: null }] })
   api.listStocks.mockResolvedValue({ data: FRASCOS })
   api.listSedes.mockResolvedValue({ data: [{ id: 3, nombre: 'Sede Centro' }] })
-  api.registrarDirectoManicura.mockResolvedValue({ data: { stock_ids: [70, 71], lote_estado: 'en_manicura' } })
+  api.registrarDirectoManicura.mockResolvedValue({ data: { pesaje_id: 900, stock_ids: [70, 71], lote_estado: 'en_manicura' } })
 })
 
 async function escanear(role, { qr, planta } = {}) {
@@ -151,5 +153,104 @@ describe('El QR de una planta en manicura, para la manicura', () => {
     await boton(w).trigger('click'); await flushPromises()
     expect(registrarPesoPlantaOffline).toHaveBeenCalledWith(11, { peso_seco_g: 31 })
     expect(api.registrarDirectoManicura).not.toHaveBeenCalled()
+  })
+})
+
+
+// AC (Germán, 30-oct-2026, «implementá del 1 al 5»): 1) cada escaneo arranca donde fue la planta
+// anterior de ese lote; 2) «Deshacer» el pesaje recién registrado; 3) los frascos dicen cuándo
+// nacieron y dónde están; 5) los gramos con coma, como el resto de la app.
+describe('Pesar planta por planta con el QR: lo que facilita y lo que corrige', () => {
+  async function registrarA70(w, gramos = 30) {
+    await pesoSeco(w).setValue(gramos); await flushPromises()
+    await w.find('.dfr__select--frasco').setValue(70); await flushPromises()
+    await boton(w).trigger('click'); await flushPromises()
+  }
+
+  it('la planta siguiente del lote arranca en el frasco de la anterior, y lo dice', async () => {
+    let w = await escanear('admin')
+    expect(w.find('[data-testid="dfr-recordado"]').exists()).toBe(false) // la primera arranca en «Frasco nuevo»
+    await registrarA70(w)
+    w.unmount()
+
+    w = await escanear('admin', { planta: { ...PLANTA, id: 12, nombre: '101-P2' } })
+    expect(w.find('.dfr__select--frasco').element.value).toBe('70')
+    expect(w.find('[data-testid="dfr-recordado"]').text()).toContain('Igual que la planta anterior')
+    await pesoSeco(w).setValue(25); await flushPromises()
+    await boton(w).trigger('click'); await flushPromises()
+    expect(api.registrarDirectoManicura).toHaveBeenLastCalledWith(5, { pesos: [{ plant_id: 12, peso_seco_g: 25 }], stock_id: 70 })
+  })
+
+  it('un frasco nuevo pasa a ser «el de la planta anterior» con el número que le dio el backend', async () => {
+    api.registrarDirectoManicura.mockResolvedValue({ data: { pesaje_id: 901, stock_ids: [70], lote_estado: 'en_manicura' } })
+    let w = await escanear('admin')
+    await pesoSeco(w).setValue(30); await flushPromises()
+    await w.find('.cfn select').setValue('altos'); await flushPromises()
+    await boton(w).trigger('click'); await flushPromises()
+    w.unmount()
+    w = await escanear('admin', { planta: { ...PLANTA, id: 12, nombre: '101-P2' } })
+    expect(w.find('.dfr__select--frasco').element.value).toBe('70')
+  })
+
+  it('un reparto se recuerda con sus frascos y sin los gramos', async () => {
+    api.listStocks.mockResolvedValue({ data: [...FRASCOS, { id: 71, forma_producto: 'flor_seca', cantidad: 10, numero_lote_producto: 'ST-26-0006', calidad: 'bajos', calidad_label: 'Bajos' }] })
+    let w = await escanear('admin')
+    await pesoSeco(w).setValue(30); await flushPromises()
+    await w.findAll('.dfr__link').find(b => b.text().includes('Repartir')).trigger('click'); await flushPromises()
+    await fila(w, 0).find('select').setValue(70); await flushPromises()
+    await fila(w, 0).find('.rpf__input--g').setValue(20); await flushPromises()
+    await fila(w, 1).find('.rpf__input--g').setValue(10); await flushPromises()
+    await boton(w).trigger('click'); await flushPromises()
+    w.unmount()
+    w = await escanear('admin', { planta: { ...PLANTA, id: 12, nombre: '101-P2' } })
+    expect(w.findAll('.rpf__fila').map(f => f.find('select').element.value)).toEqual(['70', '71'])
+    expect(w.findAll('.rpf__input--g').map(i => i.element.value)).toEqual(['', ''])
+  })
+
+  it('si el frasco recordado ya no está entre los del lote, vuelve a «Frasco nuevo»', async () => {
+    let w = await escanear('admin')
+    await registrarA70(w)
+    w.unmount()
+    api.listStocks.mockResolvedValue({ data: [] })
+    w = await escanear('admin', { planta: { ...PLANTA, id: 12, nombre: '101-P2' } })
+    expect(w.find('.dfr__select--frasco').element.value).toBe('')
+    expect(w.find('[data-testid="dfr-recordado"]').exists()).toBe(false)
+  })
+
+  it('el frasco elegido dice cuándo nació y dónde está', async () => {
+    const w = await escanear('admin')
+    await w.find('.dfr__select--frasco').setValue(70); await flushPromises()
+    expect(w.find('[data-testid="dfr-detalle"]').text()).toBe('Ingresó 30/10 · Sede Centro')
+  })
+
+  it('«Deshacer»: anula el pesaje, la planta vuelve a quedar sin pesar y el formulario vuelve con lo cargado', async () => {
+    api.deshacerPesajeManicura.mockResolvedValue({ data: { ok: true, lote_estado: 'en_manicura' } })
+    const w = await escanear('admin')
+    await registrarA70(w, 27.5)
+    expect(w.find('[data-testid="qr-registrado"]').text()).toContain('27,5') // con coma
+    await w.find('[data-testid="qr-deshacer"]').trigger('click'); await flushPromises()
+    expect(api.deshacerPesajeManicura).toHaveBeenCalledWith(5, 900)
+    expect(w.find('[data-testid="qr-registrado"]').exists()).toBe(false)
+    expect(w.find('.qr__peso-form').exists()).toBe(true)
+    expect(pesoSeco(w).element.value).toBe('27.5')
+  })
+
+  it('«Deshacer» rechazado (el frasco ya se usó): dice por qué y el pesaje sigue registrado', async () => {
+    api.deshacerPesajeManicura.mockRejectedValue({ response: { data: { error: 'El frasco ST-26-0005 ya se usó: corregilo desde el frasco (Editar pesaje del lote)' } } })
+    const w = await escanear('admin')
+    await registrarA70(w)
+    await w.find('[data-testid="qr-deshacer"]').trigger('click'); await flushPromises()
+    expect(w.find('[data-testid="qr-registrado"]').exists()).toBe(true)
+    expect(w.find('[data-testid="qr-deshacer-error"]').text()).toContain('ya se usó')
+  })
+
+  it('después de deshacer, la planta siguiente no arranca en un frasco que nació con lo deshecho', async () => {
+    api.deshacerPesajeManicura.mockResolvedValue({ data: { ok: true } })
+    let w = await escanear('admin')
+    await registrarA70(w)
+    await w.find('[data-testid="qr-deshacer"]').trigger('click'); await flushPromises()
+    w.unmount()
+    w = await escanear('admin', { planta: { ...PLANTA, id: 12, nombre: '101-P2' } })
+    expect(w.find('.dfr__select--frasco').element.value).toBe('')
   })
 })

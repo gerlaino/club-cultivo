@@ -47,7 +47,7 @@
       <i class="bi bi-scale" aria-hidden="true"></i> Pesar esta planta
     </RouterLink>
     <p v-else-if="pesadaEnManicura" class="mpd__pesada">
-      <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Pesada: {{ Number(planta.peso_seco).toFixed(1) }} g
+      <i class="bi bi-check-circle-fill" aria-hidden="true"></i> Pesada: {{ Number(planta.peso_seco).toLocaleString('es-AR', { maximumFractionDigits: 1 }) }} g
     </p>
 
     <!-- Autocultivo: lo de todos los días, a un toque. Regar dice cuánto y con qué. -->

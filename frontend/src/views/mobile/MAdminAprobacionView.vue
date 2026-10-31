@@ -98,8 +98,8 @@
                         :class="{ 'maa__cont--sel': stockDestino === s.id }" @click="stockDestino = s.id">
                   <span class="maa__cont-radio"><span v-if="stockDestino === s.id" class="maa__cont-dot"></span></span>
                   <span class="maa__cont-body">
-                    <span class="maa__cont-title">{{ s.numero_lote_producto || `Frasco #${s.id}` }} <b>{{ formatG(Number(s.cantidad || 0), 0) }}</b></span>
-                    <span class="maa__cont-meta">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}<span v-if="s.fecha_elaboracion"> · del {{ fecha(s.fecha_elaboracion) }}</span><span v-if="s.estado === 'agotado'" class="maa__cont-vacio"> · vacío, se vuelve a usar</span></span>
+                    <span class="maa__cont-title">{{ etiquetaFrasco(s) }} <b>{{ formatG(Number(s.cantidad || 0), 0) }}</b></span>
+                    <span class="maa__cont-meta">{{ detalleFrasco(s) }}<span v-if="s.estado === 'agotado'" class="maa__cont-vacio"> · vacío, se vuelve a usar</span></span>
                   </span>
                 </button>
               </div>
@@ -155,7 +155,7 @@ const cargandoContenedores = ref(false)
 const stockDestino        = ref(null)   // null = frasco nuevo
 const frascoNuevo         = ref({ calidad: '', descripcion: '' })
 const repartoFrascos      = ref(null)
-const { faltaCalidad } = useCalidadFlor()
+const { faltaCalidad, etiquetaFrasco, detalleFrasco } = useCalidadFlor()
 // Reparto en varios frascos (copones, bajos…): filas { stock_id | null = nuevo, descripcion, gramos }.
 const repartir = ref(false)
 const reparto  = ref([])
@@ -170,8 +170,6 @@ function empezarReparto() {
     { stock_id: null, descripcion: 'Bajos', calidad: 'bajos', gramos: null },
   ]
 }
-
-const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
 
 async function cargarContenedores(loteId) {
   cargandoContenedores.value = true

@@ -293,10 +293,73 @@ class PesajeManicura < ApplicationRecord
     self
   end
 
+  # DESHACER EL PESAJE DIRECTO DEL ADMIN (Germán, 30-oct-2026): escaneó la planta equivocada o tipeó
+  # 340 en vez de 34. Quien lo registró lo anula como si no hubiera existido —sale del frasco su
+  # movimiento de producción, el frasco nuevo que nació con él se borra, la planta vuelve a quedar sin
+  # pesar y, si era la última, el lote vuelve de curado a manicura—, pero SÓLO mientras nada se apoyó
+  # en él: dentro de `DESHACER_DURA` y con el frasco intacto desde entonces (sin dispensa, ajuste,
+  # separación, otro pesaje, mesa, reserva ni evento). Si ya pasó algo, se corrige desde el frasco
+  # (Editar pesaje del lote), que deja rastro.
+  DESHACER_DURA = 30.minutes
+
+  def motivo_no_se_deshace(usuario)
+    return 'Sólo se deshace un pesaje confirmado' unless confirmado?
+    return 'Sólo lo deshace quien lo registró' unless manicurador_id == usuario&.id && confirmado_por_id == usuario&.id
+    return "Pasaron más de #{DESHACER_DURA.in_minutes.to_i} minutos: corregilo desde el frasco (Editar pesaje del lote)" if confirmado_at.nil? || confirmado_at < DESHACER_DURA.ago
+    return 'El lote ya no está en manicura ni en curado' unless %w[en_manicura curado].include?(lote.estado)
+
+    destinos_efectivos!.each do |d|
+      f = d.stock
+      if f.stock_movimientos.where('created_at > ?', confirmado_at).exists? || f.cantidad.to_d < d.gramos.to_d ||
+         f.cantidad.to_d - f.gramos_reservados.to_d < d.gramos.to_d
+        return "El frasco #{f.numero_lote_producto} ya se usó: corregilo desde el frasco (Editar pesaje del lote)"
+      end
+    end
+    nil
+  end
+
+  def deshacer_directo!(usuario:)
+    with_lock do
+      motivo = motivo_no_se_deshace(usuario)
+      raise ArgumentError, motivo if motivo
+
+      destinos_efectivos!.each do |d|
+        f = d.stock
+        f.lock!
+        mov = f.stock_movimientos.where(tipo: 'produccion', gramos: d.gramos, usuario_id: usuario.id)
+               .where('created_at >= ?', created_at).order(:created_at).last
+        mov&.destroy!
+        if f.created_at >= created_at && f.cantidad_inicial.to_d == d.gramos.to_d
+          f.update_columns(cantidad: 0, cantidad_inicial: 0)
+          f.destroy! # el frasco nació con este pesaje: no queda nada de él
+        else
+          f.update!(cantidad: f.cantidad.to_d - d.gramos.to_d, cantidad_inicial: f.cantidad_inicial.to_d - d.gramos.to_d)
+        end
+      end
+      plantas = pesadas_plantas.includes(:plant).map(&:plant)
+      pesadas_plantas.each(&:destroy!)
+      plantas.each { |pl| pl.update!(peso_seco: nil, peso_humedo: nil) }
+      destinos.destroy_all
+
+      l = lote.reload
+      if l.estado == 'curado'
+        # Volvía de manicura por este pesaje: vuelve, con quien la tenía (la manicura, si pesó alguien
+        # más del lote; si no, el que deshace).
+        otro = l.pesajes_manicura.where.not(id: id).where.not(manicurador_id: usuario.id).order(:created_at).last&.manicurador
+        l.update!(estado: 'en_manicura', rendimiento_real_g: nil, manicurador: otro || usuario)
+        l.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'curado', estado_nuevo: 'en_manicura',
+                               descripcion: "Se deshizo un pesaje: el lote vuelve a manicura", user: usuario,
+                               club: club, registrado_en: Time.current)
+      end
+      destroy!
+    end
+    true
+  end
+
   # Los destinos del pesaje. Un pesaje viejo (confirmado antes del 1-oct-2026) no tiene filas: su
   # único destino es `stock` con todo el peso, y se escribe la fila la primera vez que hace falta.
   def destinos_efectivos!
-    return destinos.includes(:stock).to_a if destinos.exists? || stock.nil?
+    return destinos.includes(:stock).order(:id).to_a if destinos.exists? || stock.nil?
 
     [destinos.create!(club: club, stock: stock, gramos: peso_confirmado_g.to_d)]
   end
